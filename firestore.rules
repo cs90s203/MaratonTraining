@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Email addresses aren't case-sensitive, but `in [...]` is an exact string match — so
+    // lower() the token before comparing, and keep every address below lowercase. Without
+    // this, a token carrying different casing than the list is rejected as a stranger.
+    // (This bit babylog once; same normalization must happen on the client too.)
+    function authEmail() {
+      return request.auth != null ? request.auth.token.email.lower() : '';
+    }
+
+    // 誰能用這個 App。加人 = 在這裡加一行小寫 email，然後在 Firebase 主控台重新發布規則。
+    function isMember() {
+      return request.auth != null &&
+        authEmail() in [
+          'cs90s203@gmail.com'
+          // 伴侶 / 教練 / 其他共用者的 Google 帳號填在這裡，全部小寫，逗號分隔
+        ];
+    }
+
+    function isSelf(userId) {
+      return isMember() && request.auth.uid == userId;
+    }
+
+    // 顯示名稱等個人設定：白名單內都看得到（總覽頁要顯示別人的名字），只有本人能改。
+    match /users/{userId}/profile/{doc} {
+      allow read:  if isMember();
+      allow write: if isSelf(userId);
+    }
+
+    // 完成紀錄（status / 實際時長 / 距離）：白名單內都看得到，只有本人能寫。
+    // 規格書原本寫「唯讀,不能改別人的紀錄」——那句話要成立，靠的是這一行，不是 UI 沒放按鈕。
+    match /users/{userId}/entries/{date} {
+      allow read:  if isMember();
+      allow write: if isSelf(userId);
+    }
+
+    // 身體狀況（漏尿 / 疼痛 / 過度疲勞 / 自由文字）：只有本人讀得到。
+    // 白名單內的其他人——包含伴侶與教練——一律讀不到。要分享的話是改這一行，
+    // 不是在前端多顯示一個欄位。決策紀錄第 2 條。
+    match /users/{userId}/private/{date} {
+      allow read, write: if isSelf(userId);
+    }
+
+    // 其餘一律拒絕。
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
