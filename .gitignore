@@ -1,0 +1,18 @@
+.DS_Store
+__pycache__/
+*.pyc
+node_modules/
+build/
+dist/
+
+# --- 隱私邊界（不要拿掉，理由見 README「什麼東西不進 repo」）---
+# 這個 repo 是 public（GitHub Pages 免費版的必要條件），所以裡面的東西等於公開。
+# 原始訓練計畫含個人產後健康狀況（產後週數、配速、漏尿/腹直肌分離的討論），
+# 只留在本機。repo 裡放的是從它推導出來、不含個人狀況的課表 JSON。
+docs/計畫原文/
+
+# Firebase 服務帳號金鑰（firebaseConfig 是公開值、可以 commit；service account 不行）
+*-firebase-adminsdk-*.json
+.env
+.env.*
+!.env.example

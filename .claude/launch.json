@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "MarathonTrain",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["/Users/mick/Documents/Projects/MarathonTrain/tools/serve.py", "8772"],
+      "port": 8772
+    }
+  ]
+}
