@@ -11,6 +11,10 @@ dist/
 # 只留在本機。repo 裡放的是從它推導出來、不含個人狀況的課表 JSON。
 docs/計畫原文/
 
+# 實際發布的 Firestore 規則，含共用者的真實 email（第三人的個資，不要公開）。
+# repo 裡的 firestore.rules 是範本；這一份才是貼進 Firebase Console 的內容。
+firestore.rules.local
+
 # Firebase 服務帳號金鑰（firebaseConfig 是公開值、可以 commit；service account 不行）
 *-firebase-adminsdk-*.json
 .env
