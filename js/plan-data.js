@@ -123,7 +123,15 @@ const PlanData = (() => {
     get videos() { return videos; },
     get workouts() { return workouts; },
     get users() { return users; },
-    videoById, workoutById, userById,
+    // ⚠️ 一定要是 getter，不能用 shorthand property。videoById/workoutById/userById
+    // 在模組頂端先宣告成空物件，load() 之後才重新指派——如果這裡直接寫
+    // `videoById, workoutById, userById,`，這個回傳物件在 IIFE 執行的那一刻
+    // （load() 還沒跑）就把值凍結成初始的空物件了，之後 load() 重新指派本地變數
+    // 完全不會反映到這個已經回傳出去的物件上。三個查找表因此永遠是空的，
+    // 每一次 PlanData.videoById[x] 都靜默回傳 undefined，不會拋錯，很難發現。
+    get videoById() { return videoById; },
+    get workoutById() { return workoutById; },
+    get userById() { return userById; },
     parseLocalDate, dayKey, dateForWeekDay, keyForWeekDay, today, locateToday,
     isExpired, daysUntilRace, phaseForWeek, week, day, weekdayLabel,
     fmtRange, fmtItemMeta,
