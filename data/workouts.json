@@ -1,5 +1,5 @@
 {
-  "_note": "重訓與核心的動作清單。原規格書的 day schema 沒有欄位放這些，轉檔時整個第五節會蒸發——週三打開 App 只會看到「重量訓練 A、30 分鐘」，而重訓佔 26 週裡的 52 天。reps 用 {min,max}；perSide 表示每邊各做該組數。",
+  "_note": "重訓與核心的動作清單。原規格書的 day schema 沒有欄位放這些，轉檔時整個第五節會蒸發——週三打開 App 只會看到「重量訓練 A、30 分鐘」，而重訓佔 26 週裡的 52 天。reps 與 holdSeconds 都用 {min,max}；perSide 表示每邊各做該組數。 derived:true 表示這份清單的內容原文沒給、是推導的。",
   "workouts": [
     {
       "id": "pelvic-core-basic",
@@ -7,11 +7,44 @@
       "phase": "Phase 1",
       "loadGuidance": "全程徒手。重點是「連結」不是「燃燒」——做到有感覺就停，不要追痠。",
       "exercises": [
-        { "name": "骨盆底啟動呼吸（仰臥）", "sets": 1, "holdSeconds": 60, "notes": "吸氣放鬆、吐氣輕輕上提，不要憋氣。" },
-        { "name": "橋式呼吸 Glute Bridge with breath", "sets": 2, "reps": { "min": 10, "max": 12 } },
-        { "name": "死蟲式 Dead Bug", "sets": 2, "reps": { "min": 8, "max": 10 }, "perSide": true },
-        { "name": "鳥狗式 Bird Dog", "sets": 2, "reps": { "min": 8, "max": 10 }, "perSide": true }
-      ]
+        {
+          "name": "骨盆底啟動呼吸（仰臥）",
+          "sets": 1,
+          "holdSeconds": {
+            "min": 60,
+            "max": 60
+          },
+          "notes": "吸氣放鬆、吐氣輕輕上提，不要憋氣。"
+        },
+        {
+          "name": "橋式呼吸 Glute Bridge with breath",
+          "sets": 2,
+          "reps": {
+            "min": 10,
+            "max": 12
+          }
+        },
+        {
+          "name": "死蟲式 Dead Bug",
+          "sets": 2,
+          "reps": {
+            "min": 8,
+            "max": 10
+          },
+          "perSide": true
+        },
+        {
+          "name": "鳥狗式 Bird Dog",
+          "sets": 2,
+          "reps": {
+            "min": 8,
+            "max": 10
+          },
+          "perSide": true
+        }
+      ],
+      "derived": true,
+      "derivedNote": "原文第三節模板只寫「死蟲式、鳥狗式、橋式呼吸」與 10-15 分鐘，沒有組數次數。這裡的組數次數為推導值，依身體感覺調整即可。"
     },
     {
       "id": "pelvic-core-advanced",
@@ -19,12 +52,53 @@
       "phase": "Phase 2 之後",
       "loadGuidance": "動作品質優先。出現漏尿或下墜感就退回 pelvic-core-basic。",
       "exercises": [
-        { "name": "骨盆底啟動呼吸", "sets": 1, "holdSeconds": 60 },
-        { "name": "單腳橋式 Single-leg Glute Bridge", "sets": 2, "reps": { "min": 8, "max": 10 }, "perSide": true },
-        { "name": "死蟲式（加長槓桿）", "sets": 3, "reps": { "min": 10, "max": 10 }, "perSide": true },
-        { "name": "鳥狗式（加停頓）", "sets": 3, "reps": { "min": 10, "max": 10 }, "perSide": true },
-        { "name": "側棒式 Side Plank", "sets": 2, "holdSeconds": 30, "perSide": true }
-      ]
+        {
+          "name": "骨盆底啟動呼吸",
+          "sets": 1,
+          "holdSeconds": {
+            "min": 60,
+            "max": 60
+          }
+        },
+        {
+          "name": "單腳橋式 Single-leg Glute Bridge",
+          "sets": 2,
+          "reps": {
+            "min": 8,
+            "max": 10
+          },
+          "perSide": true
+        },
+        {
+          "name": "死蟲式（加長槓桿）",
+          "sets": 3,
+          "reps": {
+            "min": 10,
+            "max": 10
+          },
+          "perSide": true
+        },
+        {
+          "name": "鳥狗式（加停頓）",
+          "sets": 3,
+          "reps": {
+            "min": 10,
+            "max": 10
+          },
+          "perSide": true
+        },
+        {
+          "name": "側棒式 Side Plank",
+          "sets": 2,
+          "holdSeconds": {
+            "min": 30,
+            "max": 30
+          },
+          "perSide": true
+        }
+      ],
+      "derived": true,
+      "derivedNote": "原文完全沒有這份清單——第三節只寫「核心/骨盆底進階(15分鐘)」。五個動作是以 basic 版加難度推導的。出現漏尿或下墜感就退回 pelvic-core-basic。"
     },
     {
       "id": "strength-a",
@@ -32,13 +106,62 @@
       "phase": "全程",
       "loadGuidance": "Phase 1 徒手或極輕負荷；Phase 2 開始可加輕啞鈴；Phase 3 維持不加量；Phase 4 極輕量只做喚醒。",
       "exercises": [
-        { "name": "骨盆底啟動呼吸（墊上）", "sets": 1, "holdSeconds": 60 },
-        { "name": "臀橋 Glute Bridge", "sets": 3, "reps": { "min": 12, "max": 15 } },
-        { "name": "分腿蹲／後跨步蹲", "sets": 3, "reps": { "min": 10, "max": 10 }, "perSide": true, "notes": "徒手起步，之後可加啞鈴。" },
-        { "name": "側躺蚌殼式 Clamshell", "sets": 2, "reps": { "min": 15, "max": 15 }, "perSide": true },
-        { "name": "單腳硬舉 Single-leg Deadlift", "sets": 2, "reps": { "min": 8, "max": 8 }, "perSide": true, "notes": "徒手起步。" },
-        { "name": "死蟲式 Dead Bug", "sets": 3, "reps": { "min": 10, "max": 10 }, "perSide": true }
-      ]
+        {
+          "name": "骨盆底啟動呼吸（墊上）",
+          "sets": 1,
+          "holdSeconds": {
+            "min": 60,
+            "max": 60
+          }
+        },
+        {
+          "name": "臀橋 Glute Bridge",
+          "sets": 3,
+          "reps": {
+            "min": 12,
+            "max": 15
+          }
+        },
+        {
+          "name": "分腿蹲／後跨步蹲",
+          "sets": 3,
+          "reps": {
+            "min": 10,
+            "max": 10
+          },
+          "perSide": true,
+          "notes": "徒手起步，之後可加啞鈴。"
+        },
+        {
+          "name": "側躺蚌殼式 Clamshell",
+          "sets": 2,
+          "reps": {
+            "min": 15,
+            "max": 15
+          },
+          "perSide": true
+        },
+        {
+          "name": "單腳硬舉 Single-leg Deadlift",
+          "sets": 2,
+          "reps": {
+            "min": 8,
+            "max": 8
+          },
+          "perSide": true,
+          "notes": "徒手起步。"
+        },
+        {
+          "name": "死蟲式 Dead Bug",
+          "sets": 3,
+          "reps": {
+            "min": 10,
+            "max": 10
+          },
+          "perSide": true
+        }
+      ],
+      "derived": false
     },
     {
       "id": "strength-b",
@@ -46,12 +169,51 @@
       "phase": "Phase 2",
       "loadGuidance": "原計畫只在 Phase 2 模板排入訓練 B（每週 2 次＝A＋B）。Phase 1 與 Phase 3 各只排 1 次 A——不補第二次，因為那會變相增加強度。",
       "exercises": [
-        { "name": "鳥狗式 Bird Dog", "sets": 3, "reps": { "min": 10, "max": 10 }, "perSide": true },
-        { "name": "啞鈴划船 Dumbbell Row", "sets": 3, "reps": { "min": 12, "max": 12 } },
-        { "name": "伏地挺身 Push-up", "sets": 3, "reps": { "min": 8, "max": 12 }, "notes": "可用跪姿版。" },
-        { "name": "側棒式＋抬臀", "sets": 2, "holdSeconds": 30, "perSide": true, "notes": "膝著地起步，20-30 秒。" },
-        { "name": "農夫走路 Farmer's Walk", "sets": 2, "holdSeconds": 30 }
-      ]
+        {
+          "name": "鳥狗式 Bird Dog",
+          "sets": 3,
+          "reps": {
+            "min": 10,
+            "max": 10
+          },
+          "perSide": true
+        },
+        {
+          "name": "啞鈴划船 Dumbbell Row",
+          "sets": 3,
+          "reps": {
+            "min": 12,
+            "max": 12
+          }
+        },
+        {
+          "name": "伏地挺身 Push-up",
+          "sets": 3,
+          "reps": {
+            "min": 8,
+            "max": 12
+          },
+          "notes": "可用跪姿版。"
+        },
+        {
+          "name": "側棒式＋抬臀",
+          "sets": 2,
+          "holdSeconds": {
+            "min": 20,
+            "max": 30
+          },
+          "notes": "原文未標「每邊」（同節其他五個動作都有標），照原文不加。實務上兩側都做。"
+        },
+        {
+          "name": "農夫走路 Farmer's Walk",
+          "sets": 2,
+          "holdSeconds": {
+            "min": 30,
+            "max": 30
+          }
+        }
+      ],
+      "derived": false
     }
   ]
 }

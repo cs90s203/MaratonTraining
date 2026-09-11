@@ -1,12 +1,20 @@
 {
   "planId": "tokyo-marathon-2027",
-  "planVersion": 1,
-  "schemaVersion": 1,
+  "planVersion": 2,
+  "schemaVersion": 2,
   "startDate": "2026-09-07",
   "raceDate": "2027-03-07",
   "expiredBefore": "2026-09-10",
+  "expiredBeforeReason": "起算日從 2026-09-10 改成 2026-09-07 之後，9/07-9/09 已成過去式。這三天不計入完成率分母，也不提示補做——要求補做等於第一週就加量，違反決策紀錄第 0 條。",
   "totalWeeks": 26,
-  "_note": "date 與 dayOfWeek 刻意不存在本檔。由 startDate + (weekNumber-1)*7 + dayIndex 推導，見 docs/日曆基準.md。",
+  "safety": {
+    "prerequisite": "雖然已產後 3 個月,但這份計畫仍假設妳已取得醫生/婦產科的運動許可,且沒有明顯的腹直肌分離(diastasis recti)或骨盆底功能異常。若還沒做過產後檢查,或運動中出現漏尿、下墜感、疼痛、分離超過2指寬等狀況,建議先找骨盆底物理治療師評估,再逐步提升強度。這份課表是訓練架構建議,不是醫療建議。",
+    "disclaimer": "本計畫為訓練架構建議,非醫療處方。如有疼痛、漏尿、腹直肌分離未癒合等狀況,請諮詢婦產科醫師或骨盆底物理治療師調整強度。",
+    "weeklySelfCheck": "每週日快速回顧:身體有無異常(漏尿、疼痛、過度疲勞)→ 有就該週降量,而不是硬照表操課",
+    "intensityPrinciple": "產後前 3-6 個月心血管系統、韌帶(鬆弛素影響)、骨盆底都還在恢復,寧可\"心率壓低、時間拉長\",也不要為了配速硬撐。有心率錶的話,建議 Zone 2 上限先抓保守一點。",
+    "_source": "docs/計畫原文/訓練計畫.md 第 6、180、176、28 行逐字。"
+  },
+  "_note": "date 與 dayOfWeek 刻意不存在本檔。由 startDate + (weekNumber-1)*7 + dayIndex 推導，見 docs/日曆基準.md。weeklyVolumeKm 的 kind=reference 表示那是原文的參考上限，不是本週 days 的加總。",
   "phases": [
     {
       "phaseId": "p1",
@@ -64,9 +72,11 @@
       "weekNumber": 1,
       "longRunMetric": "time",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -82,16 +92,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -101,22 +113,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -129,16 +143,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -154,16 +170,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -173,47 +191,51 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
-              "type": "long-run",
+              "type": "walk-run",
               "title": "長跑（走跑交替起步）",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "65-72%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 5,
-                "max": 6
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -223,9 +245,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -243,13 +265,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -257,9 +280,11 @@
       "weekNumber": 2,
       "longRunMetric": "time",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -275,16 +300,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -294,22 +321,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -322,16 +351,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -347,16 +378,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -366,47 +399,51 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
-              "type": "long-run",
+              "type": "walk-run",
               "title": "長跑（走跑交替起步）",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "65-72%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 5,
-                "max": 6
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -416,9 +453,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -436,13 +473,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -450,9 +488,11 @@
       "weekNumber": 3,
       "longRunMetric": "time",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -468,16 +508,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -487,22 +529,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -515,16 +559,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -540,16 +586,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -559,47 +607,51 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
-              "type": "long-run",
+              "type": "walk-run",
               "title": "長跑（走跑交替起步）",
               "duration": {
                 "min": 30,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "65-72%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 5,
-                "max": 6
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -609,9 +661,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -629,13 +681,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -643,9 +696,11 @@
       "weekNumber": 4,
       "longRunMetric": "time",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -661,16 +716,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -680,22 +737,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -708,16 +767,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -733,16 +794,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -752,47 +815,51 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
-              "type": "long-run",
+              "type": "walk-run",
               "title": "長跑（走跑交替起步）",
               "duration": {
                 "min": 30,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "65-72%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 5,
-                "max": 6
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -802,9 +869,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -822,13 +889,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -836,9 +904,11 @@
       "weekNumber": 5,
       "longRunMetric": "time",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -854,16 +924,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -873,22 +945,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -901,16 +975,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -926,16 +1002,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -945,47 +1023,51 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
-              "type": "long-run",
+              "type": "walk-run",
               "title": "長跑（走跑交替起步）",
               "duration": {
                 "min": 35,
                 "max": 35
               },
               "distanceKm": null,
-              "heartRateZone": "65-72%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 5,
-                "max": 6
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -995,9 +1077,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -1015,13 +1097,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -1029,9 +1112,11 @@
       "weekNumber": 6,
       "longRunMetric": "time",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1047,16 +1132,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -1066,22 +1153,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -1094,16 +1183,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1119,16 +1210,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -1138,47 +1231,51 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
-              "type": "long-run",
+              "type": "walk-run",
               "title": "長跑（走跑交替起步）",
               "duration": {
                 "min": 35,
                 "max": 35
               },
               "distanceKm": null,
-              "heartRateZone": "65-72%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 5,
-                "max": 6
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -1188,9 +1285,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -1208,13 +1305,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -1223,11 +1321,14 @@
       "longRunMetric": "time",
       "weeklyVolumeKm": {
         "min": 8,
-        "max": 10
+        "max": 10,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1243,16 +1344,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -1262,22 +1365,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -1290,16 +1395,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1315,16 +1422,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -1334,26 +1443,28 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
-              "title": "長跑（走跑交替起步）",
+              "title": "長跑（全跑）",
               "duration": {
                 "min": 40,
                 "max": 40
@@ -1365,16 +1476,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "第四節：本階段最後兩週轉為全程跑。仍以時間計。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -1384,9 +1497,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -1404,13 +1517,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -1419,11 +1533,14 @@
       "longRunMetric": "time",
       "weeklyVolumeKm": {
         "min": 8,
-        "max": 10
+        "max": 10,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1439,16 +1556,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
-              "optional": false,
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -1458,22 +1577,24 @@
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -1486,16 +1607,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1511,16 +1634,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
-              "optional": false,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "walk-run",
@@ -1530,26 +1655,28 @@
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "60-70%",
+              "heartRateZone": "50-60%",
               "rpe": {
-                "min": 4,
-                "max": 5
+                "min": 2,
+                "max": 3
               },
-              "intensityNote": "輕鬆對話",
+              "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "逐步拉長跑段比例。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
-              "title": "長跑（走跑交替起步）",
+              "title": "長跑（全跑）",
               "duration": {
                 "min": 40,
                 "max": 40
@@ -1561,16 +1688,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "這階段的「長跑」以時間而非距離計。",
+              "notes": "第四節：本階段最後兩週轉為全程跑。仍以時間計。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": "骨盆底／核心當週練 3 次即可，不需每天。",
           "items": [
             {
               "type": "rest",
@@ -1580,9 +1709,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -1600,13 +1729,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。骨盆底／核心當週練 3 次即可，不需每天。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -1615,11 +1745,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 15,
-        "max": 18
+        "max": 18,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1635,16 +1768,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -1660,16 +1795,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -1682,16 +1819,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -1707,10 +1846,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "高抬腿、後踢腿，各 2 組 x 20 公尺",
+              "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -1727,16 +1866,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -1749,16 +1890,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -1774,16 +1917,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -1793,9 +1938,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -1813,13 +1958,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -1828,11 +1974,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 15,
-        "max": 18
+        "max": 18,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -1848,16 +1997,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -1873,16 +2024,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -1895,16 +2048,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -1920,10 +2075,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "高抬腿、後踢腿，各 2 組 x 20 公尺",
+              "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -1940,16 +2095,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -1962,16 +2119,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -1987,16 +2146,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -2006,9 +2167,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -2026,13 +2187,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -2041,11 +2203,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 18,
-        "max": 22
+        "max": 22,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -2061,16 +2226,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -2086,16 +2253,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2108,16 +2277,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -2133,10 +2304,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "高抬腿、後踢腿，各 2 組 x 20 公尺",
+              "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -2153,16 +2324,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2175,16 +2348,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -2200,16 +2375,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -2219,9 +2396,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -2239,13 +2416,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -2254,11 +2432,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 18,
-        "max": 22
+        "max": 22,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -2274,16 +2455,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -2299,16 +2482,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2321,16 +2506,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -2346,10 +2533,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "高抬腿、後踢腿，各 2 組 x 20 公尺",
+              "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -2366,16 +2553,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2388,16 +2577,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -2413,16 +2604,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -2432,9 +2625,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -2452,13 +2645,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -2467,11 +2661,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 22,
-        "max": 25
+        "max": 25,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -2487,16 +2684,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -2512,16 +2711,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2534,16 +2735,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -2559,10 +2762,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步",
+              "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -2579,16 +2782,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2601,16 +2806,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -2626,16 +2833,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -2645,9 +2854,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -2665,13 +2874,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -2680,11 +2890,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 22,
-        "max": 25
+        "max": 25,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -2700,16 +2913,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -2725,16 +2940,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2747,16 +2964,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -2772,10 +2991,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步",
+              "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -2792,16 +3011,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2814,16 +3035,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -2839,16 +3062,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -2858,9 +3083,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -2878,13 +3103,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -2893,11 +3119,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 25,
-        "max": 28
+        "max": 28,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -2913,16 +3142,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -2938,16 +3169,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -2960,16 +3193,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -2985,10 +3220,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步",
+              "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -3005,16 +3240,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -3027,16 +3264,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -3052,16 +3291,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -3071,9 +3312,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -3091,13 +3332,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -3106,11 +3348,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 25,
-        "max": 28
+        "max": 28,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -3126,16 +3371,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -3151,16 +3398,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "全程跑，不再走跑交替。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -3173,16 +3422,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "Phase 2 開始可加輕啞鈴。",
-              "derived": false
+              "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -3198,10 +3449,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步",
+              "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -3218,16 +3469,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -3240,16 +3493,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-b",
-              "optional": false,
-              "notes": null,
-              "derived": false
+              "notes": "（時長 30 分沿用 Phase 1，原文未給）",
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -3265,16 +3520,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "從 8K 起步逐週 +1-1.5K，上限約 16-18K。",
+              "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -3284,9 +3541,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -3304,13 +3561,14 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -3319,11 +3577,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 30,
-        "max": 33
+        "max": 33,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -3339,16 +3600,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -3364,20 +3627,22 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": true,
+          "dayNotes": "原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。",
           "items": [
             {
               "type": "strength",
-              "title": "重量訓練（維持）",
+              "title": "重量訓練 A（維持）",
               "duration": {
                 "min": 30,
                 "max": 30
@@ -3386,16 +3651,35 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "強度不加量，維持即可。",
-              "derived": false
+              "notes": null,
+              "derived": true
+            },
+            {
+              "type": "strength",
+              "title": "重量訓練 B（維持）",
+              "duration": {
+                "min": 30,
+                "max": 30
+              },
+              "distanceKm": null,
+              "heartRateZone": null,
+              "rpe": null,
+              "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
+              "videoRef": null,
+              "workoutRef": "strength-b",
+              "notes": null,
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -3411,10 +3695,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）",
+              "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -3425,22 +3709,24 @@
                 "max": 15
               },
               "distanceKm": null,
-              "heartRateZone": "75-80%",
+              "heartRateZone": "70-75%",
               "rpe": {
-                "min": 6,
-                "max": 7
+                "min": 5,
+                "max": 6
               },
-              "intensityNote": "可以講短句",
+              "intensityNote": "稍快於 Zone 2，仍能講短句",
+              "intensityDerived": true,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "稍快於 Zone 2，量少即可。",
+              "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "看身體狀況，兩邊地位相等。",
           "items": [
             {
               "type": "run",
@@ -3456,9 +3742,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -3470,16 +3756,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，看身體狀況。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -3495,16 +3783,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "可分段插入幾公里 MP 配速。上限 28K——不做到 32K+ 的高強度全馬課表。",
+              "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -3514,13 +3804,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -3529,11 +3820,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 30,
-        "max": 33
+        "max": 33,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -3549,16 +3843,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -3574,20 +3870,22 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": true,
+          "dayNotes": "原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。",
           "items": [
             {
               "type": "strength",
-              "title": "重量訓練（維持）",
+              "title": "重量訓練 A（維持）",
               "duration": {
                 "min": 30,
                 "max": 30
@@ -3596,16 +3894,35 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "強度不加量，維持即可。",
-              "derived": false
+              "notes": null,
+              "derived": true
+            },
+            {
+              "type": "strength",
+              "title": "重量訓練 B（維持）",
+              "duration": {
+                "min": 30,
+                "max": 30
+              },
+              "distanceKm": null,
+              "heartRateZone": null,
+              "rpe": null,
+              "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
+              "videoRef": null,
+              "workoutRef": "strength-b",
+              "notes": null,
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -3621,10 +3938,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）",
+              "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -3635,22 +3952,24 @@
                 "max": 15
               },
               "distanceKm": null,
-              "heartRateZone": "75-80%",
+              "heartRateZone": "70-75%",
               "rpe": {
-                "min": 6,
-                "max": 7
+                "min": 5,
+                "max": 6
               },
-              "intensityNote": "可以講短句",
+              "intensityNote": "稍快於 Zone 2，仍能講短句",
+              "intensityDerived": true,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "稍快於 Zone 2，量少即可。",
+              "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "看身體狀況，兩邊地位相等。",
           "items": [
             {
               "type": "run",
@@ -3666,9 +3985,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -3680,16 +3999,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，看身體狀況。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -3705,16 +4026,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "可分段插入幾公里 MP 配速。上限 28K——不做到 32K+ 的高強度全馬課表。",
+              "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -3724,13 +4047,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -3739,11 +4063,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 33,
-        "max": 36
+        "max": 36,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -3759,16 +4086,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -3784,20 +4113,22 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": true,
+          "dayNotes": "原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。",
           "items": [
             {
               "type": "strength",
-              "title": "重量訓練（維持）",
+              "title": "重量訓練 A（維持）",
               "duration": {
                 "min": 30,
                 "max": 30
@@ -3806,16 +4137,35 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "強度不加量，維持即可。",
-              "derived": false
+              "notes": null,
+              "derived": true
+            },
+            {
+              "type": "strength",
+              "title": "重量訓練 B（維持）",
+              "duration": {
+                "min": 30,
+                "max": 30
+              },
+              "distanceKm": null,
+              "heartRateZone": null,
+              "rpe": null,
+              "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
+              "videoRef": null,
+              "workoutRef": "strength-b",
+              "notes": null,
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -3831,10 +4181,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）",
+              "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -3845,22 +4195,24 @@
                 "max": 15
               },
               "distanceKm": null,
-              "heartRateZone": "75-80%",
+              "heartRateZone": "70-75%",
               "rpe": {
-                "min": 6,
-                "max": 7
+                "min": 5,
+                "max": 6
               },
-              "intensityNote": "可以講短句",
+              "intensityNote": "稍快於 Zone 2，仍能講短句",
+              "intensityDerived": true,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "稍快於 Zone 2，量少即可。",
+              "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "看身體狀況，兩邊地位相等。",
           "items": [
             {
               "type": "run",
@@ -3876,9 +4228,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -3890,16 +4242,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，看身體狀況。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -3915,16 +4269,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "可分段插入幾公里 MP 配速。上限 28K——不做到 32K+ 的高強度全馬課表。",
+              "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -3934,13 +4290,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -3949,11 +4306,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 33,
-        "max": 36
+        "max": 36,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -3969,16 +4329,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -3994,20 +4356,22 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": true,
+          "dayNotes": "原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。",
           "items": [
             {
               "type": "strength",
-              "title": "重量訓練（維持）",
+              "title": "重量訓練 A（維持）",
               "duration": {
                 "min": 30,
                 "max": 30
@@ -4016,16 +4380,35 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "強度不加量，維持即可。",
-              "derived": false
+              "notes": null,
+              "derived": true
+            },
+            {
+              "type": "strength",
+              "title": "重量訓練 B（維持）",
+              "duration": {
+                "min": 30,
+                "max": 30
+              },
+              "distanceKm": null,
+              "heartRateZone": null,
+              "rpe": null,
+              "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
+              "videoRef": null,
+              "workoutRef": "strength-b",
+              "notes": null,
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -4041,10 +4424,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）",
+              "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -4055,22 +4438,24 @@
                 "max": 15
               },
               "distanceKm": null,
-              "heartRateZone": "75-80%",
+              "heartRateZone": "70-75%",
               "rpe": {
-                "min": 6,
-                "max": 7
+                "min": 5,
+                "max": 6
               },
-              "intensityNote": "可以講短句",
+              "intensityNote": "稍快於 Zone 2，仍能講短句",
+              "intensityDerived": true,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "稍快於 Zone 2，量少即可。",
+              "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "看身體狀況，兩邊地位相等。",
           "items": [
             {
               "type": "run",
@@ -4086,9 +4471,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -4100,16 +4485,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，看身體狀況。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -4125,16 +4512,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "可分段插入幾公里 MP 配速。上限 28K——不做到 32K+ 的高強度全馬課表。",
+              "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -4144,13 +4533,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -4159,11 +4549,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 36,
-        "max": 40
+        "max": 40,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -4179,16 +4572,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -4204,20 +4599,22 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": true,
+          "dayNotes": "原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。",
           "items": [
             {
               "type": "strength",
-              "title": "重量訓練（維持）",
+              "title": "重量訓練 A（維持）",
               "duration": {
                 "min": 30,
                 "max": 30
@@ -4226,16 +4623,35 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "強度不加量，維持即可。",
-              "derived": false
+              "notes": null,
+              "derived": true
+            },
+            {
+              "type": "strength",
+              "title": "重量訓練 B（維持）",
+              "duration": {
+                "min": 30,
+                "max": 30
+              },
+              "distanceKm": null,
+              "heartRateZone": null,
+              "rpe": null,
+              "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
+              "videoRef": null,
+              "workoutRef": "strength-b",
+              "notes": null,
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -4251,10 +4667,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）",
+              "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -4265,22 +4681,24 @@
                 "max": 15
               },
               "distanceKm": null,
-              "heartRateZone": "75-80%",
+              "heartRateZone": "70-75%",
               "rpe": {
-                "min": 6,
-                "max": 7
+                "min": 5,
+                "max": 6
               },
-              "intensityNote": "可以講短句",
+              "intensityNote": "稍快於 Zone 2，仍能講短句",
+              "intensityDerived": true,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "稍快於 Zone 2，量少即可。",
+              "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "看身體狀況，兩邊地位相等。",
           "items": [
             {
               "type": "run",
@@ -4296,9 +4714,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -4310,16 +4728,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，看身體狀況。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -4335,16 +4755,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "可分段插入幾公里 MP 配速。上限 28K——不做到 32K+ 的高強度全馬課表。",
+              "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -4354,13 +4776,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -4369,11 +4792,14 @@
       "longRunMetric": "distance",
       "weeklyVolumeKm": {
         "min": 36,
-        "max": 40
+        "max": 40,
+        "kind": "reference"
       },
+      "weeklyVolumeNullReason": null,
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -4389,16 +4815,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -4414,20 +4842,22 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": true,
+          "dayNotes": "原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。",
           "items": [
             {
               "type": "strength",
-              "title": "重量訓練（維持）",
+              "title": "重量訓練 A（維持）",
               "duration": {
                 "min": 30,
                 "max": 30
@@ -4436,16 +4866,35 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
-              "notes": "強度不加量，維持即可。",
-              "derived": false
+              "notes": null,
+              "derived": true
+            },
+            {
+              "type": "strength",
+              "title": "重量訓練 B（維持）",
+              "duration": {
+                "min": 30,
+                "max": 30
+              },
+              "distanceKm": null,
+              "heartRateZone": null,
+              "rpe": null,
+              "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
+              "videoRef": null,
+              "workoutRef": "strength-b",
+              "notes": null,
+              "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "form-drill",
@@ -4461,10 +4910,10 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）",
+              "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false
             },
             {
@@ -4475,22 +4924,24 @@
                 "max": 15
               },
               "distanceKm": null,
-              "heartRateZone": "75-80%",
+              "heartRateZone": "70-75%",
               "rpe": {
-                "min": 6,
-                "max": 7
+                "min": 5,
+                "max": 6
               },
-              "intensityNote": "可以講短句",
+              "intensityNote": "稍快於 Zone 2，仍能講短句",
+              "intensityDerived": true,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "稍快於 Zone 2，量少即可。",
+              "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "看身體狀況，兩邊地位相等。",
           "items": [
             {
               "type": "run",
@@ -4506,9 +4957,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             },
@@ -4520,16 +4971,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，看身體狀況。",
+              "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -4545,16 +4998,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "可分段插入幾公里 MP 配速。上限 28K——不做到 32K+ 的高強度全馬課表。",
+              "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -4564,13 +5019,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": false
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -4578,9 +5034,11 @@
       "weekNumber": 23,
       "longRunMetric": "distance",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列只寫「遞減」，沒有給數字",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -4596,16 +5054,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": "減量期每週 2 次即可。",
+              "notes": "減量期每週 2 次即可。10 分鐘版：挑 3 項。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -4621,16 +5081,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑量每週遞減約 20-30%。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -4643,16 +5105,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "極輕量，只做動作喚醒，不追求進步。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -4668,16 +5132,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：挑 3 項。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "避免賽前疲勞，休息不扣分。",
           "items": [
             {
               "type": "run",
@@ -4693,9 +5159,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             },
@@ -4707,16 +5173,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，避免賽前疲勞。",
+              "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -4732,16 +5200,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -4751,13 +5221,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -4765,9 +5236,11 @@
       "weekNumber": 24,
       "longRunMetric": "distance",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列只寫「遞減」，沒有給數字",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -4783,16 +5256,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": "減量期每週 2 次即可。",
+              "notes": "減量期每週 2 次即可。10 分鐘版：挑 3 項。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -4808,16 +5283,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑量每週遞減約 20-30%。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -4830,16 +5307,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "極輕量，只做動作喚醒，不追求進步。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -4855,16 +5334,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：挑 3 項。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "避免賽前疲勞，休息不扣分。",
           "items": [
             {
               "type": "run",
@@ -4880,9 +5361,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             },
@@ -4894,16 +5375,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，避免賽前疲勞。",
+              "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -4919,16 +5402,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -4938,13 +5423,14 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
@@ -4952,9 +5438,11 @@
       "weekNumber": 25,
       "longRunMetric": "distance",
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "原文第四節該列只寫「遞減」，沒有給數字",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -4970,16 +5458,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": "減量期每週 2 次即可。",
+              "notes": "減量期每週 2 次即可。10 分鐘版：挑 3 項。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -4995,16 +5485,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "跑量每週遞減約 20-30%。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "strength",
@@ -5017,16 +5509,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "strength-a",
-              "optional": false,
               "notes": "極輕量，只做動作喚醒，不追求進步。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -5042,16 +5536,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "notes": "10 分鐘版：挑 3 項。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": true,
+          "dayNotes": "避免賽前疲勞，休息不扣分。",
           "items": [
             {
               "type": "run",
@@ -5067,9 +5563,9 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             },
@@ -5081,16 +5577,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
-              "notes": "二擇一，避免賽前疲勞。",
+              "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "long-run",
@@ -5106,16 +5604,18 @@
                 "max": 6
               },
               "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -5125,23 +5625,26 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     },
     {
       "weekNumber": 26,
-      "longRunMetric": "distance",
+      "longRunMetric": null,
       "weeklyVolumeKm": null,
+      "weeklyVolumeNullReason": "賽週，原文未給週跑量",
       "days": [
         {
-          "dayIndex": 0,
+          "selectOne": true,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -5151,9 +5654,9 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             },
@@ -5171,16 +5674,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": true,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 0
         },
         {
-          "dayIndex": 1,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -5196,16 +5701,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 1
         },
         {
-          "dayIndex": 2,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "recovery",
@@ -5221,16 +5728,18 @@
                 "max": 3
               },
               "intensityNote": "非常輕鬆，像散步",
+              "intensityDerived": false,
               "videoRef": null,
-              "workoutRef": "pelvic-core-advanced",
-              "optional": false,
-              "notes": null,
+              "workoutRef": "pelvic-core-basic",
+              "notes": "賽週用 basic 版，不要用 advanced。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 2
         },
         {
-          "dayIndex": 3,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "run",
@@ -5246,16 +5755,18 @@
                 "max": 5
               },
               "intensityNote": "輕鬆對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "含 2-3 段比賽配速，找感覺用，不累積疲勞。",
+              "notes": "第四節：賽週 3-5K 喚醒跑。含 2-3 段稍快的段落找感覺，不累積疲勞。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 3
         },
         {
-          "dayIndex": 4,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -5265,16 +5776,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": null,
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 4
         },
         {
-          "dayIndex": 5,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "rest",
@@ -5284,16 +5797,18 @@
               "heartRateZone": null,
               "rpe": null,
               "intensityNote": "以動作品質為主",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
               "notes": "賽前一天：確認裝備、補給、交通與起跑區。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 5
         },
         {
-          "dayIndex": 6,
+          "selectOne": false,
+          "dayNotes": null,
           "items": [
             {
               "type": "race",
@@ -5303,19 +5818,20 @@
                 "min": 42.195,
                 "max": 42.195
               },
-              "heartRateZone": "75-80%",
+              "heartRateZone": "65-72%",
               "rpe": {
-                "min": 6,
-                "max": 7
+                "min": 5,
+                "max": 6
               },
-              "intensityNote": "可以講短句",
+              "intensityNote": "後段稍吃力但仍能斷句對話",
+              "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "optional": false,
-              "notes": "比賽日。配速照 Zone 2 起跑，前 10K 寧可慢。",
+              "notes": "比賽日。第二節沒有比賽日的心率檔位，此處沿用「長跑」65-72%。配速照 Zone 2 起跑，前 10K 寧可慢。",
               "derived": true
             }
-          ]
+          ],
+          "dayIndex": 6
         }
       ]
     }
