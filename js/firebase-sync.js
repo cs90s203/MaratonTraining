@@ -17,6 +17,13 @@ let unsubPlanOverrides = null; // 跟上面三個不一樣：這個是共用資�
 
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
 
+// 排除 Chrome／Android WebView／iOS 上的 Chrome(CriOS)／Firefox(FxiOS)／Edge——
+// 這些的 UA 都含 "Safari" 字串，但不是真的 Safari，走 popup 沒問題。
+function isSafariBrowser() {
+  const ua = navigator.userAgent || '';
+  return /^((?!chrome|crios|fxios|edg|android).)*safari/i.test(ua);
+}
+
 // 教練模式新增項目時要給一個不會跟出廠課表（"{週}-{天}-{序}" 格式）撞到的 id。
 // 跟 babylog js/store.js 的 uid() 同一套寫法：crypto.randomUUID() 不支援時退回時間戳+亂數。
 function newItemId() {
@@ -92,19 +99,41 @@ const Sync = {
       this._backfillLocal(Store.activeUserId);
     });
 
-    // ITP/彈窗被擋時的 redirect 結果（若上次用了 signInWithRedirect）
-    fbAuth.getRedirectResult().catch(() => {});
+    // Safari／彈窗被擋時的 redirect 結果（若上次用了 signInWithRedirect 導回來）。
+    // 沒有等待中的 redirect 時，這裡會正常 resolve 成 { user: null }，不是錯誤——
+    // 只有真的失敗（例如帳號被拒絕）才要顯示失敗狀態，不能整個吞掉，否則使用者
+    // 從 Google 導回來卻什麼都沒發生時，會完全不知道發生了什麼事。
+    fbAuth.getRedirectResult().catch((err) => {
+      if (err && err.code && err.code !== 'auth/no-auth-event') {
+        this._set('fail', '登入失敗：' + (err.code || err.message));
+      }
+    });
   },
 
   async signIn() {
     this._set('signing-in', '登入中…');
+    const provider = new firebase.auth.GoogleAuthProvider();
+    // ⚠️ Safari（含 iOS）不要走 popup。彈出視窗登入成功後，結果要透過一個
+    // firebaseapp.com 網域的中繼頁面傳回主頁面，這條路徑會被 Safari 的 ITP
+    // （防止跨網站追蹤）當成跨站儲存擋掉——使用者在彈出視窗裡把帳號選完、
+    // Google 那邊確實登入成功了，但主頁面永遠收不到結果，畫面停在「未登入」，
+    // 而且不會拋出任何錯誤（不是 auth/popup-blocked 那種可以 catch 到的失敗）。
+    // babylog 的 firebase-sync.js 開頭註解特別記過這個坑。改成在 Safari 上直接用
+    // 整頁跳轉（signInWithRedirect）：整個頁面導到 Google 登入頁再導回來，
+    // 用的是一般的第一方導覽，不會踩到 ITP 擋跨站儲存這件事。
+    if (isSafariBrowser()) {
+      try {
+        await fbAuth.signInWithRedirect(provider);
+      } catch (e) {
+        this._set('fail', '登入失敗：' + (e && e.message));
+      }
+      return;
+    }
     try {
-      const provider = new firebase.auth.GoogleAuthProvider();
       await fbAuth.signInWithPopup(provider);
     } catch (e) {
       if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request')) {
         try {
-          const provider = new firebase.auth.GoogleAuthProvider();
           await fbAuth.signInWithRedirect(provider);
           return;
         } catch (e2) { this._set('fail', '登入失敗：' + e2.message); return; }
