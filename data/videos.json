@@ -1,0 +1,85 @@
+{
+  "_note": "linkType 決定 UI 行為：video=直接開連結；search=開 YouTube 搜尋該關鍵字；none=只顯示文字不給按鈕。url 一律為 null，除非是人工貼進來的真實網址——不要生成 YouTube 網址，規格書第 93 行。",
+  "videos": [
+    {
+      "id": "fitnessblender-postpartum",
+      "title": "Postpartum Core and Pelvic Floor Recovery Series",
+      "creator": "Fitness Blender",
+      "category": "postpartum-core",
+      "linkType": "search",
+      "searchQuery": "Fitness Blender Postpartum Core and Pelvic Floor Recovery",
+      "url": null,
+      "notes": "Phase 1 用。原計畫第六節點名的產後專門課程，取代該階段的 Pamela Reif。"
+    },
+    {
+      "id": "pamela-booty-low-impact",
+      "title": "10 MIN BOOTY WORKOUT - Knee Friendly, Low Impact, No Squats",
+      "creator": "Pamela Reif",
+      "category": "glutes",
+      "linkType": "search",
+      "searchQuery": "Pamela Reif 10 min booty workout knee friendly low impact no squats",
+      "url": null,
+      "notes": "Phase 2 之後才用。低衝擊、對產後較友善的那一支。"
+    },
+    {
+      "id": "pamela-ab-neck-friendly",
+      "title": "10 MIN AB WORKOUT - Back & Neck Friendly / No Equipment",
+      "creator": "Pamela Reif",
+      "category": "core",
+      "linkType": "search",
+      "searchQuery": "Pamela Reif 10 min ab workout back and neck friendly no equipment",
+      "url": null,
+      "notes": "Phase 2 之後才用。"
+    },
+    {
+      "id": "pamela-abs-yoga",
+      "title": "10 MIN ABS + YOGA - a slow and relaxed workout",
+      "creator": "Pamela Reif",
+      "category": "core-mobility",
+      "linkType": "search",
+      "searchQuery": "Pamela Reif 10 min abs and yoga slow relaxed workout",
+      "url": null,
+      "notes": "核心＋放鬆混合日。強度低，Phase 1 的週日伸展也可用。"
+    },
+    {
+      "id": "pamela-daily-stretch",
+      "title": "5 MIN DAILY STRETCH",
+      "creator": "Pamela Reif",
+      "category": "mobility",
+      "linkType": "search",
+      "searchQuery": "Pamela Reif 5 min daily stretch",
+      "url": null,
+      "notes": "恢復／伸展日。"
+    },
+    {
+      "id": "pamela-leg-stretch",
+      "title": "10 MIN LEG STRETCH",
+      "creator": "Pamela Reif",
+      "category": "mobility",
+      "linkType": "search",
+      "searchQuery": "Pamela Reif 10 min leg stretch",
+      "url": null,
+      "notes": "長跑後的腿部放鬆。"
+    },
+    {
+      "id": "pamela-legs-fatburn",
+      "title": "10 MIN LEGS + FAT BURN",
+      "creator": "Pamela Reif",
+      "category": "legs",
+      "linkType": "search",
+      "searchQuery": "Pamela Reif 10 min legs fat burn",
+      "url": null,
+      "notes": "強度較高。原計畫第六節建議 Phase 2 後期再用。目前課表未排入。"
+    },
+    {
+      "id": "deadbug-birddog",
+      "title": "死蟲式 ＋ 鳥狗式（自訂節奏，不需要影片）",
+      "creator": null,
+      "category": "pelvic-floor-core",
+      "linkType": "none",
+      "searchQuery": null,
+      "url": null,
+      "notes": "動作細節見 workouts.json 的 pelvic-core-basic。"
+    }
+  ]
+}
