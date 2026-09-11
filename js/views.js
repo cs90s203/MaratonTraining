@@ -28,11 +28,21 @@ const ICON = {
 
 const FLAG_LABELS = { leakage: '漏尿', pain: '疼痛', overTired: '過度疲勞' };
 
+// 教練模式編輯表單的 type 下拉選單。⚠️ 跟 tools/verify_plan.py 的 VALID_TYPES 必須
+// 保持一致——那支腳本管出廠課表，這裡管教練模式的即時編輯，是兩個不同的執行環境
+// （Python / 瀏覽器 JS），沒辦法共用同一份常數，只能靠這條註解互相提醒同步改。
+const VALID_TYPES = ['recovery', 'walk-run', 'run', 'long-run', 'tempo', 'form-drill', 'strength', 'rest', 'race'];
+const TYPE_LABELS = {
+  recovery: '恢復', 'walk-run': '走跑交替', run: '跑步', 'long-run': '長跑',
+  tempo: '節奏跑', 'form-drill': '跑姿訓練', strength: '重量訓練', rest: '休息', race: '比賽',
+};
+
 // ── 頂層外殼 ─────────────────────────────────────────────────────────────────
 function renderApp(state) {
   const dr = PlanData.daysUntilRace();
   const raceLine = dr > 0 ? `距離比賽還有 ${dr} 天` : dr === 0 ? '今天是比賽日！' : `已完賽 ${-dr} 天`;
   return `
+    ${Store.coachMode ? `<div class="coach-banner">🛠 教練模式——這裡改的是所有人共用的課表，不是你自己的紀錄</div>` : ''}
     <div class="topbar">
       <div class="topbar-inner">
         <div class="topbar-title">東京馬拉松 2027
@@ -143,7 +153,7 @@ function renderTodayPage(state) {
 
 function renderDayDetail(weekNumber, dayIndex, opts) {
   opts = opts || {};
-  const w = PlanData.week(weekNumber);
+  const w = Store.effectiveWeek(weekNumber);
   const d = w.days[dayIndex];
   const phase = PlanData.phaseForWeek(weekNumber);
   const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
@@ -151,6 +161,7 @@ function renderDayDetail(weekNumber, dayIndex, opts) {
   const entry = Store.entryFor(Store.activeUserId, dateKey);
   const dateLabel = PlanData.dateForWeekDay(weekNumber, dayIndex);
   const dateStr = `${dateLabel.getMonth() + 1}/${dateLabel.getDate()}（${PlanData.weekdayLabel(dayIndex)}）`;
+  const coach = Store.coachMode;
 
   let html = `<div class="section">`;
 
@@ -180,15 +191,34 @@ function renderDayDetail(weekNumber, dayIndex, opts) {
     html += renderWeeklyReviewCard(weekNumber);
   }
 
-  if (d.dayNotes) {
+  if (coach) {
+    html += `
+      <div class="day-coach-row">
+        <label class="toggle-switch">
+          <span class="switch"><input type="checkbox" ${d.selectOne ? 'checked' : ''} onchange="A.toggleDaySelectOne(${weekNumber},${dayIndex})"><span class="slider"></span></span>
+          這天是「二擇一」
+        </label>
+      </div>
+      <textarea class="edit-form daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
+    `;
+  } else if (d.dayNotes) {
     html += `<div class="banner info">${ICON.info}<div>${h(d.dayNotes)}</div></div>`;
   }
 
+  const editing = App.state.editingItem;
+  const isEditingThisDay = editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex;
+
   if (d.selectOne) {
-    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, entry, true, isExpired)).join(
+    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, true, isExpired)).join(
       `<div class="choice-or">或</div>`);
   } else {
-    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, entry, false, isExpired)).join('');
+    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired)).join('');
+  }
+
+  if (coach && isEditingThisDay && editing.itemId === 'new') {
+    html += renderItemEditForm(weekNumber, dayIndex, null);
+  } else if (coach) {
+    html += `<div class="coach-add-row"><button class="btn coach-add-row" onclick="A.startAddItem(${weekNumber},${dayIndex})">+ 新增項目</button></div>`;
   }
 
   if (opts.allowFlags && !isExpired) {
@@ -200,12 +230,16 @@ function renderDayDetail(weekNumber, dayIndex, opts) {
   return html;
 }
 
-function renderItemCard(weekNumber, dayIndex, item, itemIndex, entry, isSelectOne, isExpired) {
-  const itemCount = isSelectOne ? null : (PlanData.day(weekNumber, dayIndex).items.length);
+function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired) {
+  const coach = Store.coachMode;
+  const editing = App.state.editingItem;
+  const isEditingThis = coach && editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex && editing.itemId === item.id;
+  if (isEditingThis) return renderItemEditForm(weekNumber, dayIndex, item);
+
   const done = isSelectOne
-    ? (entry && entry.selectedChoice === itemIndex && entry.itemsDone && entry.itemsDone[itemIndex])
-    : (entry && entry.itemsDone && entry.itemsDone[itemIndex]);
-  const chosen = isSelectOne && entry && entry.selectedChoice === itemIndex;
+    ? (entry && entry.selectedItemId === item.id && entry.done && entry.done[item.id])
+    : (entry && entry.done && entry.done[item.id]);
+  const chosen = isSelectOne && entry && entry.selectedItemId === item.id;
   const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
   // 樂觀寫入被 Firestore 拒絕時不回滾這個打勾（見決策紀錄第 0 條：不該因為權限問題
   // 懲罰使用者剛完成的動作），但要讓使用者看得出「這筆沒有真的存到雲端」，
@@ -220,8 +254,8 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndex, entry, isSelectOn
 
   const clickAttr = isExpired ? '' :
     (isSelectOne
-      ? `onclick="A.selectChoice(${weekNumber},${dayIndex},${itemIndex})"`
-      : `onclick="A.toggleItem(${weekNumber},${dayIndex},${itemIndex},${itemCount})"`);
+      ? `onclick="A.selectChoice(${weekNumber},${dayIndex},'${jsq(item.id)}')"`
+      : `onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')"`);
 
   const links = [];
   if (item.videoRef) {
@@ -251,6 +285,15 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndex, entry, isSelectOn
     }
   }
 
+  const coachToolbar = coach ? `
+    <div class="coach-toolbar" onclick="event.stopPropagation()">
+      <button onclick="A.startEditItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">${ICON.chevron} 編輯</button>
+      <button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)">↑</button>
+      <button ${itemIndexInDay === itemCountInDay - 1 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',1)">↓</button>
+      <button class="danger" ${itemCountInDay <= 1 ? 'disabled' : ''} onclick="A.deleteItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">刪除</button>
+    </div>
+  ` : '';
+
   return `
     <div class="item ${done ? 'done' : ''} ${isExpired ? 'expired' : ''} ${item.derived ? 'derived' : ''}" ${!isExpired ? clickAttr : ''}>
       <div class="item-row">
@@ -263,6 +306,68 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndex, entry, isSelectOn
           ${workoutBlock}
           ${!isExpired && (item.duration || item.distanceKm) ? renderActualInput(weekNumber, dayIndex, item, entry) : ''}
           ${isSelectOne && chosen ? `<div class="choice-note">✓ 這次選了這個</div>` : ''}
+          ${coachToolbar}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 教練模式的項目編輯表單。item 為 null 時是「新增項目」。用 scoped querySelector
+// 讀值（A.saveItemEdit 會找 #item-edit-... 容器內的 [name=...]），不是把每個欄位
+// 塞進 onclick 參數——12 個欄位塞進 inline onclick 字串太脆弱（引號/特殊字元）。
+function renderItemEditForm(weekNumber, dayIndex, item) {
+  const isNew = !item;
+  const it = item || { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, videoRef: null, workoutRef: null, notes: '', derived: false };
+  const formId = `item-edit-${weekNumber}-${dayIndex}-${isNew ? 'new' : it.id}`;
+  const rangeVal = (r) => r ? [r.min, r.max] : ['', ''];
+  const [durMin, durMax] = rangeVal(it.duration);
+  const [kmMin, kmMax] = rangeVal(it.distanceKm);
+  const [rpeMin, rpeMax] = rangeVal(it.rpe);
+
+  return `
+    <div class="item coach-editing" id="${formId}">
+      <div class="edit-form">
+        <div class="row">
+          <div class="field">
+            <label class="field-lbl">類型</label>
+            <select name="type">${VALID_TYPES.map((t) => `<option value="${t}" ${it.type === t ? 'selected' : ''}>${TYPE_LABELS[t]}</option>`).join('')}</select>
+          </div>
+          <div class="field wide">
+            <label class="field-lbl">標題</label>
+            <input name="title" type="text" value="${h(it.title)}" placeholder="例如：走跑交替">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="field-lbl">時長下限（分）</label><input name="durationMin" type="number" min="0" value="${h(durMin)}"></div>
+          <div class="field"><label class="field-lbl">時長上限（分）</label><input name="durationMax" type="number" min="0" value="${h(durMax)}"></div>
+          <div class="field"><label class="field-lbl">距離下限（K）</label><input name="distanceMin" type="number" min="0" step="0.1" value="${h(kmMin)}"></div>
+          <div class="field"><label class="field-lbl">距離上限（K）</label><input name="distanceMax" type="number" min="0" step="0.1" value="${h(kmMax)}"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="field-lbl">心率區間</label><input name="heartRateZone" type="text" placeholder="例如 60-70%" value="${h(it.heartRateZone || '')}"></div>
+          <div class="field"><label class="field-lbl">RPE 下限</label><input name="rpeMin" type="number" min="0" max="10" value="${h(rpeMin)}"></div>
+          <div class="field"><label class="field-lbl">RPE 上限</label><input name="rpeMax" type="number" min="0" max="10" value="${h(rpeMax)}"></div>
+        </div>
+        <div class="field wide"><label class="field-lbl">強度說明</label><input name="intensityNote" type="text" value="${h(it.intensityNote || '')}"></div>
+        <div class="row">
+          <div class="field">
+            <label class="field-lbl">影片參照</label>
+            <select name="videoRef"><option value="">（無）</option>${PlanData.videos.map((v) => `<option value="${v.id}" ${it.videoRef === v.id ? 'selected' : ''}>${h(v.title)}</option>`).join('')}</select>
+          </div>
+          <div class="field">
+            <label class="field-lbl">動作參照</label>
+            <select name="workoutRef"><option value="">（無）</option>${PlanData.workouts.map((w) => `<option value="${w.id}" ${it.workoutRef === w.id ? 'selected' : ''}>${h(w.name)}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>
+        <div class="row">
+          <label class="checkrow"><input type="checkbox" name="intensityDerived" ${it.intensityDerived ? 'checked' : ''}> 強度是內插值</label>
+          <label class="checkrow"><input type="checkbox" name="derived" ${it.derived ? 'checked' : ''}> 內容是推導值</label>
+        </div>
+        <div class="actions">
+          <button class="btn" style="background:var(--warn)" onclick="A.saveItemEdit(${weekNumber},${dayIndex},'${isNew ? 'new' : jsq(it.id)}')">儲存</button>
+          <button class="btn secondary" onclick="A.cancelEditItem()">取消</button>
         </div>
       </div>
     </div>
@@ -334,8 +439,10 @@ function renderSafetyCard() {
 // ── 頁面 2：週視圖 ───────────────────────────────────────────────────────────
 function renderWeekPage(state) {
   const wn = state.weekViewNumber;
-  const w = PlanData.week(wn);
+  const w = Store.effectiveWeek(wn);
   const phase = PlanData.phaseForWeek(wn);
+  const coach = Store.coachMode;
+  const hasOverride = !!Store.planOverrides[wn];
   const loc = PlanData.locateToday();
   const todayKey = loc.status === 'in-plan' ? loc.key : null;
 
@@ -373,6 +480,41 @@ function renderWeekPage(state) {
       ${w.weeklyVolumeKm ? `
         <div class="banner info" style="margin-top:12px">${ICON.info}<div>本週跑量參考上限 ${w.weeklyVolumeKm.min}-${w.weeklyVolumeKm.max}K（第四節數字，是參考值，不是本週課表加總）</div></div>
       ` : (w.weeklyVolumeNullReason ? `<div class="banner info" style="margin-top:12px">${ICON.info}<div>${h(w.weeklyVolumeNullReason)}</div></div>` : '')}
+      ${coach ? renderWeekCoachPanel(wn, w, hasOverride) : ''}
+    </div>
+  `;
+}
+
+function renderWeekCoachPanel(wn, w, hasOverride) {
+  return `
+    <div class="card" style="margin-top:12px;border-color:var(--warn)">
+      <div style="font-weight:700;font-size:12.5px;color:var(--warn);margin-bottom:10px">🛠 本週課表設定</div>
+      <div class="edit-form">
+        <div class="row">
+          <div class="field">
+            <label class="field-lbl">長跑計量單位</label>
+            <select onchange="A.setLongRunMetric(${wn}, this.value)">
+              <option value="" ${!w.longRunMetric ? 'selected' : ''}>（無長跑）</option>
+              <option value="time" ${w.longRunMetric === 'time' ? 'selected' : ''}>以時間計</option>
+              <option value="distance" ${w.longRunMetric === 'distance' ? 'selected' : ''}>以距離計</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="field-lbl">週跑量參考下限（K）</label><input id="wv-min-${wn}" type="number" min="0" value="${w.weeklyVolumeKm ? w.weeklyVolumeKm.min : ''}"></div>
+          <div class="field"><label class="field-lbl">週跑量參考上限（K）</label><input id="wv-max-${wn}" type="number" min="0" value="${w.weeklyVolumeKm ? w.weeklyVolumeKm.max : ''}"></div>
+        </div>
+        <div class="actions">
+          <button class="btn" style="background:var(--warn);width:auto;padding:8px 14px;font-size:13px"
+            onclick="A.setWeeklyVolume(${wn}, document.getElementById('wv-min-${wn}').value, document.getElementById('wv-max-${wn}').value)">更新週跑量</button>
+        </div>
+      </div>
+      ${hasOverride ? `
+        <div class="actions" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--warn)">
+          <button class="btn danger" style="width:auto;padding:8px 14px;font-size:13px" onclick="A.resetWeekOverride(${wn})">還原本週為出廠預設值</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--text3);margin-top:6px">這週已經被教練模式改過。</div>
+      ` : `<div style="font-size:11.5px;color:var(--text3);margin-top:10px">這週目前是出廠預設值。</div>`}
     </div>
   `;
 }
@@ -456,7 +598,7 @@ function renderOverviewPage(state) {
 function renderLongRunTrend(userId) {
   const points = [];
   for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) {
-    const w = PlanData.week(wn);
+    const w = Store.effectiveWeek(wn);
     const longIdx = w.days.findIndex((d) => !d.selectOne && d.items.some((it) => it.type === 'long-run' || it.type === 'race'));
     if (longIdx === -1) continue;
     const item = w.days[longIdx].items.find((it) => it.type === 'long-run' || it.type === 'race');
@@ -538,6 +680,17 @@ function renderSettingsPage(state) {
       <div class="share-box">
         同一個網址分享給對方，對方登入自己的 Google 帳號後，在這頁選自己的名字即可——不需要對方有 GitHub 帳號。<br>
         目前網址：<code>${h(location.href.split('#')[0])}</code>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">教練模式</div>
+      <div class="coach-toggle-row">
+        <div>
+          <div style="font-weight:700;font-size:14px">編輯課表內容</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">開啟後可以在「今日」「本週」直接調整項目、順序、二擇一，改的是所有人共用的課表。</div>
+        </div>
+        <label class="switch"><input type="checkbox" ${Store.coachMode ? 'checked' : ''} onchange="A.toggleCoachMode()"><span class="slider"></span></label>
       </div>
     </div>
 

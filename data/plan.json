@@ -1,7 +1,7 @@
 {
   "planId": "tokyo-marathon-2027",
-  "planVersion": 2,
-  "schemaVersion": 2,
+  "planVersion": 3,
+  "schemaVersion": 3,
   "startDate": "2026-09-07",
   "raceDate": "2027-03-07",
   "expiredBefore": "2026-09-10",
@@ -96,7 +96,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "1-0-0"
             }
           ],
           "dayIndex": 0
@@ -123,7 +124,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "1-1-0"
             }
           ],
           "dayIndex": 1
@@ -147,7 +149,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "1-2-0"
             }
           ],
           "dayIndex": 2
@@ -174,7 +177,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "1-3-0"
             }
           ],
           "dayIndex": 3
@@ -201,7 +205,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "1-4-0"
             }
           ],
           "dayIndex": 4
@@ -228,7 +233,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
-              "derived": false
+              "derived": false,
+              "id": "1-5-0"
             }
           ],
           "dayIndex": 5
@@ -249,7 +255,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "1-6-0"
             },
             {
               "type": "recovery",
@@ -269,7 +276,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "1-6-1"
             }
           ],
           "dayIndex": 6
@@ -304,7 +312,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "2-0-0"
             }
           ],
           "dayIndex": 0
@@ -331,7 +340,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "2-1-0"
             }
           ],
           "dayIndex": 1
@@ -355,7 +365,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "2-2-0"
             }
           ],
           "dayIndex": 2
@@ -382,7 +393,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "2-3-0"
             }
           ],
           "dayIndex": 3
@@ -409,7 +421,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "2-4-0"
             }
           ],
           "dayIndex": 4
@@ -436,7 +449,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
-              "derived": false
+              "derived": false,
+              "id": "2-5-0"
             }
           ],
           "dayIndex": 5
@@ -457,7 +471,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "2-6-0"
             },
             {
               "type": "recovery",
@@ -477,7 +492,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "2-6-1"
             }
           ],
           "dayIndex": 6
@@ -512,7 +528,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "3-0-0"
             }
           ],
           "dayIndex": 0
@@ -539,7 +556,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "3-1-0"
             }
           ],
           "dayIndex": 1
@@ -563,7 +581,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "3-2-0"
             }
           ],
           "dayIndex": 2
@@ -590,7 +609,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "3-3-0"
             }
           ],
           "dayIndex": 3
@@ -617,7 +637,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "3-4-0"
             }
           ],
           "dayIndex": 4
@@ -644,7 +665,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
-              "derived": false
+              "derived": false,
+              "id": "3-5-0"
             }
           ],
           "dayIndex": 5
@@ -665,7 +687,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "3-6-0"
             },
             {
               "type": "recovery",
@@ -685,7 +708,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "3-6-1"
             }
           ],
           "dayIndex": 6
@@ -720,7 +744,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "4-0-0"
             }
           ],
           "dayIndex": 0
@@ -747,7 +772,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "4-1-0"
             }
           ],
           "dayIndex": 1
@@ -771,7 +797,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "4-2-0"
             }
           ],
           "dayIndex": 2
@@ -798,7 +825,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "4-3-0"
             }
           ],
           "dayIndex": 3
@@ -825,7 +853,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "4-4-0"
             }
           ],
           "dayIndex": 4
@@ -852,7 +881,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
-              "derived": false
+              "derived": false,
+              "id": "4-5-0"
             }
           ],
           "dayIndex": 5
@@ -873,7 +903,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "4-6-0"
             },
             {
               "type": "recovery",
@@ -893,7 +924,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "4-6-1"
             }
           ],
           "dayIndex": 6
@@ -928,7 +960,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "5-0-0"
             }
           ],
           "dayIndex": 0
@@ -955,7 +988,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "5-1-0"
             }
           ],
           "dayIndex": 1
@@ -979,7 +1013,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "5-2-0"
             }
           ],
           "dayIndex": 2
@@ -1006,7 +1041,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "5-3-0"
             }
           ],
           "dayIndex": 3
@@ -1033,7 +1069,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "5-4-0"
             }
           ],
           "dayIndex": 4
@@ -1060,7 +1097,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
-              "derived": false
+              "derived": false,
+              "id": "5-5-0"
             }
           ],
           "dayIndex": 5
@@ -1081,7 +1119,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "5-6-0"
             },
             {
               "type": "recovery",
@@ -1101,7 +1140,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "5-6-1"
             }
           ],
           "dayIndex": 6
@@ -1136,7 +1176,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "6-0-0"
             }
           ],
           "dayIndex": 0
@@ -1163,7 +1204,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "6-1-0"
             }
           ],
           "dayIndex": 1
@@ -1187,7 +1229,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "6-2-0"
             }
           ],
           "dayIndex": 2
@@ -1214,7 +1257,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "6-3-0"
             }
           ],
           "dayIndex": 3
@@ -1241,7 +1285,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "6-4-0"
             }
           ],
           "dayIndex": 4
@@ -1268,7 +1313,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
-              "derived": false
+              "derived": false,
+              "id": "6-5-0"
             }
           ],
           "dayIndex": 5
@@ -1289,7 +1335,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "6-6-0"
             },
             {
               "type": "recovery",
@@ -1309,7 +1356,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "6-6-1"
             }
           ],
           "dayIndex": 6
@@ -1348,7 +1396,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "7-0-0"
             }
           ],
           "dayIndex": 0
@@ -1375,7 +1424,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "7-1-0"
             }
           ],
           "dayIndex": 1
@@ -1399,7 +1449,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "7-2-0"
             }
           ],
           "dayIndex": 2
@@ -1426,7 +1477,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "7-3-0"
             }
           ],
           "dayIndex": 3
@@ -1453,7 +1505,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "7-4-0"
             }
           ],
           "dayIndex": 4
@@ -1480,7 +1533,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節：本階段最後兩週轉為全程跑。仍以時間計。",
-              "derived": false
+              "derived": false,
+              "id": "7-5-0"
             }
           ],
           "dayIndex": 5
@@ -1501,7 +1555,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "7-6-0"
             },
             {
               "type": "recovery",
@@ -1521,7 +1576,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "7-6-1"
             }
           ],
           "dayIndex": 6
@@ -1560,7 +1616,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。",
-              "derived": false
+              "derived": false,
+              "id": "8-0-0"
             }
           ],
           "dayIndex": 0
@@ -1587,7 +1644,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
-              "derived": false
+              "derived": false,
+              "id": "8-1-0"
             }
           ],
           "dayIndex": 1
@@ -1611,7 +1669,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。",
-              "derived": false
+              "derived": false,
+              "id": "8-2-0"
             }
           ],
           "dayIndex": 2
@@ -1638,7 +1697,8 @@
               "videoRef": "fitnessblender-postpartum",
               "workoutRef": null,
               "notes": "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。",
-              "derived": false
+              "derived": false,
+              "id": "8-3-0"
             }
           ],
           "dayIndex": 3
@@ -1665,7 +1725,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "逐步拉長跑段比例。",
-              "derived": false
+              "derived": false,
+              "id": "8-4-0"
             }
           ],
           "dayIndex": 4
@@ -1692,7 +1753,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節：本階段最後兩週轉為全程跑。仍以時間計。",
-              "derived": false
+              "derived": false,
+              "id": "8-5-0"
             }
           ],
           "dayIndex": 5
@@ -1713,7 +1775,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "8-6-0"
             },
             {
               "type": "recovery",
@@ -1733,7 +1796,8 @@
               "videoRef": "pamela-daily-stretch",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "8-6-1"
             }
           ],
           "dayIndex": 6
@@ -1772,7 +1836,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "9-0-0"
             }
           ],
           "dayIndex": 0
@@ -1799,7 +1864,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "9-1-0"
             }
           ],
           "dayIndex": 1
@@ -1823,7 +1889,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "9-2-0"
             }
           ],
           "dayIndex": 2
@@ -1850,7 +1917,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "9-3-0"
             },
             {
               "type": "recovery",
@@ -1870,7 +1938,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "9-3-1"
             }
           ],
           "dayIndex": 3
@@ -1894,7 +1963,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "9-4-0"
             }
           ],
           "dayIndex": 4
@@ -1921,7 +1991,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "9-5-0"
             }
           ],
           "dayIndex": 5
@@ -1942,7 +2013,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "9-6-0"
             },
             {
               "type": "recovery",
@@ -1962,7 +2034,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "9-6-1"
             }
           ],
           "dayIndex": 6
@@ -2001,7 +2074,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "10-0-0"
             }
           ],
           "dayIndex": 0
@@ -2028,7 +2102,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "10-1-0"
             }
           ],
           "dayIndex": 1
@@ -2052,7 +2127,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "10-2-0"
             }
           ],
           "dayIndex": 2
@@ -2079,7 +2155,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "10-3-0"
             },
             {
               "type": "recovery",
@@ -2099,7 +2176,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "10-3-1"
             }
           ],
           "dayIndex": 3
@@ -2123,7 +2201,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "10-4-0"
             }
           ],
           "dayIndex": 4
@@ -2150,7 +2229,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "10-5-0"
             }
           ],
           "dayIndex": 5
@@ -2171,7 +2251,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "10-6-0"
             },
             {
               "type": "recovery",
@@ -2191,7 +2272,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "10-6-1"
             }
           ],
           "dayIndex": 6
@@ -2230,7 +2312,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "11-0-0"
             }
           ],
           "dayIndex": 0
@@ -2257,7 +2340,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "11-1-0"
             }
           ],
           "dayIndex": 1
@@ -2281,7 +2365,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "11-2-0"
             }
           ],
           "dayIndex": 2
@@ -2308,7 +2393,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "11-3-0"
             },
             {
               "type": "recovery",
@@ -2328,7 +2414,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "11-3-1"
             }
           ],
           "dayIndex": 3
@@ -2352,7 +2439,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "11-4-0"
             }
           ],
           "dayIndex": 4
@@ -2379,7 +2467,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "11-5-0"
             }
           ],
           "dayIndex": 5
@@ -2400,7 +2489,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "11-6-0"
             },
             {
               "type": "recovery",
@@ -2420,7 +2510,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "11-6-1"
             }
           ],
           "dayIndex": 6
@@ -2459,7 +2550,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "12-0-0"
             }
           ],
           "dayIndex": 0
@@ -2486,7 +2578,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "12-1-0"
             }
           ],
           "dayIndex": 1
@@ -2510,7 +2603,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "12-2-0"
             }
           ],
           "dayIndex": 2
@@ -2537,7 +2631,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "12-3-0"
             },
             {
               "type": "recovery",
@@ -2557,7 +2652,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "12-3-1"
             }
           ],
           "dayIndex": 3
@@ -2581,7 +2677,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "12-4-0"
             }
           ],
           "dayIndex": 4
@@ -2608,7 +2705,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "12-5-0"
             }
           ],
           "dayIndex": 5
@@ -2629,7 +2727,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "12-6-0"
             },
             {
               "type": "recovery",
@@ -2649,7 +2748,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "12-6-1"
             }
           ],
           "dayIndex": 6
@@ -2688,7 +2788,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "13-0-0"
             }
           ],
           "dayIndex": 0
@@ -2715,7 +2816,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "13-1-0"
             }
           ],
           "dayIndex": 1
@@ -2739,7 +2841,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "13-2-0"
             }
           ],
           "dayIndex": 2
@@ -2766,7 +2869,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "13-3-0"
             },
             {
               "type": "recovery",
@@ -2786,7 +2890,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "13-3-1"
             }
           ],
           "dayIndex": 3
@@ -2810,7 +2915,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "13-4-0"
             }
           ],
           "dayIndex": 4
@@ -2837,7 +2943,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "13-5-0"
             }
           ],
           "dayIndex": 5
@@ -2858,7 +2965,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "13-6-0"
             },
             {
               "type": "recovery",
@@ -2878,7 +2986,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "13-6-1"
             }
           ],
           "dayIndex": 6
@@ -2917,7 +3026,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "14-0-0"
             }
           ],
           "dayIndex": 0
@@ -2944,7 +3054,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "14-1-0"
             }
           ],
           "dayIndex": 1
@@ -2968,7 +3079,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "14-2-0"
             }
           ],
           "dayIndex": 2
@@ -2995,7 +3107,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "14-3-0"
             },
             {
               "type": "recovery",
@@ -3015,7 +3128,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "14-3-1"
             }
           ],
           "dayIndex": 3
@@ -3039,7 +3153,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "14-4-0"
             }
           ],
           "dayIndex": 4
@@ -3066,7 +3181,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "14-5-0"
             }
           ],
           "dayIndex": 5
@@ -3087,7 +3203,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "14-6-0"
             },
             {
               "type": "recovery",
@@ -3107,7 +3224,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "14-6-1"
             }
           ],
           "dayIndex": 6
@@ -3146,7 +3264,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "15-0-0"
             }
           ],
           "dayIndex": 0
@@ -3173,7 +3292,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "15-1-0"
             }
           ],
           "dayIndex": 1
@@ -3197,7 +3317,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "15-2-0"
             }
           ],
           "dayIndex": 2
@@ -3224,7 +3345,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "15-3-0"
             },
             {
               "type": "recovery",
@@ -3244,7 +3366,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "15-3-1"
             }
           ],
           "dayIndex": 3
@@ -3268,7 +3391,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "15-4-0"
             }
           ],
           "dayIndex": 4
@@ -3295,7 +3419,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "15-5-0"
             }
           ],
           "dayIndex": 5
@@ -3316,7 +3441,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "15-6-0"
             },
             {
               "type": "recovery",
@@ -3336,7 +3462,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "15-6-1"
             }
           ],
           "dayIndex": 6
@@ -3375,7 +3502,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "16-0-0"
             }
           ],
           "dayIndex": 0
@@ -3402,7 +3530,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "全程跑，不再走跑交替。",
-              "derived": false
+              "derived": false,
+              "id": "16-1-0"
             }
           ],
           "dayIndex": 1
@@ -3426,7 +3555,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "16-2-0"
             }
           ],
           "dayIndex": 2
@@ -3453,7 +3583,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "16-3-0"
             },
             {
               "type": "recovery",
@@ -3473,7 +3604,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "16-3-1"
             }
           ],
           "dayIndex": 3
@@ -3497,7 +3629,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": "（時長 30 分沿用 Phase 1，原文未給）",
-              "derived": true
+              "derived": true,
+              "id": "16-4-0"
             }
           ],
           "dayIndex": 4
@@ -3524,7 +3657,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）",
-              "derived": false
+              "derived": false,
+              "id": "16-5-0"
             }
           ],
           "dayIndex": 5
@@ -3545,7 +3679,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "16-6-0"
             },
             {
               "type": "recovery",
@@ -3565,7 +3700,8 @@
               "videoRef": "pamela-abs-yoga",
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "16-6-1"
             }
           ],
           "dayIndex": 6
@@ -3604,7 +3740,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "17-0-0"
             }
           ],
           "dayIndex": 0
@@ -3631,7 +3768,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "17-1-0"
             }
           ],
           "dayIndex": 1
@@ -3655,7 +3793,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "17-2-0"
             },
             {
               "type": "strength",
@@ -3672,7 +3811,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "17-2-1"
             }
           ],
           "dayIndex": 2
@@ -3699,7 +3839,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "17-3-0"
             },
             {
               "type": "tempo",
@@ -3719,7 +3860,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
-              "derived": false
+              "derived": false,
+              "id": "17-3-1"
             }
           ],
           "dayIndex": 3
@@ -3746,7 +3888,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "17-4-0"
             },
             {
               "type": "rest",
@@ -3760,7 +3903,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "17-4-1"
             }
           ],
           "dayIndex": 4
@@ -3787,7 +3931,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
-              "derived": false
+              "derived": false,
+              "id": "17-5-0"
             }
           ],
           "dayIndex": 5
@@ -3808,7 +3953,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "17-6-0"
             }
           ],
           "dayIndex": 6
@@ -3847,7 +3993,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "18-0-0"
             }
           ],
           "dayIndex": 0
@@ -3874,7 +4021,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "18-1-0"
             }
           ],
           "dayIndex": 1
@@ -3898,7 +4046,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "18-2-0"
             },
             {
               "type": "strength",
@@ -3915,7 +4064,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "18-2-1"
             }
           ],
           "dayIndex": 2
@@ -3942,7 +4092,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "18-3-0"
             },
             {
               "type": "tempo",
@@ -3962,7 +4113,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
-              "derived": false
+              "derived": false,
+              "id": "18-3-1"
             }
           ],
           "dayIndex": 3
@@ -3989,7 +4141,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "18-4-0"
             },
             {
               "type": "rest",
@@ -4003,7 +4156,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "18-4-1"
             }
           ],
           "dayIndex": 4
@@ -4030,7 +4184,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
-              "derived": false
+              "derived": false,
+              "id": "18-5-0"
             }
           ],
           "dayIndex": 5
@@ -4051,7 +4206,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "18-6-0"
             }
           ],
           "dayIndex": 6
@@ -4090,7 +4246,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "19-0-0"
             }
           ],
           "dayIndex": 0
@@ -4117,7 +4274,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "19-1-0"
             }
           ],
           "dayIndex": 1
@@ -4141,7 +4299,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "19-2-0"
             },
             {
               "type": "strength",
@@ -4158,7 +4317,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "19-2-1"
             }
           ],
           "dayIndex": 2
@@ -4185,7 +4345,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "19-3-0"
             },
             {
               "type": "tempo",
@@ -4205,7 +4366,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
-              "derived": false
+              "derived": false,
+              "id": "19-3-1"
             }
           ],
           "dayIndex": 3
@@ -4232,7 +4394,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "19-4-0"
             },
             {
               "type": "rest",
@@ -4246,7 +4409,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "19-4-1"
             }
           ],
           "dayIndex": 4
@@ -4273,7 +4437,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
-              "derived": false
+              "derived": false,
+              "id": "19-5-0"
             }
           ],
           "dayIndex": 5
@@ -4294,7 +4459,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "19-6-0"
             }
           ],
           "dayIndex": 6
@@ -4333,7 +4499,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "20-0-0"
             }
           ],
           "dayIndex": 0
@@ -4360,7 +4527,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "20-1-0"
             }
           ],
           "dayIndex": 1
@@ -4384,7 +4552,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "20-2-0"
             },
             {
               "type": "strength",
@@ -4401,7 +4570,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "20-2-1"
             }
           ],
           "dayIndex": 2
@@ -4428,7 +4598,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "20-3-0"
             },
             {
               "type": "tempo",
@@ -4448,7 +4619,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
-              "derived": false
+              "derived": false,
+              "id": "20-3-1"
             }
           ],
           "dayIndex": 3
@@ -4475,7 +4647,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "20-4-0"
             },
             {
               "type": "rest",
@@ -4489,7 +4662,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "20-4-1"
             }
           ],
           "dayIndex": 4
@@ -4516,7 +4690,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
-              "derived": false
+              "derived": false,
+              "id": "20-5-0"
             }
           ],
           "dayIndex": 5
@@ -4537,7 +4712,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "20-6-0"
             }
           ],
           "dayIndex": 6
@@ -4576,7 +4752,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "21-0-0"
             }
           ],
           "dayIndex": 0
@@ -4603,7 +4780,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "21-1-0"
             }
           ],
           "dayIndex": 1
@@ -4627,7 +4805,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "21-2-0"
             },
             {
               "type": "strength",
@@ -4644,7 +4823,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "21-2-1"
             }
           ],
           "dayIndex": 2
@@ -4671,7 +4851,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "21-3-0"
             },
             {
               "type": "tempo",
@@ -4691,7 +4872,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
-              "derived": false
+              "derived": false,
+              "id": "21-3-1"
             }
           ],
           "dayIndex": 3
@@ -4718,7 +4900,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "21-4-0"
             },
             {
               "type": "rest",
@@ -4732,7 +4915,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "21-4-1"
             }
           ],
           "dayIndex": 4
@@ -4759,7 +4943,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
-              "derived": false
+              "derived": false,
+              "id": "21-5-0"
             }
           ],
           "dayIndex": 5
@@ -4780,7 +4965,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "21-6-0"
             }
           ],
           "dayIndex": 6
@@ -4819,7 +5005,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。",
-              "derived": false
+              "derived": false,
+              "id": "22-0-0"
             }
           ],
           "dayIndex": 0
@@ -4846,7 +5033,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "22-1-0"
             }
           ],
           "dayIndex": 1
@@ -4870,7 +5058,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "22-2-0"
             },
             {
               "type": "strength",
@@ -4887,7 +5076,8 @@
               "videoRef": null,
               "workoutRef": "strength-b",
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "22-2-1"
             }
           ],
           "dayIndex": 2
@@ -4914,7 +5104,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
-              "derived": false
+              "derived": false,
+              "id": "22-3-0"
             },
             {
               "type": "tempo",
@@ -4934,7 +5125,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。",
-              "derived": false
+              "derived": false,
+              "id": "22-3-1"
             }
           ],
           "dayIndex": 3
@@ -4961,7 +5153,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "22-4-0"
             },
             {
               "type": "rest",
@@ -4975,7 +5168,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "22-4-1"
             }
           ],
           "dayIndex": 4
@@ -5002,7 +5196,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "可分段插入幾公里 MP 配速（75-80%）。上限 28K——不做到 32K+ 的高強度全馬課表。",
-              "derived": false
+              "derived": false,
+              "id": "22-5-0"
             }
           ],
           "dayIndex": 5
@@ -5023,7 +5218,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": false
+              "derived": false,
+              "id": "22-6-0"
             }
           ],
           "dayIndex": 6
@@ -5058,7 +5254,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "減量期每週 2 次即可。10 分鐘版：挑 3 項。",
-              "derived": true
+              "derived": true,
+              "id": "23-0-0"
             }
           ],
           "dayIndex": 0
@@ -5085,7 +5282,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑量每週遞減約 20-30%。",
-              "derived": true
+              "derived": true,
+              "id": "23-1-0"
             }
           ],
           "dayIndex": 1
@@ -5109,7 +5307,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "極輕量，只做動作喚醒，不追求進步。",
-              "derived": true
+              "derived": true,
+              "id": "23-2-0"
             }
           ],
           "dayIndex": 2
@@ -5136,7 +5335,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：挑 3 項。",
-              "derived": true
+              "derived": true,
+              "id": "23-3-0"
             }
           ],
           "dayIndex": 3
@@ -5163,7 +5363,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "23-4-0"
             },
             {
               "type": "rest",
@@ -5177,7 +5378,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "23-4-1"
             }
           ],
           "dayIndex": 4
@@ -5204,7 +5406,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "23-5-0"
             }
           ],
           "dayIndex": 5
@@ -5225,7 +5428,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "23-6-0"
             }
           ],
           "dayIndex": 6
@@ -5260,7 +5464,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "減量期每週 2 次即可。10 分鐘版：挑 3 項。",
-              "derived": true
+              "derived": true,
+              "id": "24-0-0"
             }
           ],
           "dayIndex": 0
@@ -5287,7 +5492,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑量每週遞減約 20-30%。",
-              "derived": true
+              "derived": true,
+              "id": "24-1-0"
             }
           ],
           "dayIndex": 1
@@ -5311,7 +5517,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "極輕量，只做動作喚醒，不追求進步。",
-              "derived": true
+              "derived": true,
+              "id": "24-2-0"
             }
           ],
           "dayIndex": 2
@@ -5338,7 +5545,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：挑 3 項。",
-              "derived": true
+              "derived": true,
+              "id": "24-3-0"
             }
           ],
           "dayIndex": 3
@@ -5365,7 +5573,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "24-4-0"
             },
             {
               "type": "rest",
@@ -5379,7 +5588,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "24-4-1"
             }
           ],
           "dayIndex": 4
@@ -5406,7 +5616,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "24-5-0"
             }
           ],
           "dayIndex": 5
@@ -5427,7 +5638,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "24-6-0"
             }
           ],
           "dayIndex": 6
@@ -5462,7 +5674,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "減量期每週 2 次即可。10 分鐘版：挑 3 項。",
-              "derived": true
+              "derived": true,
+              "id": "25-0-0"
             }
           ],
           "dayIndex": 0
@@ -5489,7 +5702,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "跑量每週遞減約 20-30%。",
-              "derived": true
+              "derived": true,
+              "id": "25-1-0"
             }
           ],
           "dayIndex": 1
@@ -5513,7 +5727,8 @@
               "videoRef": null,
               "workoutRef": "strength-a",
               "notes": "極輕量，只做動作喚醒，不追求進步。",
-              "derived": true
+              "derived": true,
+              "id": "25-2-0"
             }
           ],
           "dayIndex": 2
@@ -5540,7 +5755,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-advanced",
               "notes": "10 分鐘版：挑 3 項。",
-              "derived": true
+              "derived": true,
+              "id": "25-3-0"
             }
           ],
           "dayIndex": 3
@@ -5567,7 +5783,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "25-4-0"
             },
             {
               "type": "rest",
@@ -5581,7 +5798,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "25-4-1"
             }
           ],
           "dayIndex": 4
@@ -5608,7 +5826,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "25-5-0"
             }
           ],
           "dayIndex": 5
@@ -5629,7 +5848,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "25-6-0"
             }
           ],
           "dayIndex": 6
@@ -5658,7 +5878,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "26-0-0"
             },
             {
               "type": "recovery",
@@ -5678,7 +5899,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "26-0-1"
             }
           ],
           "dayIndex": 0
@@ -5705,7 +5927,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "26-1-0"
             }
           ],
           "dayIndex": 1
@@ -5732,7 +5955,8 @@
               "videoRef": null,
               "workoutRef": "pelvic-core-basic",
               "notes": "賽週用 basic 版，不要用 advanced。",
-              "derived": true
+              "derived": true,
+              "id": "26-2-0"
             }
           ],
           "dayIndex": 2
@@ -5759,7 +5983,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "第四節：賽週 3-5K 喚醒跑。含 2-3 段稍快的段落找感覺，不累積疲勞。",
-              "derived": true
+              "derived": true,
+              "id": "26-3-0"
             }
           ],
           "dayIndex": 3
@@ -5780,7 +6005,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": null,
-              "derived": true
+              "derived": true,
+              "id": "26-4-0"
             }
           ],
           "dayIndex": 4
@@ -5801,7 +6027,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "賽前一天：確認裝備、補給、交通與起跑區。",
-              "derived": true
+              "derived": true,
+              "id": "26-5-0"
             }
           ],
           "dayIndex": 5
@@ -5828,7 +6055,8 @@
               "videoRef": null,
               "workoutRef": null,
               "notes": "比賽日。第二節沒有比賽日的心率檔位，此處沿用「長跑」65-72%。配速照 Zone 2 起跑，前 10K 寧可慢。",
-              "derived": true
+              "derived": true,
+              "id": "26-6-0"
             }
           ],
           "dayIndex": 6

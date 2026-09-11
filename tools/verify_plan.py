@@ -117,6 +117,14 @@ def main():
     empty = [f'W{w["weekNumber"]}D{d["dayIndex"]}' for w, d in days_all if not d["items"]]
     check("每天至少一個項目", not empty, str(empty[:5]))
 
+    # 教練模式的前提：完成紀錄用 item.id 對應，不是陣列位置——id 一定要存在且全域唯一，
+    # 否則兩個不同項目共用一個 id，其中一個打勾會誤標到另一個。
+    missing_id = [f'W{a}D{b} {it["title"]}' for a, b, it in items if not it.get("id")]
+    check("每個項目都有 id", not missing_id, str(missing_id[:5]))
+    all_ids = [it["id"] for _, _, it in items if it.get("id")]
+    dup_ids = {x for x in all_ids if all_ids.count(x) > 1}
+    check("項目 id 全域唯一", not dup_ids, str(list(dup_ids)[:5]))
+
     bad = []
     for w in weeks:
         kinds = [it["type"] for d in w["days"] for it in d["items"]]

@@ -13,8 +13,17 @@
 
 let fbApp = null, fbAuth = null, fbDb = null;
 let unsubEntries = null, unsubPrivate = null, unsubWeekAdj = null, unsubOtherEntries = {};
+let unsubPlanOverrides = null; // 跟上面三個不一樣：這個是共用資源，只在登入/登出時掛/拆，不隨切換身分重訂
 
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
+
+// 教練模式新增項目時要給一個不會跟出廠課表（"{週}-{天}-{序}" 格式）撞到的 id。
+// 跟 babylog js/store.js 的 uid() 同一套寫法：crypto.randomUUID() 不支援時退回時間戳+亂數。
+function newItemId() {
+  if (window.crypto && crypto.randomUUID) return 'c-' + crypto.randomUUID();
+  return 'c-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+window.newItemId = newItemId;
 
 const Sync = {
   state: 'idle', // idle | signing-in | syncing | done | fail | unauthorized | wrong-identity | write-denied
@@ -60,11 +69,14 @@ const Sync = {
     }
 
     Store._cloudPush = (kind, docId, data) => this.pushDoc(kind, docId, data);
+    Store._cloudPushPlanOverride = (weekNumber, data) => this.pushPlanOverride(weekNumber, data);
+    Store._cloudDeletePlanOverride = (weekNumber) => this.deletePlanOverride(weekNumber);
 
     fbAuth.onAuthStateChanged((user) => {
       if (!user) {
         this.user = null;
         this._detachListeners();
+        this._detachPlanOverrides();
         this._set('idle', '');
         return;
       }
@@ -76,6 +88,7 @@ const Sync = {
       this.user = { email, displayName: user.displayName, photoURL: user.photoURL };
       this._set('syncing', '同步中…');
       this._attachListeners();
+      this._attachPlanOverrides();
       this._backfillLocal(Store.activeUserId);
     });
 
@@ -159,6 +172,68 @@ const Sync = {
       }, (err) => this._handleSnapErr(err, 'weekAdjustments'));
   },
 
+  // 教練模式的共用覆寫層：只在登入/登出時掛/拆一次，跟 Store.activeUserId 切換
+  // 無關（不像 _attachListeners 那三個，那些是「這個人自己的資料」，這個是
+  // 「大家共用的課表」）。
+  _attachPlanOverrides() {
+    if (unsubPlanOverrides) return; // 已經訂閱過
+    unsubPlanOverrides = fbDb.collection('planOverrides')
+      .onSnapshot((snap) => {
+        snap.docChanges().forEach((c) => {
+          const weekNumber = Number(c.doc.id);
+          if (c.type === 'removed') { Store.clearRemoteWeekOverride(weekNumber); return; }
+          Store.mergeRemoteWeekOverride(weekNumber, c.doc.data());
+        });
+      }, (err) => this._handleSnapErr(err, 'planOverrides'));
+  },
+
+  _detachPlanOverrides() {
+    if (unsubPlanOverrides) unsubPlanOverrides();
+    unsubPlanOverrides = null;
+  },
+
+  // 三個白名單成員都能寫同一份共用課表，所以「兩人幾乎同時編輯同一週」是真的會
+  // 發生的情境，不是理論案例。整份 set(merge:false) 沒有任何版本比對的話，後寫的
+  // 人會用「他打開編輯畫面那一刻看到的舊版本」整份蓋掉先寫的人的修改，而且兩邊都
+  // 顯示「已同步」——用 transaction 做寫入前比對：baseUpdatedAt 是 app.js 的
+  // _cloneEffectiveWeek 記下「這次編輯是從哪個版本開始改的」，跟 transaction 裡
+  // 讀到的最新版本不一致就中止，不要靜默覆蓋。
+  pushPlanOverride(weekNumber, weekObj, baseUpdatedAt) {
+    if (!this.isSignedIn()) return;
+    const key = `planOverrides:${weekNumber}`;
+    const clean = JSON.parse(JSON.stringify(weekObj)); // 深層清掉 undefined（教練模式表單可能留下沒填的欄位）
+    const ref = fbDb.collection('planOverrides').doc(String(weekNumber));
+    fbDb.runTransaction((tx) => tx.get(ref).then((snap) => {
+      const remoteAt = snap.exists ? (snap.data() || {}).updatedAt || null : null;
+      if (remoteAt && remoteAt !== (baseUpdatedAt || null)) {
+        const err = new Error('plan-conflict'); err.code = 'plan-conflict'; throw err;
+      }
+      tx.set(ref, clean);
+    })).then(() => { if (this.failedWrites.delete(key)) this._notify(); })
+      .catch((err) => {
+        if (err && err.code === 'plan-conflict') {
+          this.failedWrites.add(key);
+          this._set('fail', `第 ${weekNumber} 週剛被別人改過，你這次的修改沒有存進去，請重新整理後再編輯。`);
+          // 用遠端最新版本蓋掉本機剛剛的樂觀更新，避免這台裝置的畫面跟雲端分岔。
+          ref.get().then((snap) => { if (snap.exists) Store.mergeRemoteWeekOverride(weekNumber, snap.data()); });
+          return;
+        }
+        this._onWriteError('planOverrides', String(weekNumber), '(共用課表)', key, err);
+      });
+  },
+
+  deletePlanOverride(weekNumber, backupForRollback) {
+    if (!this.isSignedIn()) return;
+    fbDb.collection('planOverrides').doc(String(weekNumber)).delete()
+      .catch((err) => {
+        // 還原失敗（離線／權限被收回）：不能讓「這台裝置看起來已還原、其他人的裝置
+        // 其實沒變」這種分岔在沒有任何提示下發生——把本機剛清掉的覆寫層放回去。
+        Store.rollbackResetWeekOverride(weekNumber, backupForRollback);
+        this._set('fail', `第 ${weekNumber} 週還原失敗（可能離線或沒有權限），課表沒有改變，請重試。` +
+          (err && err.message ? ` (${err.message})` : ''));
+      });
+  },
+
   // 讀取「其他人」的 entries（總覽頁唯讀查看用），跟自己的訂閱分開管理，
   // 用完（切換走）要記得取消，不然裝置上會一直掛著好幾個人的即時監聽。
   subscribeOtherEntries(otherUserId, onData) {
@@ -221,10 +296,16 @@ const Sync = {
   _onWriteError(kind, docId, userId, key, err) {
     this.failedWrites.add(key);
     if (err && err.code === 'permission-denied') {
-      // 最常見的原因：這個 Google 帳號沒有被授權寫入 activeUserId 這個身分
-      // （firestore.rules 的 ownerEmail() 對不上）。不要讓使用者以為資料存好了。
-      this._set('write-denied',
-        `這個 Google 帳號不能寫入「${userId}」的紀錄。請確認登入的帳號跟裝置上選的身分一致。`);
+      if (kind === 'planOverrides') {
+        // 這個集合任何白名單成員都能寫（isMember()），跟 userId 身分無關——
+        // 會被拒絕只可能是這個帳號根本不在白名單裡。
+        this._set('write-denied', '這個 Google 帳號不在白名單裡，無法編輯共用課表。');
+      } else {
+        // 最常見的原因：這個 Google 帳號沒有被授權寫入 activeUserId 這個身分
+        // （firestore.rules 的 ownerEmail() 對不上）。不要讓使用者以為資料存好了。
+        this._set('write-denied',
+          `這個 Google 帳號不能寫入「${userId}」的紀錄。請確認登入的帳號跟裝置上選的身分一致。`);
+      }
     } else {
       this._set('fail', '寫入失敗：' + (err ? err.message : ''));
     }

@@ -308,6 +308,13 @@ def build():
             days = []
             for i, entry in enumerate(ph["builder"](w)):
                 entry["dayIndex"] = i
+                # 每個項目一個固定 id（"{週次}-{星期}-{在當天的序號}"）。這是教練模式
+                # 存在的前提：完成紀錄（Store.entries[...].done）用 id 對應項目，不是用
+                # 陣列位置——教練在 UI 上新增/刪除/調整順序時，位置會變但 id 不會變，
+                # 舊的打勾紀錄才不會悄悄對到錯的項目上。verify_plan.py 有斷言檢查
+                # 全域 id 唯一。
+                for j, it in enumerate(entry["items"]):
+                    it["id"] = f"{w}-{i}-{j}"
                 days.append(entry)
             assert len(days) == 7, f"W{w} 不是 7 天"
             vol = WEEKLY_VOLUME.get(w)
@@ -322,8 +329,8 @@ def build():
 
     return {
         "planId": "tokyo-marathon-2027",
-        "planVersion": 2,
-        "schemaVersion": 2,
+        "planVersion": 3,
+        "schemaVersion": 3,  # v3：每個項目多了固定 id（教練模式用，見上方 build() 註解）
         "startDate": START_DATE,
         "raceDate": RACE_DATE,
         "expiredBefore": EXPIRED_BEFORE,

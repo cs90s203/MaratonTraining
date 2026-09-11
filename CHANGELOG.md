@@ -4,6 +4,59 @@
 
 ---
 
+## v0.4.1 — 2026-09-11 · PlanData 查找表修正 + 教練模式
+
+### 修正：PlanData.userById/videoById/workoutById 永遠是空物件
+
+三個查找表用 shorthand property 回傳，在 IIFE 執行的那一刻（`load()` 還沒跑）就把值
+凍結成初始空物件，之後 `load()` 重新指派本地變數不會反映到已經回傳出去的物件上——
+跟 `plan/videos/workouts/users` 不一樣，那四個當時就寫成 getter。影響：影片連結、
+動作清單、總覽頁的頭像姓名縮寫全部靜默不見，不拋錯，很難發現。改成 getter，跟其他
+四個一致。同時加入 Annlin、Phoebe 兩位使用者（`data/users.json` + `firestore.rules.local`
+的 `ownerEmail` 對照）。
+
+### 新增：教練模式
+
+三個白名單成員都能切換進一個編輯模式，直接在 UI 上調整共用課表——新增/刪除/調整
+順序項目、切換二擇一、編輯週跑量參考、還原成出廠預設值。範圍與取捨見
+[決策紀錄第 11 條](docs/決策紀錄.md#11-教練模式課表從共用唯讀改成三人皆可寫)。
+
+**架構**：出廠課表（`data/plan.json`）不變，教練模式的修改存進 Firestore 新集合
+`planOverrides/{weekNumber}`，疊加在出廠值上面（`Store.effectiveWeek()`）。每個項目
+多了固定 `id`（出廠課表用 `"{週次}-{星期}-{序號}"`，教練新增的項目用
+`crypto.randomUUID()`），完成紀錄從「陣列位置對應」（`itemsDone`/`selectedChoice`）
+換成「id 對應」（`entries.done`/`selectedItemId`）——這是新增/刪除/排序項目時，
+舊的打勾紀錄不會對到錯的項目上的前提。`planVersion`/`schemaVersion` bump 到 3。
+
+### 教練模式程式碼審查：18 個代理、12 條發現通過查證（2 blocker、4 major）
+
+同樣的流程：五維度平行審查 + 逐條查證，實際重現每條發現（不只讀碼），修掉全部：
+
+- **blocker**：`planOverrides` 寫入零 schema 驗證，一份殘缺文件（缺 `days`）會讓
+  「總覽」與該週「本週」頁對所有人同時當機——連「還原成出廠預設值」這個自救按鈕
+  都畫在會當機的頁面裡，按不到。修法兩層：`Store.saveWeekOverride` 存檔前擋、
+  `Store.effectiveWeek` 讀取時也擋（壞資料當作不存在，退回出廠值）；`main.js` 的
+  `render()` 也包一層 try/catch 當最後防線。
+- **blocker**：教練能直接刪除二擇一日唯一的休息選項，把「可以完全休息」變成
+  「一定要做點什麼」，違反決策紀錄第 0 條。`deleteItem` 加兩道防呆：selectOne
+  少於 2 個選項擋下、刪除後不再有 `rest` 類型的選項也擋下。
+- **major**：教練刪掉使用者已選的選項後，舊的 `selectedItemId` 懸空卻仍被算成
+  「完成」，把完成率灌水。`dayStatus`/`weekCompletionRate` 改成先確認選中的 id
+  還存在於目前的項目清單裡。
+- **major**：整週覆寫（`merge:false`）沒有任何版本比對，兩人幾乎同時編輯同一週時
+  後寫的會靜默蓋掉先寫的。改用 Firestore transaction 比對 `baseUpdatedAt`，偵測到
+  衝突就中止並提示重新整理，不會無聲覆蓋。
+- **major**：時長/距離/RPE 輸入沒有上下限，HTML 的 `min`/`max` 只是裝飾，手滑
+  打錯會直接存進所有人共用的課表。存檔前加範圍檢查（時長 0-300 分、距離 0-100K、
+  RPE 0-10）。
+- 其餘 minor/nit：`toggleDaySelectOne` 開啟二擇一時也檢查至少 2 個選項；還原失敗
+  時回滾本機狀態並告知使用者；清空週跑量時補上 `weeklyVolumeNullReason`，避免
+  「兩個 null 同時代表不同意思」；決策紀錄補第 11 條記錄這個功能的取捨。
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+---
+
 ## v0.3.0 — 2026-09-11 · CP2-CP4 今日視圖／週視圖／總覽／使用者切換／Firestore 同步
 
 一次做完四個頁面 + 同步層。純前端 + Firebase compat SDK，零建置工具，inline

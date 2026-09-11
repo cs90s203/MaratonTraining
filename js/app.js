@@ -7,6 +7,7 @@ const App = {
     weekViewNumber: 1,
     viewingUserId: null,   // null = 預設看自己；總覽頁「查看別人」用，跟 Store.activeUserId（寫入身分）分開
     focusDay: null,        // {weekNumber,dayIndex}：週視圖點某一天要跳去看時用；null = 顯示真正的「今天」
+    editingItem: null,     // 教練模式：{weekNumber,dayIndex,itemId}，itemId==='new' 表示正在新增項目
   },
 
   goTo(page) {
@@ -17,6 +18,7 @@ const App = {
       this.state.weekViewNumber = loc.status === 'in-plan' ? loc.weekNumber
         : (loc.status === 'before-start' ? 1 : PlanData.plan.totalWeeks);
     }
+    this.state.editingItem = null;
     render();
   },
 
@@ -36,19 +38,18 @@ const App = {
     render();
   },
 
-  toggleItem(weekNumber, dayIndex, itemIndex, itemCount) {
+  toggleItem(weekNumber, dayIndex, itemId) {
     const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
-    Store.toggleItemDone(dateKey, itemIndex, itemCount);
+    Store.toggleItemDone(dateKey, itemId);
     render();
   },
 
-  selectChoice(weekNumber, dayIndex, itemIndex) {
+  selectChoice(weekNumber, dayIndex, itemId) {
     const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
     // 選了選項就直接算完成——選擇題的「選」跟「做完」在 UI 上是同一個點擊，
-    // 避免多一次操作。Store.setSelectedChoice 自己處理 itemsDone 的重建，
+    // 避免多一次操作。Store.setSelectedItem 自己處理 done 的重建，
     // 不要在這裡另外呼叫 toggleItemDone（那會把選項間切換弄壞既有的完成紀錄）。
-    const itemCount = PlanData.day(weekNumber, dayIndex).items.length;
-    Store.setSelectedChoice(dateKey, itemIndex, itemCount);
+    Store.setSelectedItem(dateKey, itemId);
     render();
   },
 
@@ -92,5 +93,204 @@ const App = {
   signIn() { Sync.signIn(); },
   signOut() { Sync.signOut(); },
   retrySync() { Sync.resubscribe(); render(); },
+
+  // ── 教練模式 ──────────────────────────────────────────────────────────────
+  // 課表內容存在 Store.planOverrides（Firestore 的 planOverrides/{週次}，白名單內
+  // 任何人都能寫）。每次編輯都是「讀整週目前有效的內容（出廠值或已有的覆寫）→
+  // 深拷貝避免動到原物件 → 改一小塊 → 整週寫回」，不逐項目局部更新——這樣新增/
+  // 刪除項目不需要處理陣列的部分寫入語意。
+
+  toggleCoachMode() {
+    Store.setCoachMode(!Store.coachMode);
+    this.state.editingItem = null;
+    render();
+  },
+
+  startEditItem(weekNumber, dayIndex, itemId) {
+    this.state.editingItem = { weekNumber, dayIndex, itemId };
+    render();
+  },
+
+  startAddItem(weekNumber, dayIndex) {
+    this.state.editingItem = { weekNumber, dayIndex, itemId: 'new' };
+    render();
+  },
+
+  cancelEditItem() {
+    this.state.editingItem = null;
+    render();
+  },
+
+  _cloneEffectiveWeek(weekNumber) {
+    const current = Store.effectiveWeek(weekNumber);
+    const clone = JSON.parse(JSON.stringify(current));
+    // 記住這次編輯是從哪個版本開始改的（出廠值沒有 updatedAt，null 也是有效的
+    // 起點）。firebase-sync.js 存檔前會拿這個跟雲端最新版本比對，偵測「別人剛好
+    // 也在改這週」的衝突——三個白名單成員共用同一份課表，這是真的會發生的情境。
+    clone.__baseUpdatedAt = current.updatedAt || null;
+    return clone;
+  },
+
+  // 讀 #item-edit-... 表單容器裡的欄位值，組成一個 item 物件。用 scoped querySelector
+  // 而不是把 12 個欄位塞進 onclick 參數——那樣任何欄位含引號/特殊字元都會拼壞整串
+  // inline JS（jsq() 只解決得了單一個字串參數，解決不了一次塞 12 個）。
+  _readItemForm(formId) {
+    const root = document.getElementById(formId);
+    if (!root) return null;
+    const val = (name) => { const el = root.querySelector(`[name="${name}"]`); return el ? el.value.trim() : ''; };
+    const checked = (name) => { const el = root.querySelector(`[name="${name}"]`); return !!(el && el.checked); };
+    const range = (minName, maxName) => {
+      const min = val(minName), max = val(maxName);
+      if (min === '' && max === '') return null;
+      const a = min === '' ? Number(max) : Number(min);
+      const b = max === '' ? Number(min) : Number(max);
+      if (Number.isNaN(a) || Number.isNaN(b)) return null;
+      return { min: Math.min(a, b), max: Math.max(a, b) };
+    };
+    return {
+      type: val('type'),
+      title: val('title'),
+      duration: range('durationMin', 'durationMax'),
+      distanceKm: range('distanceMin', 'distanceMax'),
+      heartRateZone: val('heartRateZone') || null,
+      rpe: range('rpeMin', 'rpeMax'),
+      intensityNote: val('intensityNote') || null,
+      intensityDerived: checked('intensityDerived'),
+      videoRef: val('videoRef') || null,
+      workoutRef: val('workoutRef') || null,
+      notes: val('notes') || null,
+      derived: checked('derived'),
+    };
+  },
+
+  // 存檔前的健全性檢查——這是一份「寧可保守也不要硬撐」的產後恢復課表，教練模式
+  // 開了一條跟出廠資料（有 tools/verify_plan.py 一路守著）完全平行、沒人守的
+  // 寫入路徑：HTML input 的 min/max 只是視覺提示，不會真的擋住送出的值。手滑打錯
+  // 一個負號或多打幾個 9，就會讓所有人看到「RPE 2-9999」，且不會有任何錯誤訊息。
+  _validateItemFields(fields) {
+    if (!fields.title) return '標題不能空白';
+    if (!VALID_TYPES.includes(fields.type)) return '類型不合法';
+    const r = fields.duration;
+    if (r && (r.min < 0 || r.max > 300)) return '時長要在 0-300 分鐘之間';
+    const k = fields.distanceKm;
+    if (k && (k.min < 0 || k.max > 100)) return '距離要在 0-100 公里之間';
+    const p = fields.rpe;
+    if (p && (p.min < 0 || p.max > 10)) return 'RPE 要在 0-10 之間';
+    return null;
+  },
+
+  saveItemEdit(weekNumber, dayIndex, itemIdOrNew) {
+    const isNew = itemIdOrNew === 'new';
+    const formId = `item-edit-${weekNumber}-${dayIndex}-${itemIdOrNew}`;
+    const fields = this._readItemForm(formId);
+    if (!fields) return;
+    const err = this._validateItemFields(fields);
+    if (err) { alert(err); return; }
+
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const day = week.days[dayIndex];
+    if (isNew) {
+      fields.id = newItemId();
+      day.items.push(fields);
+    } else {
+      const idx = day.items.findIndex((it) => it.id === itemIdOrNew);
+      if (idx === -1) return;
+      fields.id = itemIdOrNew; // id 永遠不變，這是教練模式安全性的核心
+      day.items[idx] = fields;
+    }
+    Store.saveWeekOverride(weekNumber, week);
+    this.state.editingItem = null;
+    render();
+  },
+
+  deleteItem(weekNumber, dayIndex, itemId) {
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const day = week.days[dayIndex];
+    if (day.items.length <= 1) { alert('這天至少要留一個項目——原規格書的教訓：一天空白會讓畫面壞掉。'); return; }
+
+    const target = day.items.find((it) => it.id === itemId);
+    if (day.selectOne) {
+      // tools/verify_plan.py 的 B4 檢查「selectOne 的日子至少兩個選項」，但那條規則
+      // 只管出廠課表，教練模式完全繞過它——刪到剩 1 個會讓「二擇一」這個語意失真。
+      if (day.items.length <= 2) { alert('這天是「二擇一」，至少要留兩個選項。'); return; }
+      // 決策紀錄第 0 條：「休息或受傷的調整，不應該變相增加強度」。刪掉二擇一裡
+      // 唯一的休息選項，等於把「可以完全休息」變成「一定要做點什麼」——負荷確定
+      // 比原本高，這正是第 0 條明講禁止的事，不是一般的內容編輯，直接擋下。
+      const restCount = day.items.filter((it) => it.type === 'rest').length;
+      if (target && target.type === 'rest' && restCount <= 1) {
+        alert('不能刪除這天唯一的休息選項——決策紀錄第 0 條：調整不能變相增加強度。');
+        return;
+      }
+    }
+
+    if (!confirm('確定刪除這個項目？已經打過勾的舊紀錄會保留在資料裡，但畫面上不會再顯示。')) return;
+    day.items = day.items.filter((it) => it.id !== itemId);
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
+
+  moveItem(weekNumber, dayIndex, itemId, direction) {
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const day = week.days[dayIndex];
+    const idx = day.items.findIndex((it) => it.id === itemId);
+    const swapWith = idx + direction;
+    if (idx === -1 || swapWith < 0 || swapWith >= day.items.length) return;
+    const tmp = day.items[idx];
+    day.items[idx] = day.items[swapWith];
+    day.items[swapWith] = tmp;
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
+
+  toggleDaySelectOne(weekNumber, dayIndex) {
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const day = week.days[dayIndex];
+    if (!day.selectOne && day.items.length < 2) {
+      alert('「二擇一」至少要有兩個選項，請先新增一個項目再切換。');
+      return;
+    }
+    day.selectOne = !day.selectOne;
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
+
+  setDayNotes(weekNumber, dayIndex, value) {
+    const week = this._cloneEffectiveWeek(weekNumber);
+    week.days[dayIndex].dayNotes = value || null;
+    Store.saveWeekOverride(weekNumber, week);
+    // 不 render()：跟 setNote 同理，避免 textarea 失焦。
+  },
+
+  setLongRunMetric(weekNumber, value) {
+    const week = this._cloneEffectiveWeek(weekNumber);
+    week.longRunMetric = value || null;
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
+
+  setWeeklyVolume(weekNumber, minVal, maxVal) {
+    const week = this._cloneEffectiveWeek(weekNumber);
+    if (minVal === '' && maxVal === '') {
+      // 決策紀錄第 8 條：「不要讓 null 同時代表三件事」——weeklyVolumeKm 跟
+      // weeklyVolumeNullReason 不能一起是 null，否則週視圖的說明橫幅會無聲消失，
+      // 使用者不知道這週的跑量參考是「本來沒有」還是「教練清掉了」。
+      week.weeklyVolumeKm = null;
+      week.weeklyVolumeNullReason = '教練已清除本週跑量參考';
+    } else {
+      const a = minVal === '' ? Number(maxVal) : Number(minVal);
+      const b = maxVal === '' ? Number(minVal) : Number(maxVal);
+      if (Number.isNaN(a) || Number.isNaN(b) || a < 0 || b > 100) { alert('週跑量要在 0-100 公里之間'); return; }
+      week.weeklyVolumeKm = { min: Math.min(a, b), max: Math.max(a, b), kind: 'reference' };
+      week.weeklyVolumeNullReason = null;
+    }
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
+
+  resetWeekOverride(weekNumber) {
+    if (!confirm('確定要把這週還原成出廠預設值嗎？你在這週做的所有調整都會消失（其他週不受影響）。')) return;
+    Store.resetWeekOverride(weekNumber);
+    render();
+  },
 };
 const A = App; // 給 inline onclick="A.xxx()" 用的短名

@@ -70,7 +70,9 @@ GitHub Pages：Settings → Pages → Source 選 `main` / root。網址會是
 - [x] **CP2** 今日視圖
 - [x] **CP3** 接 Firestore + 離線與失敗狀態
 - [x] **CP4** 週視圖、總覽、使用者切換
-- [ ] **CP5** 部署到 GitHub Pages + 邀請伴侶/教練（填 `data/users.json` +
+- [x] **教練模式** 三人皆可切換編輯共用課表（設定頁開關），見
+      [決策紀錄第 11 條](docs/決策紀錄.md#11-教練模式課表從共用唯讀改成三人皆可寫)
+- [ ] **CP5** 部署到 GitHub Pages + 邀請其他共用者（填 `data/users.json` +
       `firestore.rules.local` 的 `isMember()`／`ownerEmail()`）
 
 完整的規格審查報告（36 條發現）見 CHANGELOG 的 v0.1.0 條目。

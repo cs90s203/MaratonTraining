@@ -271,4 +271,61 @@ textarea.note-input {
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text2); }
 .empty-state svg { width: 40px; height: 40px; margin-bottom: 10px; opacity: .5; }
 
+/* ── 教練模式 ─────────────────────────────────────────────── */
+/* 開關關掉時（預設）完全不渲染這一整組，跟原本的畫面一模一樣——這是使用者的
+   明確要求：教練模式不能動到學員模式的 UI。 */
+.coach-banner {
+  background: var(--warnBg); color: var(--warn); font-size: 12.5px; font-weight: 700;
+  text-align: center; padding: 7px 12px; border-bottom: 1px solid var(--warn);
+}
+.coach-toolbar {
+  display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--warn);
+}
+.coach-toolbar button {
+  border: 1.5px solid var(--warn); background: var(--warnBg); color: var(--warn);
+  border-radius: 7px; padding: 5px 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 3px; line-height: 1;
+}
+.coach-toolbar button:disabled { opacity: .3; cursor: default; }
+.coach-toolbar button.danger { border-color: var(--crit); background: var(--critBg); color: var(--crit); }
+.coach-add-row { margin-top: 10px; }
+.coach-add-row .btn { border: 1.5px dashed var(--warn); background: transparent; color: var(--warn); }
+
+.item.coach-editing { border-color: var(--warn); background: var(--warnBg); }
+
+.edit-form { display: flex; flex-direction: column; gap: 10px; }
+.edit-form .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.edit-form .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 90px; }
+.edit-form .field.wide { flex: 1 1 100%; }
+.edit-form label.field-lbl { font-size: 11px; font-weight: 700; color: var(--text2); }
+.edit-form input, .edit-form select, .edit-form textarea {
+  border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text);
+  border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; width: 100%;
+}
+.edit-form textarea { min-height: 56px; resize: vertical; }
+.edit-form .checkrow { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text2); }
+.edit-form .actions { display: flex; gap: 8px; margin-top: 4px; }
+.edit-form .actions .btn { width: auto; padding: 8px 16px; font-size: 13px; }
+
+.day-coach-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; font-size: 12.5px; color: var(--warn); font-weight: 600; }
+.day-coach-row .toggle-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.day-coach-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--warn); }
+.daynotes-edit { width: 100%; margin: 8px 0; font-size: 12.5px; }
+
+.coach-toggle-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--card); border: 1.5px solid var(--warn); border-radius: 12px; padding: 13px 14px;
+}
+.switch { position: relative; display: inline-block; width: 42px; height: 24px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider {
+  position: absolute; inset: 0; background: var(--track); border-radius: 99px; cursor: pointer; transition: background .15s;
+}
+.switch .slider::before {
+  content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+  background: white; border-radius: 50%; transition: transform .15s;
+}
+.switch input:checked + .slider { background: var(--warn); }
+.switch input:checked + .slider::before { transform: translateX(18px); }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

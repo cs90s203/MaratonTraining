@@ -63,6 +63,14 @@ service cloud.firestore {
       allow write: if isSelf(userId);
     }
 
+    // 教練模式：課表內容的共用覆寫層（一份文件＝一整週）。跟上面「個人紀錄」不同，
+    // 這是白名單內任何人都能改的共用資源——決策：三個使用者都能切換教練模式編輯課表。
+    // 出廠預設值（data/plan.json）維持 git 版控、不受影響；這裡只存「被改過的週」，
+    // 沒被改過的週前端會自己退回讀 plan.json。
+    match /planOverrides/{weekNumber} {
+      allow read, write: if isMember();
+    }
+
     // 其餘一律拒絕。
     match /{document=**} {
       allow read, write: if false;
