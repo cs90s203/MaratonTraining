@@ -56,8 +56,7 @@ Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表�
 
 ## 部署
 
-GitHub Pages：Settings → Pages → Source 選 `main` / root。網址會是
-`https://cs90s203.github.io/MaratonTraining/`。
+已上線：**https://cs90s203.github.io/MaratonTraining/**（GitHub Pages，`main` 分支 / root）。
 
 改課表或改功能時**一定要 bump 版本號**並更新所有 `?v=` querystring——
 檔案伺服器不送 Cache-Control header，不改 URL 的話手機會靜默跑舊版
@@ -72,7 +71,8 @@ GitHub Pages：Settings → Pages → Source 選 `main` / root。網址會是
 - [x] **CP4** 週視圖、總覽、使用者切換
 - [x] **教練模式** 三人皆可切換編輯共用課表（設定頁開關），見
       [決策紀錄第 11 條](docs/決策紀錄.md#11-教練模式課表從共用唯讀改成三人皆可寫)
-- [ ] **CP5** 部署到 GitHub Pages + 邀請其他共用者（填 `data/users.json` +
+- [x] **CP5** 部署到 GitHub Pages——**https://cs90s203.github.io/MaratonTraining/**
+      （2026-09-11 上線；邀請新的共用者仍要補 `data/users.json` +
       `firestore.rules.local` 的 `isMember()`／`ownerEmail()`）
 
 完整的規格審查報告（36 條發現）見 CHANGELOG 的 v0.1.0 條目。
