@@ -1,0 +1,12 @@
+{
+  "name": "東京馬拉松 2027 訓練追蹤",
+  "short_name": "馬拉松訓練",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F0F3EF",
+  "theme_color": "#1F4D3D",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

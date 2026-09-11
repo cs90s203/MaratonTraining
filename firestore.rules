@@ -19,8 +19,22 @@ service cloud.firestore {
         ];
     }
 
+    // userId（data/users.json 裡的人類可讀字串，例如 "mick"）綁定哪個 email 才能寫。
+    //
+    // ⚠️ 這裡不能用 request.auth.uid == userId——Firebase Auth 的 uid 是登入時隨機
+    // 產生的字串（例如 "AbC123XyZ..."），永遠不會等於 users.json 裡的 "mick"。
+    // 兩者是不同的識別系統：uid 是「這次登入的裝置/帳號」，userId 是「App 裡的這個人」。
+    // 這個對照表就是把兩者接起來的地方——只能放在 rules（gitignore 的 .local 版本），
+    // 不能放進 data/users.json，那是公開的靜態資料，不該含任何人的 email。
+    function ownerEmail(userId) {
+      return userId == 'mick' ? 'cs90s203@gmail.com'
+        // : userId == 'partner' ? '伴侶的@gmail.com'
+        // : userId == 'coach' ? '教練的@gmail.com'
+        : null;
+    }
+
     function isSelf(userId) {
-      return isMember() && request.auth.uid == userId;
+      return isMember() && authEmail() == ownerEmail(userId);
     }
 
     // 顯示名稱等個人設定：白名單內都看得到（總覽頁要顯示別人的名字），只有本人能改。
@@ -41,6 +55,12 @@ service cloud.firestore {
     // 不是在前端多顯示一個欄位。決策紀錄第 2 條。
     match /users/{userId}/private/{date} {
       allow read, write: if isSelf(userId);
+    }
+
+    // 週調整（決策紀錄第 0 條：「本週已降量」的標記）：跟 entries 同層級的可見性。
+    match /users/{userId}/weekAdjustments/{week} {
+      allow read:  if isMember();
+      allow write: if isSelf(userId);
     }
 
     // 其餘一律拒絕。

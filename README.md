@@ -66,10 +66,11 @@ GitHub Pages：Settings → Pages → Source 選 `main` / root。網址會是
 ## 進度
 
 - [x] **CP0** 專案骨架、port 登記、架構與待決事項定案、日期修正
-- [ ] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過
-- [ ] **CP2** 今日視圖（假資料）
-- [ ] **CP3** 接 Firestore + 離線與失敗狀態
-- [ ] **CP4** 週視圖、總覽、使用者切換
-- [ ] **CP5** 部署 + 版本號顯示
+- [x] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過（39 項）
+- [x] **CP2** 今日視圖
+- [x] **CP3** 接 Firestore + 離線與失敗狀態
+- [x] **CP4** 週視圖、總覽、使用者切換
+- [ ] **CP5** 部署到 GitHub Pages + 邀請伴侶/教練（填 `data/users.json` +
+      `firestore.rules.local` 的 `isMember()`／`ownerEmail()`）
 
 完整的規格審查報告（36 條發現）見 CHANGELOG 的 v0.1.0 條目。
