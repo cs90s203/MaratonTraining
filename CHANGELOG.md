@@ -4,7 +4,37 @@
 
 ---
 
-## v0.6.2 — 2026-09-12 · 找到真正的成因：Safari「加入主畫面」模式
+## v0.6.3 — 2026-09-12 · 登入改回跟 babylog 一模一樣；v0.4.2～v0.6.2 三次修法全部撤回
+
+使用者糾正：babylog 與日文學習 App 同一套架構（GitHub Pages + firebaseapp.com
+authDomain + compat SDK 12.17.0 + iOS「加入主畫面」）登入、同步都正常——v0.6.2 斷定
+「主畫面模式無法登入」是錯的，而且把原本能用的模式整個擋掉；v0.6.1 之後連 Safari 分頁
+也登不進去。三個版本的修法都是根據網路搜尋推論出來的假設，沒有一次先比對 babylog
+的程式碼。完整對照表見 [決策紀錄第 16 條](docs/決策紀錄.md)。
+
+### 撤回
+- v0.4.2 的「Safari 改用 redirect」、v0.6.1 的「iOS/Firefox 一律 redirect」＋逾時計時＋
+  sessionStorage 旗標、v0.6.2 的「主畫面模式不讓登入」＋說明卡片，全部移除。
+
+### 改回
+- `Sync.signIn()` 一字不差照 babylog 的 `signInWithGoogle()`：popup 優先，只有
+  `auth/popup-blocked` 才退回 redirect，`auth/popup-closed-by-user` 回 idle。
+  不做任何瀏覽器／裝置判斷。
+- 帶進 babylog 2026-08-02 事故的 `experimentalAutoDetectLongPolling`（同一支手機、同樣
+  的行動網路：串流連線被中間設備弄斷時 SDK 自動退回 long-polling）。
+
+### 保留（只讓失敗看得見，不改登入機制）
+- 頂欄小標籤在「沒登入」時也會顯示「登入中…」（可再點一次重開視窗）、「登入失敗，
+  點擊重試」、「未授權」——之前這三個狀態排在「沒登入 → 點擊登入以同步」之後，永遠
+  顯示不出來。
+- 未授權時訊息寫出被拒絕的 email，且登出後狀態不洗回 idle（babylog 也這樣做）——
+  這是「帳號不在白名單／規則改了沒發布」跟「登入壞了」唯一分得出來的地方。
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+
+---
+
+## v0.6.2 — 2026-09-12 · 找到真正的成因：Safari「加入主畫面」模式（**已撤回，見 v0.6.3**）
 
 v0.6.1 上線後使用者回報還是一樣，並補了關鍵資訊：**用的是 Safari 加入主畫面的圖示**，
 不是在 Safari 分頁裡開。這徹底改變診斷方向——查證後確認這不是「該用 popup 還是

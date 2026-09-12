@@ -83,11 +83,14 @@ function renderSyncPill() {
     // 彈出視窗的結果傳不回主頁面）時 Sync.state 會變成 'signing-in' 或 'fail'，但
     // isSignedIn() 一直是 false，如果沒有這兩條，畫面會一直顯示「點擊登入以同步」，
     // 跟使用者從沒按過登入一模一樣——這正是「登入後還是跟未登入一樣」的成因。
-    if (Sync.state === 'standalone-blocked') {
-      return `<button class="sync-pill off" title="主畫面模式無法登入，詳情見「設定」頁" onclick="A.goTo('settings')"><span class="dot"></span>主畫面模式無法登入</button>`;
+    if (Sync.state === 'unauthorized') {
+      // _handleSnapErr 判定未授權後會 signOut()，這時 isSignedIn() 已經是 false——
+      // 這個分支一定要在這裡（沒登入的區塊）也有，不然畫面會退回「點擊登入以同步」。
+      return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.goTo('settings')"><span class="dot"></span>未授權</button>`;
     }
     if (Sync.state === 'signing-in') {
-      return `<span class="sync-pill busy"><span class="dot"></span>登入中…</span>`;
+      // 可以再點：彈出視窗被關掉或沒出現時，再點一次會重新開一個。
+      return `<button class="sync-pill busy" onclick="A.signIn()"><span class="dot"></span>登入中…</button>`;
     }
     if (Sync.state === 'fail') {
       return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.retrySync()"><span class="dot"></span>登入失敗，點擊重試</button>`;
@@ -942,20 +945,6 @@ function renderLongRunTrend(userId) {
 }
 
 // ── 頁面 4：使用者切換 / 分享設定 ────────────────────────────────────────────
-// 從主畫面圖示開啟時的登入說明（見 firebase-sync.js isStandaloneHomeScreenApp 的註解）：
-// 這不是「登入沒接好」，是這個模式本身的限制（儲存空間跟 Safari 分開＋ Google 拒絕
-// 在嵌入式環境登入）——所以不提供「重試」，直接給唯一可行的解法：改用 Safari 分頁。
-// 「複製網址」用 navigator.clipboard；不支援時退回顯示網址讓她自己選取複製。
-function renderStandaloneAuthNotice() {
-  const url = location.href.split('#')[0];
-  return `
-    <p style="font-size:13.5px;color:var(--text2);margin-bottom:10px">從主畫面圖示開啟時沒辦法登入同步——這是 iOS 的限制，不是這個 App 的問題：主畫面模式的資料跟 Safari 分頁是分開儲存的，而且 Google 不允許在這種模式下完成登入。</p>
-    <p style="font-size:13.5px;color:var(--text2);margin-bottom:12px">要同步的話，請改用 <b>Safari</b>（不是主畫面圖示）打開這個網址登入。本機這支裝置上已經記錄的紀錄不會遺失，登入後會照常補推上雲。</p>
-    <div class="share-box" style="margin-bottom:10px">網址：<code>${h(url)}</code></div>
-    <button class="btn secondary" onclick="A.copyAppUrl(this)">複製網址</button>
-  `;
-}
-
 function renderSettingsPage(state) {
   const users = PlanData.users;
   return `
@@ -976,25 +965,21 @@ function renderSettingsPage(state) {
     <div class="section">
       <div class="section-title">同步</div>
       <div class="card">
-        ${(() => {
-          const isStandalone = window.isStandaloneHomeScreenApp && window.isStandaloneHomeScreenApp();
-          if (isStandalone && !Sync.isSignedIn()) return renderStandaloneAuthNotice();
-          return Sync.isSignedIn() ? `
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-              ${Sync.user.photoURL ? `<img src="${h(Sync.user.photoURL)}" style="width:36px;height:36px;border-radius:50%">` : ''}
-              <div>
-                <div style="font-weight:700;font-size:14px">${h(Sync.user.displayName || Sync.user.email)}</div>
-                <div style="font-size:12px;color:var(--text2)">${h(Sync.user.email)}</div>
-              </div>
+        ${Sync.isSignedIn() ? `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            ${Sync.user.photoURL ? `<img src="${h(Sync.user.photoURL)}" style="width:36px;height:36px;border-radius:50%">` : ''}
+            <div>
+              <div style="font-weight:700;font-size:14px">${h(Sync.user.displayName || Sync.user.email)}</div>
+              <div style="font-size:12px;color:var(--text2)">${h(Sync.user.email)}</div>
             </div>
-            <button class="btn secondary" onclick="A.signOut()">登出</button>
-          ` : `
-            <p style="font-size:13.5px;color:var(--text2);margin-bottom:12px">登入 Google 帳號才能在多裝置間同步紀錄。不登入也能用，資料只留在這支裝置。</p>
-            <button class="btn" onclick="A.signIn()" ${Sync.state === 'signing-in' ? 'disabled' : ''}>${Sync.state === 'signing-in' ? '登入中…' : '使用 Google 帳號登入'}</button>
-          `;
-        })()}
+          </div>
+          <button class="btn secondary" onclick="A.signOut()">登出</button>
+        ` : `
+          <p style="font-size:13.5px;color:var(--text2);margin-bottom:12px">登入 Google 帳號才能在多裝置間同步紀錄。不登入也能用，資料只留在這支裝置。</p>
+          <button class="btn" onclick="A.signIn()">${Sync.state === 'signing-in' ? '登入中…（再點一次可重開視窗）' : '使用 Google 帳號登入'}</button>
+        `}
         ${!Sync.isSignedIn() && Sync.state === 'fail' ? `<div class="banner crit" style="margin-top:12px">${ICON.warn}<div><b>登入沒有完成</b>${h(Sync.message)}</div></div>` : ''}
-        ${Sync.state === 'unauthorized' ? `<div class="banner crit" style="margin-top:12px">${ICON.warn}<div>此帳號未被授權存取。請確認登入的 Google 帳號在白名單裡。</div></div>` : ''}
+        ${Sync.state === 'unauthorized' ? `<div class="banner crit" style="margin-top:12px">${ICON.warn}<div><b>未授權</b>${h(Sync.message)}</div></div>` : ''}
         ${Sync.state === 'wrong-identity' ? `<div class="banner warn" style="margin-top:12px">${ICON.warn}<div>${h(Sync.message)}</div></div>` : ''}
         ${Sync.persistenceDisabled ? `<div class="banner info" style="margin-top:12px">${ICON.info}<div>這台裝置的離線快取沒有啟用（可能是私密瀏覽模式）。離線時請避免關閉分頁，尚未送出的紀錄可能會遺失。</div></div>` : ''}
       </div>
