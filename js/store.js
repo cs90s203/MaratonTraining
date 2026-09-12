@@ -67,6 +67,16 @@ const RUN_TYPES = ['run', 'long-run', 'tempo'];
 const LEGACY_RUN_TYPES = ['walk-run'];
 function isRunType(t) { return RUN_TYPES.includes(t) || LEGACY_RUN_TYPES.includes(t); }
 
+// 一週的顯示順序：identity＝出廠順序（週一顯示週一的內容...）。決策紀錄第 14 條：
+// 環境因素讓某天跟另一天對調時，用這個排列表示「日曆上的第 i 天，顯示的其實是
+// 出廠課表第 order[i] 天的內容」——課表項目一個字都沒改，只是重新標籤，所以不可能
+// 變相加量。isValidDayOrder 檔壞資料（缺值、有重複）：長度 7 且涵蓋 0-6 全部，
+// 就保證是排列（不需要另外檢查重複）。
+const IDENTITY_ORDER = [0, 1, 2, 3, 4, 5, 6];
+function isValidDayOrder(order) {
+  return Array.isArray(order) && order.length === 7 && IDENTITY_ORDER.every((i) => order.includes(i));
+}
+
 function nowIso() { return new Date().toISOString(); }
 function round1(x) { return Math.round(x * 10) / 10; }
 
@@ -120,7 +130,7 @@ const Store = {
   weekViewMode: 'cards', // 'cards' | 'table'
   entries: {},          // { [userId]: { [dateKey]: entryDoc } }
   privateData: {},      // { [dateKey]: privateDoc }  — 只有 activeUserId 自己的
-  weekAdjustments: {},  // { [weekNumber]: adjDoc }   — 只有 activeUserId 自己的
+  weekAdjustments: {},  // { [userId]: { [weekNumber]: adjDoc } } — 自己的會存 localStorage；別人的（查看進度用）只在記憶體
   goals: {},            // { [userId]: goalsDoc }     — 自己的會存 localStorage；別人的只在記憶體（總覽頁唯讀）
   planOverrides: {},    // { [weekNumber]: weekDoc }  — 白名單共用，教練模式改過的週
   listeners: [],
@@ -146,7 +156,11 @@ const Store = {
     Object.keys(stored).forEach((k) => { merged[k] = mergeDocs(stored[k], mem[k]); });
     this.entries[userId] = merged;
     this.privateData = loadJSON(`mt_private::${userId}`, {});
-    this.weekAdjustments = loadJSON(`mt_weekadj::${userId}`, {});
+    const storedAdj = loadJSON(`mt_weekadj::${userId}`, {});
+    const memAdj = this.weekAdjustments[userId] || {};
+    const mergedAdj = { ...memAdj };
+    Object.keys(storedAdj).forEach((k) => { mergedAdj[k] = mergeDocs(storedAdj[k], memAdj[k]); });
+    this.weekAdjustments[userId] = mergedAdj;
     const g = loadJSON(`mt_goals::${userId}`, null);
     if (g) this.goals[userId] = mergeDocs(g, this.goals[userId]);
   },
@@ -159,7 +173,7 @@ const Store = {
   persist(silent) {
     saveJSON(`mt_entries::${this.activeUserId}`, this.entries[this.activeUserId] || {});
     saveJSON(`mt_private::${this.activeUserId}`, this.privateData);
-    saveJSON(`mt_weekadj::${this.activeUserId}`, this.weekAdjustments);
+    saveJSON(`mt_weekadj::${this.activeUserId}`, this.weekAdjustments[this.activeUserId] || {});
     if (this.goals[this.activeUserId]) saveJSON(`mt_goals::${this.activeUserId}`, this.goals[this.activeUserId]);
     if (!silent) this._notify();
   },
@@ -210,9 +224,12 @@ const Store = {
   },
 
   // 當天所有項目 id 都列出的 done map（沒勾的寫 false）——見檔頭「done 是 map」那段。
+  // 用 effectiveDayOrder 解析成「這個日曆日實際顯示的內容」，不是出廠當天——如果這天
+  // 被對調過（決策紀錄第 14 條），打的勾屬於顯示出來的那份內容，不是日曆格子本來的內容。
   _fullDone(dateKey, trueIds) {
     const loc = PlanData.locateKey(dateKey);
-    const items = loc ? this.effectiveDay(loc.weekNumber, loc.dayIndex).items : [];
+    const order = loc ? this.effectiveDayOrder(loc.weekNumber, this.activeUserId) : IDENTITY_ORDER;
+    const items = loc ? this.effectiveDay(loc.weekNumber, order[loc.dayIndex]).items : [];
     const done = {};
     items.forEach((it) => { done[it.id] = false; });
     Object.keys(trueIds || {}).forEach((id) => { if (trueIds[id]) done[id] = true; });
@@ -272,7 +289,8 @@ const Store = {
       // 但數字若留在 entry 裡，週跑量 weekVolume 還是會繼續把它加進去，畫面上卻沒有
       // 任何地方看得到、也沒辦法清掉。
       const loc = PlanData.locateKey(dateKey);
-      const day = loc && this.effectiveDay(loc.weekNumber, loc.dayIndex);
+      const order = loc ? this.effectiveDayOrder(loc.weekNumber, this.activeUserId) : IDENTITY_ORDER;
+      const day = loc && this.effectiveDay(loc.weekNumber, order[loc.dayIndex]);
       const patch = { status: null };
       if (day) {
         if (!day.items.some((it) => isRunType(it.type) || it.type === 'race')) patch.actualDistanceKm = null;
@@ -331,70 +349,122 @@ const Store = {
   // ── 週調整（決策紀錄第 0 條：降量不能變相增加強度）──────────────────────
   // 標記「本週已降量」只影響週日回顧橫幅（顯示已標記）與跑量卡（不比對目標）；
   // 不進完成率、絕不會把少掉的量搬到別的週——那正是第 0 條明講禁止的做法。
-  weekAdjustmentFor(weekNumber) { return this.weekAdjustments[weekNumber] || null; },
+  // 這份文件也存「這週的顯示順序對調」（決策紀錄第 14 條），跟降量標記是同一類東西：
+  // 「這週對我來說不太一樣」的個人狀態，不是課表內容改變，只有本人能寫。
+  weekAdjustmentFor(weekNumber, userId) {
+    const uid = userId || this.activeUserId;
+    return (this.weekAdjustments[uid] && this.weekAdjustments[uid][weekNumber]) || null;
+  },
 
   setWeekReduced(weekNumber, reduced, reason, note) {
-    const prev = this.weekAdjustments[weekNumber] || {};
+    const userId = this.activeUserId;
+    if (!this.weekAdjustments[userId]) this.weekAdjustments[userId] = {};
+    const prev = this.weekAdjustments[userId][weekNumber] || {};
     const { next, push } = applyPatch(prev, { reduced: !!reduced, reason: reason || null, note: note || '' });
-    this.weekAdjustments[weekNumber] = next;
+    this.weekAdjustments[userId][weekNumber] = next;
     this.persist();
     if (this._cloudPush) this._cloudPush('weekAdjustments', String(weekNumber), push);
     return next;
   },
 
-  mergeRemoteWeekAdjustment(weekNumber, doc) {
-    this.weekAdjustments[weekNumber] = mergeDocs(this.weekAdjustments[weekNumber], doc);
-    saveJSON(`mt_weekadj::${this.activeUserId}`, this.weekAdjustments);
+  // 顯示順序：教練模式一律回傳出廠順序（identity），不管本人有沒有對調過——教練模式
+  // 編輯的是所有人共用的課表結構，且 renderDayDetail 在教練模式下把「日曆格子」直接
+  // 當成「要編輯的出廠天」用，順序被打亂會編輯到錯的一天。不合法的 dayOrder（缺值、
+  // 舊格式）一律退回 identity，不讓壞資料讓畫面錯位——跟 _isValidWeekShape 同一個精神。
+  effectiveDayOrder(weekNumber, userId) {
+    if (this.coachMode) return IDENTITY_ORDER;
+    const adj = this.weekAdjustmentFor(weekNumber, userId);
+    const order = adj && adj.dayOrder;
+    return isValidDayOrder(order) ? order : IDENTITY_ORDER;
+  },
+
+  // 決策紀錄第 14 條：環境因素讓這週的某天跟另一天對調，課表項目完全不變，只是重新
+  // 標籤「日曆上第 i 天顯示第 order[i] 天的內容」。只有自己能設（跟「本週已降量」同一份
+  // 文件、同樣本人專用）——這是個人排程狀況，不是教練要改的課表內容。
+  setDayOrder(weekNumber, dayOrder) {
+    const userId = this.activeUserId;
+    if (!this.weekAdjustments[userId]) this.weekAdjustments[userId] = {};
+    const prev = this.weekAdjustments[userId][weekNumber] || {};
+    const valid = isValidDayOrder(dayOrder) ? dayOrder : null;
+    const { next, push } = applyPatch(prev, { dayOrder: valid });
+    this.weekAdjustments[userId][weekNumber] = next;
+    this.persist();
+    if (this._cloudPush) this._cloudPush('weekAdjustments', String(weekNumber), push);
+    return next;
+  },
+
+  // 對調兩天（UI 的唯一入口）。對調回出廠順序時直接清掉 dayOrder，不留一筆
+  // 「順序其實跟出廠一樣」的空紀錄。
+  swapWeekDays(weekNumber, a, b) {
+    a = Number(a); b = Number(b);
+    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 6 || b < 0 || b > 6 || a === b) return null;
+    const order = this.effectiveDayOrder(weekNumber, this.activeUserId).slice();
+    const tmp = order[a]; order[a] = order[b]; order[b] = tmp;
+    const isIdentity = order.every((v, i) => v === i);
+    return this.setDayOrder(weekNumber, isIdentity ? null : order);
+  },
+
+  resetDayOrder(weekNumber) { return this.setDayOrder(weekNumber, null); },
+
+  mergeRemoteWeekAdjustment(userId, weekNumber, doc) {
+    if (!this.weekAdjustments[userId]) this.weekAdjustments[userId] = {};
+    this.weekAdjustments[userId][weekNumber] = mergeDocs(this.weekAdjustments[userId][weekNumber], doc);
+    if (userId === this.activeUserId) saveJSON(`mt_weekadj::${userId}`, this.weekAdjustments[userId]);
     this._notify();
   },
 
-  // ── 訓練目標（users/{userId}/profile/goals；每個人自己的）─────────────────
+  // ── 訓練目標（users/{userId}/profile/goals）───────────────────────────────
   // 形狀：{ raceGoal: string, items: [{id, text, done}], updatedAt, deleted }
-  // 這是使用者自己寫給自己（跟教練）看的目標，例如「完賽」「VO₂max 34 → 40」——
-  // 不是課表的一部分，教練模式改不到它，也不會拿它去改任何一天的負荷（第 0 條）。
+  // 每個人自己的目標，例如「完賽」「VO₂max 34 → 40」——不是課表的一部分，也不會拿它去改
+  // 任何一天的負荷（第 0 條）。決策紀錄第 15 條：教練模式開著時，任何白名單成員都能
+  // 幫別人設目標（跟教練模式改課表同一套「三人皆可」哲學，不限定某一人是教練），
+  // 所以寫入函式都接受一個可選的 targetUserId；不傳就是寫自己的。
   goalsFor(userId) {
     const g = this.goals[userId];
     if (!g || g.deleted) return null;
     return { raceGoal: g.raceGoal || '', items: Array.isArray(g.items) ? g.items : [] };
   },
 
-  _writeOwnGoals(patch, silent) {
-    const userId = this.activeUserId;
-    const prev = this.goals[userId] || { raceGoal: '', items: [] };
+  _writeGoalsFor(targetUserId, patch, silent) {
+    const uid = targetUserId || this.activeUserId;
+    const prev = this.goals[uid] || { raceGoal: '', items: [] };
     const { next, push } = applyPatch(prev, patch);
-    this.goals[userId] = next;
-    this.persist(silent);
-    if (this._cloudPush) this._cloudPush('profile', 'goals', push);
+    this.goals[uid] = next;
+    // 只有自己的目標存進本機 localStorage 快取——幫別人設的目標已經在記憶體裡
+    // （靠 subscribeOtherProfile 保持最新），不需要、也不該用自己的裝置快取別人的資料。
+    if (uid === this.activeUserId) this.persist(silent);
+    else if (!silent) this._notify();
+    if (this._cloudPush) this._cloudPush('profile', 'goals', push, uid);
     return next;
   },
 
-  setRaceGoal(text) { return this._writeOwnGoals({ raceGoal: String(text || '').trim() }, true); },
+  setRaceGoal(text, targetUserId) { return this._writeGoalsFor(targetUserId, { raceGoal: String(text || '').trim() }, true); },
 
-  addGoal(text) {
+  addGoal(text, targetUserId) {
     const t = String(text || '').trim();
     if (!t) return null;
-    const cur = this.goalsFor(this.activeUserId) || { items: [] };
-    return this._writeOwnGoals({ items: [...cur.items, { id: newItemId(), text: t, done: false }] });
+    const cur = this.goalsFor(targetUserId || this.activeUserId) || { items: [] };
+    return this._writeGoalsFor(targetUserId, { items: [...cur.items, { id: newItemId(), text: t, done: false }] });
   },
 
-  toggleGoalDone(id) {
-    const cur = this.goalsFor(this.activeUserId);
+  toggleGoalDone(id, targetUserId) {
+    const cur = this.goalsFor(targetUserId || this.activeUserId);
     if (!cur) return null;
-    return this._writeOwnGoals({ items: cur.items.map((g) => g.id === id ? { ...g, done: !g.done } : g) });
+    return this._writeGoalsFor(targetUserId, { items: cur.items.map((g) => g.id === id ? { ...g, done: !g.done } : g) });
   },
 
-  setGoalText(id, text) {
-    const cur = this.goalsFor(this.activeUserId);
+  setGoalText(id, text, targetUserId) {
+    const cur = this.goalsFor(targetUserId || this.activeUserId);
     if (!cur) return null;
     const t = String(text || '').trim();
     if (!t) return null; // 清空不等於刪除——要刪按 ×
-    return this._writeOwnGoals({ items: cur.items.map((g) => g.id === id ? { ...g, text: t } : g) }, true);
+    return this._writeGoalsFor(targetUserId, { items: cur.items.map((g) => g.id === id ? { ...g, text: t } : g) }, true);
   },
 
-  removeGoal(id) {
-    const cur = this.goalsFor(this.activeUserId);
+  removeGoal(id, targetUserId) {
+    const cur = this.goalsFor(targetUserId || this.activeUserId);
     if (!cur) return null;
-    return this._writeOwnGoals({ items: cur.items.filter((g) => g.id !== id) });
+    return this._writeGoalsFor(targetUserId, { items: cur.items.filter((g) => g.id !== id) });
   },
 
   mergeRemoteGoals(userId, doc) {
@@ -493,9 +563,14 @@ const Store = {
   // 就算卡片還有勾也不算「照表完成」）。
   dayStatus(weekNumber, dayIndex, userId) {
     if (PlanData.isExpired(weekNumber, dayIndex)) return 'expired';
+    const uid = userId || this.activeUserId;
     const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
-    const d = this.effectiveDay(weekNumber, dayIndex);
-    const entry = this.entryFor(userId || this.activeUserId, dateKey);
+    // dayIndex 是日曆格子；effectiveDayOrder 解析出那個格子實際顯示哪個出廠天的內容
+    // （決策紀錄第 14 條的對調）。dateKey 永遠對應日曆格子本身，不受對調影響——
+    // 對調換的是「看到什麼」，不是「哪天算哪天」。
+    const order = this.effectiveDayOrder(weekNumber, uid);
+    const d = this.effectiveDay(weekNumber, order[dayIndex]);
+    const entry = this.entryFor(uid, dateKey);
     if (entry && DAY_STATUS_OVERRIDES.includes(entry.status)) return entry.status;
     if (d.selectOne) {
       // ⚠️ 教練模式可能刪掉了使用者當初選的那個選項——selectedItemId 是懸空引用時
@@ -520,15 +595,17 @@ const Store = {
   // 不另外算一個「有練率」，避免第二個分數在催人。
   weekCompletionRate(weekNumber, userId) {
     const w = this.effectiveWeek(weekNumber);
+    const order = this.effectiveDayOrder(weekNumber, userId);
     let countable = 0, done = 0;
-    w.days.forEach((d, i) => {
-      if (d.items.every((it) => it.type === 'rest')) return;
+    for (let i = 0; i < 7; i++) {
+      const d = w.days[order[i]]; // 那個日曆格子實際顯示的內容（見 dayStatus 的註解）
+      if (d.items.every((it) => it.type === 'rest')) continue;
       // 狀態的唯一出口是 dayStatus——這裡不重抄一遍 selectOne／doneCount 的推導。
       const st = this.dayStatus(weekNumber, i, userId);
-      if (st === 'expired' || st === 'rested' || st === 'substituted') return;
+      if (st === 'expired' || st === 'rested' || st === 'substituted') continue;
       countable++;
       if (st === 'done') done++;
-    });
+    }
     return countable === 0 ? null : done / countable;
   },
 
@@ -548,13 +625,15 @@ const Store = {
   // 實際＝該週各天的公里加總；某天沒填公里但有填分鐘、且當天課表有跑步項目，就用同一個
   // 分速換算（跟目標對稱，否則 Phase 1 以時間計的八週實際永遠是 —），並標 estimated。
   // 「本週已降量」（weekAdjustments）只有自己的才讀得到；reduced=true 時畫面不比對目標。
-  // opts.planOnly=true：純課表加總（只扣過期日、不看任何人的 entries）——教練設目標時的上限
-  // 與面板上的「課表加總」用這個；使用者自己看的目標才依 entries 縮分母。
+  // opts.planOnly=true：純課表加總（只扣過期日、不看任何人的 entries、不看任何人對調過的
+  // 順序）——教練設目標時的上限與面板上的「課表加總」用這個；使用者自己看的目標才依
+  // entries／自己的對調順序縮分母。
   weekTargetAuto(weekNumber, userId, opts) {
     const planOnly = !!(opts && opts.planOnly);
     const w = this.effectiveWeek(weekNumber);
     const pace = Number(PlanData.plan.timeBasedRunPaceMinPerKm) || 9;
     const uid = userId || this.activeUserId;
+    const order = planOnly ? IDENTITY_ORDER : this.effectiveDayOrder(weekNumber, uid);
     let min = 0, max = 0, timeBased = false;
     const kmRange = (it) => {
       if (!isRunType(it.type)) return [0, 0];
@@ -562,15 +641,16 @@ const Store = {
       if (it.duration) { timeBased = true; return [it.duration.min / pace, it.duration.max / pace]; }
       return [0, 0];
     };
-    w.days.forEach((d, i) => {
-      if (PlanData.isExpired(weekNumber, i)) return;
-      if (d.items.some((it) => it.type === 'race')) return;
-      if (!d.items.some((it) => isRunType(it.type))) return;
+    for (let i = 0; i < 7; i++) {
+      const d = w.days[order[i]];
+      if (PlanData.isExpired(weekNumber, i)) continue;
+      if (d.items.some((it) => it.type === 'race')) continue;
+      if (!d.items.some((it) => isRunType(it.type))) continue;
       const e = planOnly ? null : this.entryFor(uid, PlanData.keyForWeekDay(weekNumber, i));
-      if (e && e.status === 'rested') return;
+      if (e && e.status === 'rested') continue;
       // 改做：有記公里（改做的也是跑步）就照算，跟實際對得上；沒記公里（改騎車、改核心）
       // 這天就不算——不然畫面會出現一個她已經決定不跑的缺口。
-      if (e && e.status === 'substituted' && e.actualDistanceKm == null) return;
+      if (e && e.status === 'substituted' && e.actualDistanceKm == null) continue;
       const ranges = d.items.map(kmRange);
       if (d.selectOne) {
         min += Math.min(...ranges.map((r) => r[0]));
@@ -578,7 +658,7 @@ const Store = {
       } else {
         ranges.forEach((r) => { min += r[0]; max += r[1]; });
       }
-    });
+    }
     return { min: round1(min), max: round1(max), timeBased };
   },
 
@@ -586,6 +666,7 @@ const Store = {
     const w = this.effectiveWeek(weekNumber);
     const pace = Number(PlanData.plan.timeBasedRunPaceMinPerKm) || 9;
     const uid = userId || this.activeUserId;
+    const order = this.effectiveDayOrder(weekNumber, uid);
     const auto = this.weekTargetAuto(weekNumber, uid);
     const ov = w.weeklyVolumeKm;
     // 教練目標是「上限」不是固定數字：讀取時再夾一次在（這個人的）自動加總以下——
@@ -596,7 +677,8 @@ const Store = {
       ? { min: round1(Math.min(ov.min, ov.max, auto.min)), max: round1(Math.min(Math.max(ov.min, ov.max), auto.max)), source: 'coach', timeBased: auto.timeBased }
       : { ...auto, source: 'auto' };
     let actual = null, estimated = false, race = null;
-    w.days.forEach((d, i) => {
+    for (let i = 0; i < 7; i++) {
+      const d = w.days[order[i]];
       const e = this.entryFor(uid, PlanData.keyForWeekDay(weekNumber, i));
       // ⚠️ 先判 != null 再 Number()：Number(null) 是 0，會把「沒填」算成「跑了 0 公里」，
       // 讓整週實際顯示 0 而不是 —。
@@ -604,10 +686,10 @@ const Store = {
       const minutes = e && !e.deleted && e.actualDurationMinutes != null ? Number(e.actualDurationMinutes) : NaN;
       if (d.items.some((it) => it.type === 'race')) {
         race = { planned: 42.195, actual: Number.isFinite(km) ? km : null };
-        return;
+        continue;
       }
-      if (e && (e.status === 'rested' || e.status === 'missed')) return;
-      if (Number.isFinite(km)) { actual = (actual || 0) + km; return; }
+      if (e && (e.status === 'rested' || e.status === 'missed')) continue;
+      if (Number.isFinite(km)) { actual = (actual || 0) + km; continue; }
       // 分鐘換公里只在「照表、且當天所有有時長的項目都是跑步」時做——一天一個分鐘欄，
       // 跑姿訓練＋節奏跑那種混合日換算會把跑姿的分鐘也當跑步；二擇一以選中的那個為準；
       // 改做的分鐘不知道是不是跑步，不換。
@@ -619,8 +701,8 @@ const Store = {
         actual = (actual || 0) + minutes / pace;
         estimated = true;
       }
-    });
-    const adj = uid === this.activeUserId ? this.weekAdjustmentFor(weekNumber) : null;
+    }
+    const adj = uid === this.activeUserId ? this.weekAdjustmentFor(weekNumber, uid) : null;
     return {
       target,
       actual: actual == null ? null : round1(actual),

@@ -13,7 +13,7 @@
 
 let fbApp = null, fbAuth = null, fbDb = null;
 let unsubEntries = null, unsubPrivate = null, unsubWeekAdj = null, unsubProfile = null;
-let unsubOtherEntries = {}, unsubOtherProfile = {};
+let unsubOtherEntries = {}, unsubOtherProfile = {}, unsubOtherWeekAdj = {};
 let unsubPlanOverrides = null; // 跟上面三個不一樣：這個是共用資源，只在登入/登出時掛/拆，不隨切換身分重訂
 
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
@@ -57,7 +57,12 @@ const Sync = {
   _notify() { this.listeners.forEach((fn) => fn()); },
 
   isSignedIn() { return !!this.user; },
-  isWriteFailed(kind, docId) { return this.failedWrites.has(`${kind}:${docId}`); },
+  // targetUserId 只在「幫別人寫」時傳（見 pushDoc 的註解）；自己的寫入不傳，跟原本的
+  // key 格式一致，不影響既有呼叫端。
+  isWriteFailed(kind, docId, targetUserId) {
+    const key = (targetUserId && targetUserId !== Store.activeUserId) ? `${kind}:${docId}:${targetUserId}` : `${kind}:${docId}`;
+    return this.failedWrites.has(key);
+  },
 
   init() {
     try {
@@ -160,9 +165,11 @@ const Sync = {
     if (unsubProfile) unsubProfile();
     Object.values(unsubOtherEntries).forEach((fn) => fn && fn());
     Object.values(unsubOtherProfile).forEach((fn) => fn && fn());
+    Object.values(unsubOtherWeekAdj).forEach((fn) => fn && fn());
     unsubEntries = unsubPrivate = unsubWeekAdj = unsubProfile = null;
     unsubOtherEntries = {};
     unsubOtherProfile = {};
+    unsubOtherWeekAdj = {};
   },
 
   // 使用者切換裝置上的「我是誰」時重新訂閱（Store.setActiveUser 會呼叫這個）。
@@ -204,7 +211,7 @@ const Sync = {
         this.pendingByCollection.weekAdjustments = snap.metadata.hasPendingWrites;
         snap.docChanges().forEach((c) => {
           if (c.type === 'removed') return;
-          Store.mergeRemoteWeekAdjustment(c.doc.id, c.doc.data());
+          Store.mergeRemoteWeekAdjustment(userId, c.doc.id, c.doc.data());
         });
         this._notify();
       }, (err) => this._handleSnapErr(err, 'weekAdjustments'));
@@ -299,7 +306,8 @@ const Sync = {
       }, () => {}); // 讀不到（不在白名單）就悄悄放棄，總覽頁顯示「尚無資料」
   },
 
-  // 別人的訓練目標（總覽頁「查看別人的進度」唯讀用），跟上面同一套管理方式。
+  // 別人的訓練目標（總覽頁「查看別人的進度」唯讀用，教練模式下也用這份資料編輯），
+  // 跟上面同一套管理方式。
   subscribeOtherProfile(otherUserId, onData) {
     if (!this.isSignedIn() || !fbDb) return;
     if (unsubOtherProfile[otherUserId]) return;
@@ -308,6 +316,22 @@ const Sync = {
         snap.docChanges().forEach((c) => {
           if (c.type === 'removed' || c.doc.id !== 'goals') return;
           Store.mergeRemoteGoals(otherUserId, c.doc.data());
+        });
+        onData && onData();
+      }, () => {});
+  },
+
+  // 別人的週調整（含決策紀錄第 14 條的顯示順序對調）——總覽頁算別人的完成率／週跑量
+  // 時，要用「那個人自己」的對調順序才算得對：對調換的是內容跟日曆格子的對應，
+  // 每個人各自獨立，不知道對方的順序就會拿錯的內容去對他的打勾紀錄。
+  subscribeOtherWeekAdjustments(otherUserId, onData) {
+    if (!this.isSignedIn() || !fbDb) return;
+    if (unsubOtherWeekAdj[otherUserId]) return;
+    unsubOtherWeekAdj[otherUserId] = fbDb.collection(`users/${otherUserId}/weekAdjustments`)
+      .onSnapshot((snap) => {
+        snap.docChanges().forEach((c) => {
+          if (c.type === 'removed') return;
+          Store.mergeRemoteWeekAdjustment(otherUserId, c.doc.id, c.doc.data());
         });
         onData && onData();
       }, () => {});
@@ -338,10 +362,14 @@ const Sync = {
     this._set('fail', '同步發生錯誤：' + (err ? err.message : ''));
   },
 
-  pushDoc(kind, docId, data) {
+  // targetUserId：決策紀錄第 15 條，教練模式下可以幫別人寫 profile/goals——多數呼叫
+  // 不傳這個參數，寫自己的（userId = Store.activeUserId，key 維持原格式，不影響其他
+  // 呼叫端）。傳了才走「幫別人寫」的路徑，key 額外帶 userId 避免跟自己的紀錄撞在一起
+  // （例如同時幫 Annlin 跟自己都改 profile/goals，兩者的失敗狀態不能互相蓋掉）。
+  pushDoc(kind, docId, data, targetUserId) {
     if (!this.isSignedIn()) return; // 未登入：純本機模式，不同步
-    const userId = Store.activeUserId;
-    const key = `${kind}:${docId}`;
+    const userId = targetUserId || Store.activeUserId;
+    const key = (targetUserId && targetUserId !== Store.activeUserId) ? `${kind}:${docId}:${userId}` : `${kind}:${docId}`;
     // 防禦性清理：Firestore 對值為 undefined 的欄位是**同步丟例外**，不是 Promise
     // reject——一旦漏過上游檢查，那個例外會在這裡的呼叫當下就炸穿整條呼叫鏈，連下面
     // 的 .catch() 都接不到，直接讓呼叫端的整個 action 中斷、畫面也不會重繪。
@@ -389,7 +417,7 @@ const Sync = {
     await this._backfillCollection(userId, 'entries', Store.entries[userId] || {});
     if (userId === Store.activeUserId) {
       await this._backfillCollection(userId, 'private', Store.privateData);
-      await this._backfillCollection(userId, 'weekAdjustments', Store.weekAdjustments);
+      await this._backfillCollection(userId, 'weekAdjustments', Store.weekAdjustments[userId] || {});
       if (Store.goals[userId]) await this._backfillCollection(userId, 'profile', { goals: Store.goals[userId] });
     }
   },

@@ -168,7 +168,13 @@ function renderTodayPage(state) {
 function renderDayDetail(weekNumber, dayIndex, opts) {
   opts = opts || {};
   const w = Store.effectiveWeek(weekNumber);
-  const d = w.days[dayIndex];
+  // dayIndex 是日曆格子；教練模式下 effectiveDayOrder 一律回傳出廠順序，所以這裡
+  // 同時是「要編輯的出廠天」（coach 專用的按鈕都掛在這條路徑上，見下方 coachToolbar）。
+  // 非教練模式時若這天被對調過（決策紀錄第 14 條），這裡顯示的就是對調後的內容。
+  const order = Store.effectiveDayOrder(weekNumber, Store.activeUserId);
+  const contentIndex = order[dayIndex];
+  const d = w.days[contentIndex];
+  const swapped = contentIndex !== dayIndex;
   const phase = PlanData.phaseForWeek(weekNumber);
   const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
   const isExpired = PlanData.isExpired(weekNumber, dayIndex);
@@ -185,7 +191,7 @@ function renderDayDetail(weekNumber, dayIndex, opts) {
         <span class="wk">第 ${weekNumber} 週 · 第 ${dayIndex + 1} 天</span>
         <span class="ph">${h(phase.name)}</span>
       </div>
-      <div class="today-date">${dateStr}</div>
+      <div class="today-date">${dateStr}${swapped ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : ''}</div>
     `;
   }
 
@@ -511,8 +517,10 @@ function renderWeekPage(state) {
 
   const table = Store.weekViewMode === 'table';
   const vol = Store.weekVolume(wn, Store.activeUserId);
+  const order = Store.effectiveDayOrder(wn, Store.activeUserId);
 
-  const rows = w.days.map((d, i) => {
+  const rows = order.map((contentIndex, i) => {
+    const d = w.days[contentIndex];
     const status = Store.dayStatus(wn, i);
     const dateLabel = PlanData.dateForWeekDay(wn, i);
     const dateKey = PlanData.keyForWeekDay(wn, i);
@@ -524,7 +532,7 @@ function renderWeekPage(state) {
         <div class="weekday-badge ${isToday ? 'today' : ''}">${PlanData.weekdayLabel(i)}<span class="num">${dateLabel.getDate()}</span></div>
         <div class="weekday-status ${status}">${statusIcon}</div>
         <div class="weekday-summary">
-          <div class="t">${h(titles)}</div>
+          <div class="t">${h(titles)}${contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : ''}</div>
           <div class="sub">${DAY_STATUS_LABELS[status] || '待完成'}</div>
         </div>
       </div>
@@ -547,8 +555,36 @@ function renderWeekPage(state) {
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
       </div>
-      ${table ? renderWeekTable(wn, w, todayKey) : `<div class="card">${rows}</div>`}
+      ${table ? renderWeekTable(wn, w, order, todayKey) : `<div class="card">${rows}</div>`}
+      ${!coach ? renderDaySwapPanel(wn, order) : ''}
       ${coach ? renderWeekCoachPanel(wn, w, hasOverride, vol) : ''}
+    </div>
+  `;
+}
+
+// 決策紀錄第 14 條：環境因素讓這週某天跟另一天對調，課表項目不變，只是重新標籤。
+// 教練模式開著時不顯示——那個模式下 effectiveDayOrder 一律回傳出廠順序，這裡的對調
+// 完全不會生效，顯示出來只會讓人以為壞了。
+function renderDaySwapPanel(wn, order) {
+  const hasSwap = order.some((v, i) => v !== i);
+  const dayOpt = (selected) => Array.from({ length: 7 }, (_, i) =>
+    `<option value="${i}" ${i === selected ? 'selected' : ''}>${PlanData.weekdayLabel(i)}</option>`).join('');
+  return `
+    <div class="card" style="margin-top:12px">
+      <div style="font-weight:700;font-size:12.5px;color:var(--text2);margin-bottom:10px">本週順序（只有你自己看得到）</div>
+      <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <select id="swap-a-${wn}">${dayOpt(0)}</select>
+        <span style="color:var(--text3);font-size:13px">對調</span>
+        <select id="swap-b-${wn}">${dayOpt(2)}</select>
+        <button class="btn secondary" style="width:auto;padding:7px 12px;font-size:13px"
+          onclick="A.swapWeekDays(${wn}, document.getElementById('swap-a-${wn}').value, document.getElementById('swap-b-${wn}').value)">對調</button>
+      </div>
+      ${hasSwap ? `
+        <div style="font-size:11.5px;color:var(--text3);margin-top:10px">
+          已對調：${order.map((v, i) => v !== i ? `${PlanData.weekdayLabel(i)}顯示${PlanData.weekdayLabel(v)}的內容` : null).filter(Boolean).join('、')}
+        </div>
+        <div class="actions" style="margin-top:10px"><button class="btn secondary" style="width:auto;padding:7px 12px;font-size:13px" onclick="A.resetDayOrder(${wn})">還原本週順序</button></div>
+      ` : `<div style="font-size:11.5px;color:var(--text3);margin-top:10px">課表內容不會變，只是這週哪天顯示哪天的內容——例如環境因素讓週一跟週三對調。</div>`}
     </div>
   `;
 }
@@ -602,16 +638,18 @@ function renderWeekVolumeCard(vol, opts) {
 }
 
 // 表格模式：課表｜實際 並排，模仿舊 Notion 課表那張表——給回顧用；手機上打勾用卡片模式。
-function renderWeekTable(wn, w, todayKey) {
-  const rows = w.days.map((d, i) => {
+function renderWeekTable(wn, w, order, todayKey) {
+  const rows = order.map((contentIndex, i) => {
+    const d = w.days[contentIndex];
     const status = Store.dayStatus(wn, i);
     const dateLabel = PlanData.dateForWeekDay(wn, i);
     const dateKey = PlanData.keyForWeekDay(wn, i);
     const entry = Store.entryFor(Store.activeUserId, dateKey);
-    const planCell = d.items.map((it) => {
-      const meta = [PlanData.fmtItemMeta(it), it.heartRateZone || ''].filter(Boolean).join(' · ');
-      return `<div class="wt-item"><span class="wt-title">${h(it.title)}</span>${meta ? `<span class="wt-meta">${h(meta)}</span>` : ''}</div>`;
-    }).join(d.selectOne ? '<div class="wt-or">或</div>' : '');
+    const planCell = (contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : '') +
+      d.items.map((it) => {
+        const meta = [PlanData.fmtItemMeta(it), it.heartRateZone || ''].filter(Boolean).join(' · ');
+        return `<div class="wt-item"><span class="wt-title">${h(it.title)}</span>${meta ? `<span class="wt-meta">${h(meta)}</span>` : ''}</div>`;
+      }).join(d.selectOne ? '<div class="wt-or">或</div>' : '');
     const bits = [];
     if (status !== 'pending') bits.push(`<span class="wt-status ${status}">${DAY_STATUS_LABELS[status]}</span>`);
     const nums = [];
@@ -728,6 +766,7 @@ function renderOverviewPage(state) {
         ${others.map((u) => {
           Sync.subscribeOtherEntries(u.userId, () => window.render && window.render());
           Sync.subscribeOtherProfile(u.userId, () => window.render && window.render());
+          Sync.subscribeOtherWeekAdjustments(u.userId, () => window.render && window.render());
           return `
           <div class="otheruser-row" style="cursor:pointer" onclick="A.viewProgress('${jsq(u.userId)}')">
             <div class="avatar">${h(u.displayName).slice(0, 1)}</div>
@@ -763,11 +802,14 @@ function renderOverviewPage(state) {
 }
 
 // 訓練目標（users/{userId}/profile/goals）：比賽目標一句 + 自訂目標清單。
-// 自己的可以編輯；看別人的是唯讀。目標不會改變任何一天的課表（決策紀錄第 0 條）。
+// 自己的隨時可以編輯；教練模式開著時也能編輯別人的（決策紀錄第 15 條：跟教練模式改
+// 課表同一套「白名單內任何人都能做」哲學，不限定某一人是教練）。目標不會改變任何一天
+// 的課表內容（第 0 條）。
 function renderGoalsCard(userId, isSelf, user) {
   const g = Store.goalsFor(userId) || { raceGoal: '', items: [] };
-  const title = isSelf ? '我的目標' : `${h(user ? user.displayName : userId)} 的目標`;
-  if (!isSelf) {
+  const editable = isSelf || Store.coachMode;
+  if (!editable) {
+    const title = `${h(user ? user.displayName : userId)} 的目標`;
     const empty = !g.raceGoal && !g.items.length;
     return `
       <div class="section">
@@ -779,24 +821,26 @@ function renderGoalsCard(userId, isSelf, user) {
         </div>
       </div>`;
   }
+  const uid = jsq(userId);
+  const title = isSelf ? '我的目標' : `${h(user ? user.displayName : userId)} 的目標`;
   return `
     <div class="section">
-      <div class="section-title">我的目標</div>
+      <div class="section-title">${title}${!isSelf ? ' <span class="coach-tag">教練模式編輯</span>' : ''}</div>
       <div class="card goals-card">
         <label class="field-label">比賽目標</label>
-        <input class="goal-input" type="text" placeholder="例如：安全完賽、5 小時內、全程不走路" value="${h(g.raceGoal)}" onchange="A.setRaceGoal(this.value)">
+        <input class="goal-input" type="text" placeholder="例如：安全完賽、5 小時內、全程不走路" value="${h(g.raceGoal)}" onchange="A.setRaceGoal(this.value,'${uid}')">
         <label class="field-label" style="margin-top:14px">訓練目標</label>
         ${g.items.map((it) => `
           <div class="goal-row ${it.done ? 'done' : ''}">
-            <button class="goal-check" onclick="A.toggleGoal('${jsq(it.id)}')" aria-label="達成">${ICON.check}</button>
-            <input class="goal-text-input" type="text" value="${h(it.text)}" onchange="A.setGoalText('${jsq(it.id)}', this.value)">
-            <button class="goal-del" onclick="A.removeGoal('${jsq(it.id)}')" aria-label="刪除">×</button>
+            <button class="goal-check" onclick="A.toggleGoal('${jsq(it.id)}','${uid}')" aria-label="達成">${ICON.check}</button>
+            <input class="goal-text-input" type="text" value="${h(it.text)}" onchange="A.setGoalText('${jsq(it.id)}',this.value,'${uid}')">
+            <button class="goal-del" onclick="A.removeGoal('${jsq(it.id)}','${uid}')" aria-label="刪除">×</button>
           </div>`).join('')}
         <div class="goal-add">
-          <input id="goal-new" type="text" placeholder="例如：W8 結束可以連續跑 40 分不喘" onkeydown="if(event.key==='Enter'&&!event.isComposing){A.addGoal()}">
-          <button class="btn secondary" style="width:auto;padding:8px 12px;font-size:13px;flex:none" onclick="A.addGoal()">新增</button>
+          <input id="goal-new" type="text" placeholder="例如：W8 結束可以連續跑 40 分不喘" onkeydown="if(event.key==='Enter'&&!event.isComposing){A.addGoal('${uid}')}">
+          <button class="btn secondary" style="width:auto;padding:8px 12px;font-size:13px;flex:none" onclick="A.addGoal('${uid}')">新增</button>
         </div>
-        <div style="font-size:11.5px;color:var(--text3);margin-top:10px;line-height:1.5">寫給自己（跟一起練的人）看的。目標不會改變任何一天的課表內容。</div>
+        <div style="font-size:11.5px;color:var(--text3);margin-top:10px;line-height:1.5">${isSelf ? '寫給自己（跟一起練的人）看的。' : `以教練模式編輯，${h(user ? user.displayName : userId)} 看得到。`}目標不會改變任何一天的課表內容。</div>
       </div>
     </div>`;
 }
@@ -848,7 +892,11 @@ function renderLongRunTrend(userId) {
     if (longIdx === -1) continue;
     const item = w.days[longIdx].items.find((it) => it.type === 'long-run' || it.type === 'race');
     if (w.longRunMetric !== 'distance' || !item.distanceKm) continue; // 只畫有公里數的部分（Phase 1 以時間計，不在這張圖裡）
-    const dateKey = PlanData.keyForWeekDay(wn, longIdx);
+    // longIdx 是出廠課表裡長跑的位置；如果這個人這週對調過日曆順序（決策紀錄第 14 條），
+    // 她實際跑的那天不是 longIdx，是「顯示 longIdx 內容」的那個日曆格子——反查 order。
+    const order = Store.effectiveDayOrder(wn, userId);
+    const calendarSlot = order.indexOf(longIdx);
+    const dateKey = PlanData.keyForWeekDay(wn, calendarSlot);
     const entry = Store.entryFor(userId, dateKey);
     points.push({
       wn,

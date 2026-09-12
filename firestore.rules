@@ -37,10 +37,14 @@ service cloud.firestore {
       return isMember() && authEmail() == ownerEmail(userId);
     }
 
-    // 顯示名稱等個人設定：白名單內都看得到（總覽頁要顯示別人的名字），只有本人能改。
+    // 顯示名稱等個人設定 + 訓練目標（profile/goals）：白名單內都看得到。
+    // 寫入：白名單內任何人都能寫，不限本人——決策紀錄第 15 條，教練模式下可以幫別人
+    // 設訓練目標，跟 planOverrides 同一套「三人皆可、不限定一人是教練」哲學。
+    // 這個集合目前只放 goals（比賽目標＋自訂清單），不放身體狀況等敏感資料——
+    // 那些走 private/ 子集合（下面），isSelf 才能寫。
     match /users/{userId}/profile/{doc} {
       allow read:  if isMember();
-      allow write: if isSelf(userId);
+      allow write: if isMember();
     }
 
     // 完成紀錄（status / 實際時長 / 距離）：白名單內都看得到，只有本人能寫。

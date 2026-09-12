@@ -77,22 +77,29 @@ const App = {
     render();
   },
 
-  // ── 訓練目標（自己的 profile/goals）────────────────────────────────────────
-  setRaceGoal(value) { Store.setRaceGoal(value); render(); },
-  addGoal() {
+  // ── 訓練目標（profile/goals；決策紀錄第 15 條：教練模式下可以幫別人設）────────────
+  // 每個 handler 都接受可選的 userId——views.js 的 renderGoalsCard 自己的表單也一律傳
+  // 明確的 userId（等於 Store.activeUserId），不靠「不傳＝自己」的隱含預設，比較不容易
+  // 在改動時漏掉。
+  setRaceGoal(value, userId) { Store.setRaceGoal(value, userId); render(); },
+  addGoal(userId) {
     const el = document.getElementById('goal-new');
     if (!el || !el.value.trim()) return;
-    Store.addGoal(el.value);
+    Store.addGoal(el.value, userId);
     render();
   },
-  toggleGoal(id) { Store.toggleGoalDone(id); render(); },
+  toggleGoal(id, userId) { Store.toggleGoalDone(id, userId); render(); },
   // 清空不等於刪除（Store.setGoalText 空字串時直接不寫）——要刪一條目標請按 ×，
   // 不要讓「打字打到一半、暫時清空重打」這個動作變成靜默刪除且沒有復原。
-  setGoalText(id, value) {
-    Store.setGoalText(id, value);
+  setGoalText(id, value, userId) {
+    Store.setGoalText(id, value, userId);
     // 不 render()：避免 input 失焦。
   },
-  removeGoal(id) { Store.removeGoal(id); render(); },
+  removeGoal(id, userId) { Store.removeGoal(id, userId); render(); },
+
+  // ── 本週順序對調（決策紀錄第 14 條）───────────────────────────────────────
+  swapWeekDays(weekNumber, a, b) { Store.swapWeekDays(weekNumber, a, b); render(); },
+  resetDayOrder(weekNumber) { Store.resetDayOrder(weekNumber); render(); },
 
   toggleFlag(dateKey, flagKey) {
     const priv = Store.privateFor(dateKey);
