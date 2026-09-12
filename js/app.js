@@ -141,6 +141,16 @@ const App = {
     else { Sync.signIn(); }
   },
 
+  // 主畫面模式的登入說明卡片用：把網址複製起來，讓使用者貼到 Safari 分頁打開。
+  // 不 render()——只是暫時把按鈕文字換成「已複製」，不需要整頁重繪。
+  copyAppUrl(btn) {
+    const url = location.href.split('#')[0];
+    const done = () => { if (btn) { const old = btn.textContent; btn.textContent = '已複製'; setTimeout(() => { btn.textContent = old; }, 1500); } };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done).catch(() => {});
+    }
+  },
+
   // ── 教練模式 ──────────────────────────────────────────────────────────────
   // 課表內容存在 Store.planOverrides（Firestore 的 planOverrides/{週次}，白名單內
   // 任何人都能寫）。每次編輯都是「讀整週目前有效的內容（出廠值或已有的覆寫）→

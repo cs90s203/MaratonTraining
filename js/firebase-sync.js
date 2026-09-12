@@ -42,6 +42,23 @@ function needsAuthRedirect() {
   return isIOS || isDesktopSafari || isFirefox;
 }
 
+// 從 iOS「加入主畫面」開啟的網頁應用程式——`navigator.standalone` 是蘋果自己的 API，
+// 只有這種情況會是 true。這不是「哪個瀏覽器」的問題，是完全不同的環境：
+//   1. 儲存空間跟一般 Safari 分頁是分開的兩個 partition——就算登入真的成功，
+//      這裡的 Firebase Auth session 也不會跟 Safari 分頁互通，反過來也一樣。
+//   2. Google 的登入頁會偵測「這是不是嵌入式 webview」並直接拒絕完成登入
+//      （防釣魚政策，不是 Firebase 或這個 App 能繞過的）——主畫面模式從 Google 的角度
+//      看就是一個 webview，不是「瀏覽器」。
+// 這兩點合起來代表：在主畫面模式下，不管換哪種登入方式（popup／redirect／未來的
+// Google Identity Services）大概率都無法完成——問題不在「用哪個 API 呼叫登入」，
+// 在於這個環境本身。查證來源：MDN/webkit 對 standalone 儲存隔離的說明、Google 對
+// OAuth embedded-webview 的公開政策（"disallowed_useragent"）。
+// 因此這裡不嘗試登入，直接告訴使用者唯一的解法：改用 Safari 分頁打開同一個網址登入。
+function isStandaloneHomeScreenApp() {
+  return !!(window.navigator && window.navigator.standalone);
+}
+window.isStandaloneHomeScreenApp = isStandaloneHomeScreenApp; // views.js 的設定頁要在按登入之前就主動提示
+
 // 教練模式新增項目時要給一個不會跟出廠課表（"{週}-{天}-{序}" 格式）撞到的 id。
 // 跟 babylog js/store.js 的 uid() 同一套寫法：crypto.randomUUID() 不支援時退回時間戳+亂數。
 function newItemId() {
@@ -76,7 +93,7 @@ let signInTimeoutId = null;
 function clearSignInTimeout() { if (signInTimeoutId) { clearTimeout(signInTimeoutId); signInTimeoutId = null; } }
 
 const Sync = {
-  state: 'idle', // idle | signing-in | syncing | done | fail | unauthorized | wrong-identity | write-denied
+  state: 'idle', // idle | standalone-blocked | signing-in | syncing | done | fail | unauthorized | wrong-identity | write-denied
   message: '',
   user: null, // {email, displayName, photoURL}
   persistenceDisabled: false,
@@ -181,6 +198,13 @@ const Sync = {
   },
 
   async signIn() {
+    // 見 isStandaloneHomeScreenApp() 的註解：主畫面模式不是「哪種登入 API 沒接對」的問題，
+    // 是這個環境本身（儲存空間隔離＋ Google 封鎖 webview 登入）——不要讓使用者再等一次
+    // 逾時才看到失敗，直接告訴她唯一的解法。
+    if (isStandaloneHomeScreenApp()) {
+      this._set('standalone-blocked', '');
+      return;
+    }
     this._set('signing-in', '登入中…');
     clearSignInTimeout();
     // 保險：不管走 popup 還是 redirect，只要逾時前都沒有變成已登入（也沒有任何錯誤），
