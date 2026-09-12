@@ -259,6 +259,7 @@ textarea.note-input {
 .btn.secondary { background: var(--card); color: var(--text); border: 1.5px solid var(--inpBorder); }
 .btn.danger { background: var(--critBg); color: var(--crit); }
 .btn svg { width: 16px; height: 16px; }
+.btn:disabled { opacity: .55; cursor: default; }
 
 .field-label { font-size: 12.5px; font-weight: 700; color: var(--text2); margin-bottom: 6px; display: block; }
 

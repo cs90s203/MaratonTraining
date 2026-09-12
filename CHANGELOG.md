@@ -4,6 +4,51 @@
 
 ---
 
+## v0.6.1 — 2026-09-12 · 修正登入後畫面還是跟未登入一樣（v0.4.2 沒有真的修好）
+
+使用者回報：登入之後，畫面還是跟沒登入時一樣。查證後發現 v0.4.2 的修法本身有兩個洞，
+剛好疊在一起讓症狀維持不變：
+
+**成因一：`isSafariBrowser()` 排除了 iOS 上的非 Safari 瀏覽器，但它們一樣受 ITP 限制。**
+蘋果規定 iOS 上所有瀏覽器都要用 WebKit（App Store 政策），Chrome/Firefox on iOS 只是套了
+自己介面的 Safari，一樣會被 ITP 擋掉彈出視窗登入結果的跨網站傳遞——但舊版的判斷式把
+UA 含 `crios`／`fxios` 的瀏覽器排除在「需要整頁跳轉」之外，導致 iPhone 上用 Chrome 或
+Firefox 登入，會走進跟原本 Safari 一樣會卡住的 popup 路徑。改成判斷「引擎是不是一定會擋
+第三方資料」（iOS 不分瀏覽器名稱、桌機 Safari、Firefox 不分平台），不是判斷瀏覽器名稱。
+
+**成因二（更根本）：卡住的登入完全沒有任何畫面反應。** `renderSyncPill()` 的第一條規則是
+「沒登入就顯示『點擊登入以同步』」，這條規則排在所有狀態判斷之前——`signInWithPopup`
+卡住不拋錯也不 resolve 時（第三方資料被擋的典型行為），`Sync.state` 停在 `'signing-in'`
+但畫面完全不看這個狀態，直接顯示「點擊登入以同步」，跟從沒按過登入一模一樣。同樣地，
+Firebase 官方文件證實：2024 年中起，Chrome 115+／Firefox 109+／Safari 16.1+ 在沒有額外
+設定時，`signInWithRedirect` 導回來也會正常 resolve 成「沒有使用者」而不是拋錯——這條
+路徑舊版完全沒有處理。
+
+修法兩層：
+1. 登入逾時保險（12 秒）：不管走 popup 還是 redirect，逾時前沒有變成已登入也沒有任何
+   錯誤，一律轉成看得見的失敗狀態，不能讓畫面跟「從沒登入過」一樣。
+2. `sessionStorage` 記住「剛剛送出過一次 redirect 登入」，撐過整頁跳轉；回來後如果
+   `getRedirectResult()` 是「沒有使用者」，用這個旗標判斷「這是不是剛剛登入失敗」，
+   而不是把它當成一般的「沒有登入過」。
+3. `renderSyncPill()`／設定頁補上「登入中…」「登入失敗，點擊重試」兩個狀態的畫面——
+   之前這兩個狀態存在於 `Sync.state`，但因為排在 `!isSignedIn()` 判斷之後，永遠不會被
+   看到。`A.retrySync()` 在「還沒登入」時改成重新觸發登入（原本只會重新訂閱，登入沒完成
+   時什麼都不做）。
+
+用 node harness 模擬「popup 卡住不 resolve」與「redirect 回來後拿到空使用者」兩種
+Firebase 官方文件記載的失敗模式，確認都會在有限時間內轉成看得見的失敗狀態，不留在
+跟未登入一樣的畫面上；也確認一般沒登入過的頁面載入不會被誤判成失敗。
+
+**如果這次還是沒有完全解決**：Firebase 的官方建議是這類第三方資料限制唯一真正根治的
+方法要嘛是自己的網域（GitHub Pages 的 `github.io` 網址不算），要嘛換成 Google Identity
+Services（不經過 Firebase 的中繼頁面）——後者需要 Firebase Console →
+Authentication → Sign-in method → Google → Web SDK configuration 裡的「Web client ID」，
+之後有需要再取。
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+---
+
 ## v0.6.0 — 2026-09-12 · 本週順序對調 + 教練模式可幫別人設目標
 
 設計裁決見 [決策紀錄第 14、15 條](docs/決策紀錄.md)。

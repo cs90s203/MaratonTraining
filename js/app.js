@@ -133,7 +133,13 @@ const App = {
 
   signIn() { Sync.signIn(); },
   signOut() { Sync.signOut(); },
-  retrySync() { Sync.resubscribe(); render(); },
+  // 「重試」在兩種情況下都會被點到：已登入但訂閱斷線（resubscribe 有意義），或
+  // 登入本身沒有完成（見 firebase-sync.js 的登入逾時保險）——後者 resubscribe()
+  // 一開頭就 `if (!isSignedIn()) return;` 直接不做事，要重跑一次真正的登入流程。
+  retrySync() {
+    if (Sync.isSignedIn()) { Sync.resubscribe(); render(); }
+    else { Sync.signIn(); }
+  },
 
   // ── 教練模式 ──────────────────────────────────────────────────────────────
   // 課表內容存在 Store.planOverrides（Firestore 的 planOverrides/{週次}，白名單內

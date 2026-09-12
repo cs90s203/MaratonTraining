@@ -18,11 +18,28 @@ let unsubPlanOverrides = null; // 跟上面三個不一樣：這個是共用資�
 
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
 
-// 排除 Chrome／Android WebView／iOS 上的 Chrome(CriOS)／Firefox(FxiOS)／Edge——
-// 這些的 UA 都含 "Safari" 字串，但不是真的 Safari，走 popup 沒問題。
-function isSafariBrowser() {
+// 哪些瀏覽器一定要用整頁跳轉（signInWithRedirect），不能用彈出視窗：
+//
+// ⚠️ 這裡 v0.4.2 犯過一次錯：舊版只排除「UA 含 Safari 但其實不是 Safari」的瀏覽器
+// （chrome/crios/fxios/edg/android），邏輯是「這些引擎不是 WebKit，走 popup 沒問題」——
+// 但 iOS 上蘋果強制所有瀏覽器都用 WebKit（App Store 規定，Chrome/Firefox on iOS 只是
+// 套了自己介面的 Safari），所以 CriOS／FxiOS 在 iPhone 上一樣有 Safari 的 ITP（跨站資料
+// 一律擋）限制，只是 UA 字串把它們排除在判斷之外——這就是使用者在 iPhone 上用非 Safari
+// 瀏覽器登入「看起來還是沒登入」的實際成因：整頁跳轉沒有觸發，走的是會被 ITP 擋掉的 popup。
+//
+// 判斷改成看「引擎是不是一定會擋第三方資料」，不是看「瀏覽器叫什麼名字」：
+//   - iOS（不分瀏覽器名稱，全部是 WebKit）
+//   - 桌機 Safari
+//   - Firefox（不分平台，ETP 預設也擋第三方資料，跟 Safari 是同一類問題）
+// Android 上的 Chrome/Edge/Samsung Internet 等引擎不同、預設不擋，維持 popup（體驗較好，
+// 不用整頁跳轉）。
+function needsAuthRedirect() {
   const ua = navigator.userAgent || '';
-  return /^((?!chrome|crios|fxios|edg|android).)*safari/i.test(ua);
+  // iPadOS 13+ 偽裝成 Macintosh UA，用「有觸控點」分辨是不是其實是 iPad。
+  const isIOS = /iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const isDesktopSafari = /^((?!chrome|crios|fxios|edg|android).)*safari/i.test(ua);
+  const isFirefox = /firefox|fxios/i.test(ua);
+  return isIOS || isDesktopSafari || isFirefox;
 }
 
 // 教練模式新增項目時要給一個不會跟出廠課表（"{週}-{天}-{序}" 格式）撞到的 id。
@@ -32,6 +49,31 @@ function newItemId() {
   return 'c-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 window.newItemId = newItemId;
+
+// 記著「剛剛送出過一次 signInWithRedirect」——存在 sessionStorage 才能撐過整頁跳轉。
+// 用途：Google 導回來後如果 getRedirectResult() 拿到 { user: null }（不是例外，是真的
+// 沒有使用者），單看這個結果分不出「這次載入根本沒登入過」跟「登入被瀏覽器擋掉了」，
+// 兩者都是 null。有這個旗標才能只在「剛剛真的按過登入」的那次載入顯示失敗。
+const REDIRECT_PENDING_KEY = 'mt_auth_redirect_pending';
+function takeRedirectPendingFlag() {
+  try {
+    const v = sessionStorage.getItem(REDIRECT_PENDING_KEY) === '1';
+    sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    return v;
+  } catch (e) { return false; } // 私密瀏覽模式等 sessionStorage 被擋：退回沒有這個旗標，不影響其餘功能
+}
+function setRedirectPendingFlag() {
+  try { sessionStorage.setItem(REDIRECT_PENDING_KEY, '1'); } catch (e) {}
+}
+
+// 登入逾時的保險：不管走 popup 還是 redirect，只要點了登入卻遲遲沒有變成「已登入」，
+// 一定要讓使用者看得出「這次登入沒有成功」，不能讓畫面停在跟從沒登入過一模一樣的樣子——
+// renderSyncPill() 的第一條規則就是「!isSignedIn() → 顯示『點擊登入以同步』」，如果
+// signInWithPopup 卡住不拋錯也不 resolve（跨網站資料被瀏覽器擋掉時常見的行為），
+// 使用者會看到自己剛剛按過的登入完全沒有發生過，卻沒有任何錯誤訊息可以回報。
+const SIGNIN_TIMEOUT_MS = 12000;
+let signInTimeoutId = null;
+function clearSignInTimeout() { if (signInTimeoutId) { clearTimeout(signInTimeoutId); signInTimeoutId = null; } }
 
 const Sync = {
   state: 'idle', // idle | signing-in | syncing | done | fail | unauthorized | wrong-identity | write-denied
@@ -90,7 +132,12 @@ const Sync = {
     Store._cloudPushPlanOverride = this.pushPlanOverride.bind(this);
     Store._cloudDeletePlanOverride = this.deletePlanOverride.bind(this);
 
+    // 這次載入是不是「剛剛從 signInWithRedirect 導回來」——要在 getRedirectResult()
+    // 之前先讀（讀了就清掉），下面兩個地方都要用。
+    const redirectWasPending = takeRedirectPendingFlag();
+
     fbAuth.onAuthStateChanged((user) => {
+      clearSignInTimeout(); // 不管成功失敗，auth 狀態確實變動過一次，逾時保險就不需要了
       if (!user) {
         this.user = null;
         this._detachListeners();
@@ -110,12 +157,24 @@ const Sync = {
       this._backfillLocal(Store.activeUserId);
     });
 
-    // Safari／彈窗被擋時的 redirect 結果（若上次用了 signInWithRedirect 導回來）。
-    // 沒有等待中的 redirect 時，這裡會正常 resolve 成 { user: null }，不是錯誤——
-    // 只有真的失敗（例如帳號被拒絕）才要顯示失敗狀態，不能整個吞掉，否則使用者
-    // 從 Google 導回來卻什麼都沒發生時，會完全不知道發生了什麼事。
-    fbAuth.getRedirectResult().catch((err) => {
+    // Redirect 登入的結果（若上次用了 signInWithRedirect 導回來）。沒有等待中的
+    // redirect 時，這裡正常 resolve 成 { user: null }，不是錯誤。
+    //
+    // ⚠️ 這個 resolve-成功但-user-是-null 的分支本身也可能是「失敗」：2024 年中起，
+    // Chrome／Firefox／Safari 陸續預設擋掉 Firebase Auth 中繼頁（*.firebaseapp.com）
+    // 需要的跨站資料存取，官方文件明講「不做額外設定，redirect 登入在這些瀏覽器上
+    // 會直接收不到使用者」——而且不拋例外，就是正常 resolve 成 null。單看這個 promise
+    // 本身分不出「這次載入沒有人登入過」跟「登入被擋掉了」，兩者都是 null，所以要靠
+    // redirectWasPending（sessionStorage 撐過整頁跳轉）判斷「剛剛是不是真的按過登入」。
+    fbAuth.getRedirectResult().then((result) => {
+      if (redirectWasPending && !(result && result.user)) {
+        clearSignInTimeout();
+        this._set('fail', '登入沒有完成——這個瀏覽器可能封鎖了登入需要的跨網站資料。' +
+          '可以先點一次「重試」；如果一直失敗，換 Chrome（電腦版或 Android）登入通常最穩定。');
+      }
+    }).catch((err) => {
       if (err && err.code && err.code !== 'auth/no-auth-event') {
+        clearSignInTimeout();
         this._set('fail', '登入失敗：' + (err.code || err.message));
       }
     });
@@ -123,19 +182,29 @@ const Sync = {
 
   async signIn() {
     this._set('signing-in', '登入中…');
+    clearSignInTimeout();
+    // 保險：不管走 popup 還是 redirect，只要逾時前都沒有變成已登入（也沒有任何錯誤），
+    // 一定要讓畫面跟「從沒登入過」長得不一樣——不然使用者會覺得「按登入完全沒反應」，
+    // 卻沒有任何線索可以回報。redirect 分支通常等不到這個逾時（頁面已經跳走），
+    // 主要是保護 popup 卡住不拋錯也不 resolve 的情況（跨站資料被擋時常見）。
+    signInTimeoutId = setTimeout(() => {
+      signInTimeoutId = null;
+      if (!this.isSignedIn() && this.state === 'signing-in') {
+        this._set('fail', '登入逾時，沒有完成——這個瀏覽器可能封鎖了登入需要的跨網站資料。' +
+          '可以先點一次「重試」；如果一直失敗，換 Chrome（電腦版或 Android）登入通常最穩定。');
+      }
+    }, SIGNIN_TIMEOUT_MS);
+
     const provider = new firebase.auth.GoogleAuthProvider();
-    // ⚠️ Safari（含 iOS）不要走 popup。彈出視窗登入成功後，結果要透過一個
-    // firebaseapp.com 網域的中繼頁面傳回主頁面，這條路徑會被 Safari 的 ITP
-    // （防止跨網站追蹤）當成跨站儲存擋掉——使用者在彈出視窗裡把帳號選完、
-    // Google 那邊確實登入成功了，但主頁面永遠收不到結果，畫面停在「未登入」，
-    // 而且不會拋出任何錯誤（不是 auth/popup-blocked 那種可以 catch 到的失敗）。
-    // babylog 的 firebase-sync.js 開頭註解特別記過這個坑。改成在 Safari 上直接用
-    // 整頁跳轉（signInWithRedirect）：整個頁面導到 Google 登入頁再導回來，
-    // 用的是一般的第一方導覽，不會踩到 ITP 擋跨站儲存這件事。
-    if (isSafariBrowser()) {
+    // 見檔頭 needsAuthRedirect() 的註解：iOS（不分瀏覽器名稱）、桌機 Safari、Firefox
+    // 這幾類引擎預設就擋第三方資料，彈出視窗登入完成後結果傳不回主頁面——不拋錯、
+    // 也不 resolve，畫面就停在「未登入」。改用整頁跳轉，走一般的第一方導覽。
+    if (needsAuthRedirect()) {
       try {
+        setRedirectPendingFlag();
         await fbAuth.signInWithRedirect(provider);
       } catch (e) {
+        clearSignInTimeout();
         this._set('fail', '登入失敗：' + (e && e.message));
       }
       return;
@@ -145,11 +214,13 @@ const Sync = {
     } catch (e) {
       if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request')) {
         try {
+          setRedirectPendingFlag();
           await fbAuth.signInWithRedirect(provider);
           return;
-        } catch (e2) { this._set('fail', '登入失敗：' + e2.message); return; }
+        } catch (e2) { clearSignInTimeout(); this._set('fail', '登入失敗：' + e2.message); return; }
       }
-      if (e && e.code === 'auth/popup-closed-by-user') { this._set('idle', ''); return; }
+      if (e && e.code === 'auth/popup-closed-by-user') { clearSignInTimeout(); this._set('idle', ''); return; }
+      clearSignInTimeout();
       this._set('fail', '登入失敗：' + e.message);
     }
   },

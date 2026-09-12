@@ -79,6 +79,16 @@ function renderSyncPill() {
   // 如果查詢順序反過來，一個曾經有 pending 寫入、後來訂閱失敗的畫面會卡在
   // 「同步中」，蓋掉使用者真正需要看到的失敗/未授權/身分不符訊息。
   if (!Sync.isSignedIn()) {
+    // ⚠️ 這兩條務必排在「點擊登入以同步」前面——之前登入卡住（跨網站資料被瀏覽器擋掉、
+    // 彈出視窗的結果傳不回主頁面）時 Sync.state 會變成 'signing-in' 或 'fail'，但
+    // isSignedIn() 一直是 false，如果沒有這兩條，畫面會一直顯示「點擊登入以同步」，
+    // 跟使用者從沒按過登入一模一樣——這正是「登入後還是跟未登入一樣」的成因。
+    if (Sync.state === 'signing-in') {
+      return `<span class="sync-pill busy"><span class="dot"></span>登入中…</span>`;
+    }
+    if (Sync.state === 'fail') {
+      return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.retrySync()"><span class="dot"></span>登入失敗，點擊重試</button>`;
+    }
     return `<button class="sync-pill off" onclick="A.signIn()"><span class="dot"></span>點擊登入以同步</button>`;
   }
   if (Sync.state === 'unauthorized') {
@@ -960,8 +970,9 @@ function renderSettingsPage(state) {
           <button class="btn secondary" onclick="A.signOut()">登出</button>
         ` : `
           <p style="font-size:13.5px;color:var(--text2);margin-bottom:12px">登入 Google 帳號才能在多裝置間同步紀錄。不登入也能用，資料只留在這支裝置。</p>
-          <button class="btn" onclick="A.signIn()">使用 Google 帳號登入</button>
+          <button class="btn" onclick="A.signIn()" ${Sync.state === 'signing-in' ? 'disabled' : ''}>${Sync.state === 'signing-in' ? '登入中…' : '使用 Google 帳號登入'}</button>
         `}
+        ${!Sync.isSignedIn() && Sync.state === 'fail' ? `<div class="banner crit" style="margin-top:12px">${ICON.warn}<div><b>登入沒有完成</b>${h(Sync.message)}</div></div>` : ''}
         ${Sync.state === 'unauthorized' ? `<div class="banner crit" style="margin-top:12px">${ICON.warn}<div>此帳號未被授權存取。請確認登入的 Google 帳號在白名單裡。</div></div>` : ''}
         ${Sync.state === 'wrong-identity' ? `<div class="banner warn" style="margin-top:12px">${ICON.warn}<div>${h(Sync.message)}</div></div>` : ''}
         ${Sync.persistenceDisabled ? `<div class="banner info" style="margin-top:12px">${ICON.info}<div>這台裝置的離線快取沒有啟用（可能是私密瀏覽模式）。離線時請避免關閉分頁，尚未送出的紀錄可能會遺失。</div></div>` : ''}
