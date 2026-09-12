@@ -84,6 +84,15 @@ const PlanData = (() => {
     return keyForWeekDay(weekNumber, dayIndex) < plan.expiredBefore;
   }
 
+  // 反向：dateKey → {weekNumber, dayIndex}；不在計畫期間回 null。
+  function locateKey(dateKey) {
+    const start = parseLocalDate(plan.startDate);
+    const d = parseLocalDate(dateKey);
+    const diffDays = Math.round((d - start) / 86400000);
+    if (diffDays < 0 || diffDays >= plan.totalWeeks * 7) return null;
+    return { weekNumber: Math.floor(diffDays / 7) + 1, dayIndex: diffDays % 7 };
+  }
+
   function daysUntilRace() {
     const race = parseLocalDate(plan.raceDate);
     return Math.round((race - today()) / 86400000);
@@ -132,7 +141,7 @@ const PlanData = (() => {
     get videoById() { return videoById; },
     get workoutById() { return workoutById; },
     get userById() { return userById; },
-    parseLocalDate, dayKey, dateForWeekDay, keyForWeekDay, today, locateToday,
+    parseLocalDate, dayKey, dateForWeekDay, keyForWeekDay, today, locateToday, locateKey,
     isExpired, daysUntilRace, phaseForWeek, week, day, weekdayLabel,
     fmtRange, fmtItemMeta,
   };

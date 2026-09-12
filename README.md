@@ -37,7 +37,7 @@
 
 | | 放哪 | 為什麼 |
 |---|---|---|
-| 程式碼、課表 JSON | 這個 repo | 只有訓練結構（「走跑交替 20-25 分鐘」），不含個人狀況 |
+| 程式碼、課表 JSON | 這個 repo | 只有訓練結構（「Zone 2 跑 20-25 分鐘」），不含個人狀況 |
 | 原始訓練計畫 md | **只在本機** `docs/計畫原文/`（已 gitignore） | 含產後週數、配速、漏尿/腹直肌分離的個人健康狀況 |
 | 完成紀錄、漏尿/疼痛/備註 | **Firestore**，永遠不進 repo | 敏感健康資料，且 `private/` 子集合只有本人可讀 |
 | `firebaseConfig` | 這個 repo，可以放心 commit | 這組本來就是公開值，安全性由 Security Rules 把關 |
@@ -65,7 +65,7 @@ Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表�
 ## 進度
 
 - [x] **CP0** 專案骨架、port 登記、架構與待決事項定案、日期修正
-- [x] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過（39 項）
+- [x] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過（現在 47 項）
 - [x] **CP2** 今日視圖
 - [x] **CP3** 接 Firestore + 離線與失敗狀態
 - [x] **CP4** 週視圖、總覽、使用者切換
@@ -74,5 +74,8 @@ Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表�
 - [x] **CP5** 部署到 GitHub Pages——**https://cs90s203.github.io/MaratonTraining/**
       （2026-09-11 上線；邀請新的共用者仍要補 `data/users.json` +
       `firestore.rules.local` 的 `isMember()`／`ownerEmail()`）
+- [x] **v0.5.0** 舊 Notion 課表格式整合：每天「實際操作」（改做／錯過／主動休息＋自由文字）、
+      週跑量目標 vs 實際、我的目標、週視圖表格模式；課表拿掉走跑改 Zone 2，見
+      [決策紀錄第 12、13 條](docs/決策紀錄.md)
 
 完整的規格審查報告（36 條發現）見 CHANGELOG 的 v0.1.0 條目。

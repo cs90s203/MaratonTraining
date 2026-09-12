@@ -1,12 +1,13 @@
 {
   "planId": "tokyo-marathon-2027",
-  "planVersion": 3,
-  "schemaVersion": 3,
+  "planVersion": 4,
+  "schemaVersion": 4,
   "startDate": "2026-09-07",
   "raceDate": "2027-03-07",
   "expiredBefore": "2026-09-10",
   "expiredBeforeReason": "起算日從 2026-09-10 改成 2026-09-07 之後，9/07-9/09 已成過去式。這三天不計入完成率分母，也不提示補做——要求補做等於第一週就加量，違反決策紀錄第 0 條。",
   "totalWeeks": 26,
+  "timeBasedRunPaceMinPerKm": 9,
   "safety": {
     "prerequisite": "雖然已產後 3 個月,但這份計畫仍假設妳已取得醫生/婦產科的運動許可,且沒有明顯的腹直肌分離(diastasis recti)或骨盆底功能異常。若還沒做過產後檢查,或運動中出現漏尿、下墜感、疼痛、分離超過2指寬等狀況,建議先找骨盆底物理治療師評估,再逐步提升強度。這份課表是訓練架構建議,不是醫療建議。",
     "disclaimer": "本計畫為訓練架構建議,非醫療處方。如有疼痛、漏尿、腹直肌分離未癒合等狀況,請諮詢婦產科醫師或骨盆底物理治療師調整強度。",
@@ -14,7 +15,7 @@
     "intensityPrinciple": "產後前 3-6 個月心血管系統、韌帶(鬆弛素影響)、骨盆底都還在恢復,寧可\"心率壓低、時間拉長\",也不要為了配速硬撐。有心率錶的話,建議 Zone 2 上限先抓保守一點。",
     "_source": "docs/計畫原文/訓練計畫.md 第 6、180、176、28 行逐字。"
   },
-  "_note": "date 與 dayOfWeek 刻意不存在本檔。由 startDate + (weekNumber-1)*7 + dayIndex 推導，見 docs/日曆基準.md。weeklyVolumeKm 的 kind=reference 表示那是原文的參考上限，不是本週 days 的加總。",
+  "_note": "date 與 dayOfWeek 刻意不存在本檔。由 startDate + (weekNumber-1)*7 + dayIndex 推導，見 docs/日曆基準.md。週跑量目標也刻意不存在本檔——由 App 從該週的跑步項目即時加總（只有時長的項目用 timeBasedRunPaceMinPerKm 換算），教練模式改了項目目標就跟著變，不會有兩個必須互相對應的數字。",
   "phases": [
     {
       "phaseId": "p1",
@@ -23,7 +24,7 @@
         1,
         8
       ],
-      "goal": "核心／骨盆底重建、走跑交替、建立跑步習慣、輕重量適應",
+      "goal": "核心／骨盆底重建、Zone 2 慢跑起步、建立跑步習慣、輕重量適應",
       "loadGuidance": "全部用徒手或極輕負荷，重點是動作品質與核心連結。"
     },
     {
@@ -71,8 +72,6 @@
     {
       "weekNumber": 1,
       "longRunMetric": "time",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
           "selectOne": false,
@@ -107,23 +106,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "1-1-0"
             }
@@ -188,23 +187,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "1-4-0"
             }
@@ -216,23 +215,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "長跑（走跑交替起步）",
+              "type": "long-run",
+              "title": "長跑（Zone 2）",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
+              "notes": "這階段的「長跑」以時間而非距離計，全程維持 Zone 2。若骨盆有下墜感就縮短當天時間，不要硬撐。",
               "derived": false,
               "id": "1-5-0"
             }
@@ -287,8 +286,6 @@
     {
       "weekNumber": 2,
       "longRunMetric": "time",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
           "selectOne": false,
@@ -323,23 +320,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "2-1-0"
             }
@@ -404,23 +401,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "2-4-0"
             }
@@ -432,23 +429,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "長跑（走跑交替起步）",
+              "type": "long-run",
+              "title": "長跑（Zone 2）",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
+              "notes": "這階段的「長跑」以時間而非距離計，全程維持 Zone 2。若骨盆有下墜感就縮短當天時間，不要硬撐。",
               "derived": false,
               "id": "2-5-0"
             }
@@ -503,8 +500,6 @@
     {
       "weekNumber": 3,
       "longRunMetric": "time",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
           "selectOne": false,
@@ -539,23 +534,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "3-1-0"
             }
@@ -620,23 +615,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "3-4-0"
             }
@@ -648,23 +643,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "長跑（走跑交替起步）",
+              "type": "long-run",
+              "title": "長跑（Zone 2）",
               "duration": {
                 "min": 30,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
+              "notes": "這階段的「長跑」以時間而非距離計，全程維持 Zone 2。若骨盆有下墜感就縮短當天時間，不要硬撐。",
               "derived": false,
               "id": "3-5-0"
             }
@@ -719,8 +714,6 @@
     {
       "weekNumber": 4,
       "longRunMetric": "time",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
           "selectOne": false,
@@ -755,23 +748,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "4-1-0"
             }
@@ -836,23 +829,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "4-4-0"
             }
@@ -864,23 +857,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "長跑（走跑交替起步）",
+              "type": "long-run",
+              "title": "長跑（Zone 2）",
               "duration": {
                 "min": 30,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
+              "notes": "這階段的「長跑」以時間而非距離計，全程維持 Zone 2。若骨盆有下墜感就縮短當天時間，不要硬撐。",
               "derived": false,
               "id": "4-5-0"
             }
@@ -935,8 +928,6 @@
     {
       "weekNumber": 5,
       "longRunMetric": "time",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
           "selectOne": false,
@@ -971,23 +962,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "5-1-0"
             }
@@ -1052,23 +1043,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "5-4-0"
             }
@@ -1080,23 +1071,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "長跑（走跑交替起步）",
+              "type": "long-run",
+              "title": "長跑（Zone 2）",
               "duration": {
                 "min": 35,
                 "max": 35
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
+              "notes": "這階段的「長跑」以時間而非距離計，全程維持 Zone 2。若骨盆有下墜感就縮短當天時間，不要硬撐。",
               "derived": false,
               "id": "5-5-0"
             }
@@ -1151,8 +1142,6 @@
     {
       "weekNumber": 6,
       "longRunMetric": "time",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列寫「走跑為主,不計公里」或「-」",
       "days": [
         {
           "selectOne": false,
@@ -1187,23 +1176,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "6-1-0"
             }
@@ -1268,23 +1257,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "6-4-0"
             }
@@ -1296,23 +1285,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "長跑（走跑交替起步）",
+              "type": "long-run",
+              "title": "長跑（Zone 2）",
               "duration": {
                 "min": 35,
                 "max": 35
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "這階段的「長跑」以時間而非距離計。走跑交替，不求連續。",
+              "notes": "這階段的「長跑」以時間而非距離計，全程維持 Zone 2。若骨盆有下墜感就縮短當天時間，不要硬撐。",
               "derived": false,
               "id": "6-5-0"
             }
@@ -1367,12 +1356,6 @@
     {
       "weekNumber": 7,
       "longRunMetric": "time",
-      "weeklyVolumeKm": {
-        "min": 8,
-        "max": 10,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -1407,23 +1390,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "7-1-0"
             }
@@ -1488,23 +1471,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "7-4-0"
             }
@@ -1517,7 +1500,7 @@
           "items": [
             {
               "type": "long-run",
-              "title": "長跑（全跑）",
+              "title": "長跑",
               "duration": {
                 "min": 40,
                 "max": 40
@@ -1532,7 +1515,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "第四節：本階段最後兩週轉為全程跑。仍以時間計。",
+              "notes": "第四節：本階段最後兩週長跑強度進到 65-72%。仍以時間計。",
               "derived": false,
               "id": "7-5-0"
             }
@@ -1587,12 +1570,6 @@
     {
       "weekNumber": 8,
       "longRunMetric": "time",
-      "weeklyVolumeKm": {
-        "min": 8,
-        "max": 10,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -1627,23 +1604,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 25
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。",
+              "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。",
               "derived": false,
               "id": "8-1-0"
             }
@@ -1708,23 +1685,23 @@
           "dayNotes": null,
           "items": [
             {
-              "type": "walk-run",
-              "title": "走跑交替",
+              "type": "run",
+              "title": "Zone 2 跑",
               "duration": {
                 "min": 20,
                 "max": 30
               },
               "distanceKm": null,
-              "heartRateZone": "50-60%",
+              "heartRateZone": "60-70%",
               "rpe": {
-                "min": 2,
-                "max": 3
+                "min": 4,
+                "max": 5
               },
-              "intensityNote": "非常輕鬆，像散步",
+              "intensityNote": "輕鬆對話",
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "逐步拉長跑段比例。",
+              "notes": "逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。",
               "derived": false,
               "id": "8-4-0"
             }
@@ -1737,7 +1714,7 @@
           "items": [
             {
               "type": "long-run",
-              "title": "長跑（全跑）",
+              "title": "長跑",
               "duration": {
                 "min": 40,
                 "max": 40
@@ -1752,7 +1729,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "第四節：本階段最後兩週轉為全程跑。仍以時間計。",
+              "notes": "第四節：本階段最後兩週長跑強度進到 65-72%。仍以時間計。",
               "derived": false,
               "id": "8-5-0"
             }
@@ -1807,12 +1784,6 @@
     {
       "weekNumber": 9,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 15,
-        "max": 18,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -1863,7 +1834,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "9-1-0"
             }
@@ -2045,12 +2016,6 @@
     {
       "weekNumber": 10,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 15,
-        "max": 18,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -2101,7 +2066,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "10-1-0"
             }
@@ -2283,12 +2248,6 @@
     {
       "weekNumber": 11,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 18,
-        "max": 22,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -2339,7 +2298,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "11-1-0"
             }
@@ -2521,12 +2480,6 @@
     {
       "weekNumber": 12,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 18,
-        "max": 22,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -2577,7 +2530,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "12-1-0"
             }
@@ -2759,12 +2712,6 @@
     {
       "weekNumber": 13,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 22,
-        "max": 25,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -2815,7 +2762,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "13-1-0"
             }
@@ -2997,12 +2944,6 @@
     {
       "weekNumber": 14,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 22,
-        "max": 25,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -3053,7 +2994,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "14-1-0"
             }
@@ -3235,12 +3176,6 @@
     {
       "weekNumber": 15,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 25,
-        "max": 28,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -3291,7 +3226,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "15-1-0"
             }
@@ -3473,12 +3408,6 @@
     {
       "weekNumber": 16,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 25,
-        "max": 28,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -3529,7 +3458,7 @@
               "intensityDerived": false,
               "videoRef": null,
               "workoutRef": null,
-              "notes": "全程跑，不再走跑交替。",
+              "notes": null,
               "derived": false,
               "id": "16-1-0"
             }
@@ -3711,12 +3640,6 @@
     {
       "weekNumber": 17,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 30,
-        "max": 33,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -3964,12 +3887,6 @@
     {
       "weekNumber": 18,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 30,
-        "max": 33,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -4217,12 +4134,6 @@
     {
       "weekNumber": 19,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 33,
-        "max": 36,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -4470,12 +4381,6 @@
     {
       "weekNumber": 20,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 33,
-        "max": 36,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -4723,12 +4628,6 @@
     {
       "weekNumber": 21,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 36,
-        "max": 40,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -4976,12 +4875,6 @@
     {
       "weekNumber": 22,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": {
-        "min": 36,
-        "max": 40,
-        "kind": "reference"
-      },
-      "weeklyVolumeNullReason": null,
       "days": [
         {
           "selectOne": false,
@@ -5229,8 +5122,6 @@
     {
       "weekNumber": 23,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列只寫「遞減」，沒有給數字",
       "days": [
         {
           "selectOne": false,
@@ -5439,8 +5330,6 @@
     {
       "weekNumber": 24,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列只寫「遞減」，沒有給數字",
       "days": [
         {
           "selectOne": false,
@@ -5649,8 +5538,6 @@
     {
       "weekNumber": 25,
       "longRunMetric": "distance",
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "原文第四節該列只寫「遞減」，沒有給數字",
       "days": [
         {
           "selectOne": false,
@@ -5859,8 +5746,6 @@
     {
       "weekNumber": 26,
       "longRunMetric": null,
-      "weeklyVolumeKm": null,
-      "weeklyVolumeNullReason": "賽週，原文未給週跑量",
       "days": [
         {
           "selectOne": true,

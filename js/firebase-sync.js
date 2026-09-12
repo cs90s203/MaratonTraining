@@ -12,7 +12,8 @@
 // 不符合就能立刻顯示「此帳號未被授權」，而不是讓使用者看到一堆 permission-denied。
 
 let fbApp = null, fbAuth = null, fbDb = null;
-let unsubEntries = null, unsubPrivate = null, unsubWeekAdj = null, unsubOtherEntries = {};
+let unsubEntries = null, unsubPrivate = null, unsubWeekAdj = null, unsubProfile = null;
+let unsubOtherEntries = {}, unsubOtherProfile = {};
 let unsubPlanOverrides = null; // 跟上面三個不一樣：這個是共用資源，只在登入/登出時掛/拆，不隨切換身分重訂
 
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
@@ -37,12 +38,13 @@ const Sync = {
   message: '',
   user: null, // {email, displayName, photoURL}
   persistenceDisabled: false,
-  // 三個集合分開追蹤「本機已存、雲端還沒確認」，renderSyncPill 用 OR 合併判斷——
-  // 只看 entries 的話，單獨改身體狀況備註或標記本週降量時，畫面會誤顯示「已同步」
-  // （那兩者走的是 private/weekAdjustments 集合，之前沒被算進去）。
-  pendingByCollection: { entries: false, private: false, weekAdjustments: false },
+  // 四個集合分開追蹤「本機已存、雲端還沒確認」，renderSyncPill 用 OR 合併判斷——
+  // 只看 entries 的話，單獨改身體狀況備註、標記本週降量或改訓練目標時，畫面會誤顯示
+  // 「已同步」（那些走的是 private/weekAdjustments/profile 集合，之前沒被算進去）。
+  pendingByCollection: { entries: false, private: false, weekAdjustments: false, profile: false },
   get hasPendingWrites() {
-    return this.pendingByCollection.entries || this.pendingByCollection.private || this.pendingByCollection.weekAdjustments;
+    const p = this.pendingByCollection;
+    return p.entries || p.private || p.weekAdjustments || p.profile;
   },
   // 樂觀寫入被 Firestore 拒絕時，不回滾使用者剛打的勾（那等於因為權限問題懲罰使用者
   // 剛完成的動作，跟決策紀錄第 0 條的精神相反），但要讓 UI 能標出「這筆沒真的存到雲端」，
@@ -75,9 +77,13 @@ const Sync = {
       return;
     }
 
-    Store._cloudPush = (kind, docId, data) => this.pushDoc(kind, docId, data);
-    Store._cloudPushPlanOverride = (weekNumber, data) => this.pushPlanOverride(weekNumber, data);
-    Store._cloudDeletePlanOverride = (weekNumber) => this.deletePlanOverride(weekNumber);
+    // ⚠️ 用 bind 而不是重寫一次參數簽名。之前這裡寫成 `(weekNumber, data) => this.pushPlanOverride(weekNumber, data)`，
+    // 少接了 store.js 傳來的第三個參數 baseUpdatedAt——結果版本比對永遠拿到 undefined，
+    // 同一週第二次編輯必定被判成「剛被別人改過」而丟掉；deletePlanOverride 同樣少接
+    // backup，還原失敗時本機永遠不會回滾。bind 讓參數數量不可能再對不上。
+    Store._cloudPush = this.pushDoc.bind(this);
+    Store._cloudPushPlanOverride = this.pushPlanOverride.bind(this);
+    Store._cloudDeletePlanOverride = this.deletePlanOverride.bind(this);
 
     fbAuth.onAuthStateChanged((user) => {
       if (!user) {
@@ -151,16 +157,19 @@ const Sync = {
     if (unsubEntries) unsubEntries();
     if (unsubPrivate) unsubPrivate();
     if (unsubWeekAdj) unsubWeekAdj();
+    if (unsubProfile) unsubProfile();
     Object.values(unsubOtherEntries).forEach((fn) => fn && fn());
-    unsubEntries = unsubPrivate = unsubWeekAdj = null;
+    Object.values(unsubOtherProfile).forEach((fn) => fn && fn());
+    unsubEntries = unsubPrivate = unsubWeekAdj = unsubProfile = null;
     unsubOtherEntries = {};
+    unsubOtherProfile = {};
   },
 
   // 使用者切換裝置上的「我是誰」時重新訂閱（Store.setActiveUser 會呼叫這個）。
   resubscribe() {
     if (!this.isSignedIn()) return;
     this._detachListeners();
-    this.pendingByCollection = { entries: false, private: false, weekAdjustments: false };
+    this.pendingByCollection = { entries: false, private: false, weekAdjustments: false, profile: false };
     this._attachListeners();
     this._backfillLocal(Store.activeUserId);
   },
@@ -199,6 +208,18 @@ const Sync = {
         });
         this._notify();
       }, (err) => this._handleSnapErr(err, 'weekAdjustments'));
+
+    // profile 集合目前只有一份文件 goals（訓練目標）；用 collection 訂閱而不是單一 doc，
+    // 跟其他三個一致，之後 profile 多一份文件也不用改這裡。
+    unsubProfile = fbDb.collection(`users/${userId}/profile`)
+      .onSnapshot({ includeMetadataChanges: true }, (snap) => {
+        this.pendingByCollection.profile = snap.metadata.hasPendingWrites;
+        snap.docChanges().forEach((c) => {
+          if (c.type === 'removed' || c.doc.id !== 'goals') return;
+          Store.mergeRemoteGoals(userId, c.doc.data());
+        });
+        this._notify();
+      }, (err) => this._handleSnapErr(err, 'profile'));
   },
 
   // 教練模式的共用覆寫層：只在登入/登出時掛/拆一次，跟 Store.activeUserId 切換
@@ -266,6 +287,7 @@ const Sync = {
   // 讀取「其他人」的 entries（總覽頁唯讀查看用），跟自己的訂閱分開管理，
   // 用完（切換走）要記得取消，不然裝置上會一直掛著好幾個人的即時監聽。
   subscribeOtherEntries(otherUserId, onData) {
+    if (!this.isSignedIn() || !fbDb) return;
     if (unsubOtherEntries[otherUserId]) return; // 已經訂閱過
     unsubOtherEntries[otherUserId] = fbDb.collection(`users/${otherUserId}/entries`)
       .onSnapshot((snap) => {
@@ -275,6 +297,20 @@ const Sync = {
         });
         onData && onData();
       }, () => {}); // 讀不到（不在白名單）就悄悄放棄，總覽頁顯示「尚無資料」
+  },
+
+  // 別人的訓練目標（總覽頁「查看別人的進度」唯讀用），跟上面同一套管理方式。
+  subscribeOtherProfile(otherUserId, onData) {
+    if (!this.isSignedIn() || !fbDb) return;
+    if (unsubOtherProfile[otherUserId]) return;
+    unsubOtherProfile[otherUserId] = fbDb.collection(`users/${otherUserId}/profile`)
+      .onSnapshot((snap) => {
+        snap.docChanges().forEach((c) => {
+          if (c.type === 'removed' || c.doc.id !== 'goals') return;
+          Store.mergeRemoteGoals(otherUserId, c.doc.data());
+        });
+        onData && onData();
+      }, () => {});
   },
 
   _handleSnapErr(err, collectionName) {
@@ -354,6 +390,7 @@ const Sync = {
     if (userId === Store.activeUserId) {
       await this._backfillCollection(userId, 'private', Store.privateData);
       await this._backfillCollection(userId, 'weekAdjustments', Store.weekAdjustments);
+      if (Store.goals[userId]) await this._backfillCollection(userId, 'profile', { goals: Store.goals[userId] });
     }
   },
 

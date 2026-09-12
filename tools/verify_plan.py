@@ -20,8 +20,12 @@ from datetime import date, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEEKDAY = "一二三四五六日"
-VALID_TYPES = {"recovery", "walk-run", "run", "long-run", "tempo",
+VALID_TYPES = {"recovery", "run", "long-run", "tempo",
                "form-drill", "strength", "rest", "race"}
+# 週跑量目標只算這三種（js/store.js weekVolume 用同一組；兩邊是不同執行環境，靠註解同步）。
+# race 刻意不在裡面：比賽是整份計畫的終點，不是「賽週的跑量目標」——算進去會讓賽週目標
+# 變成 47K+，進度條整週停在 10%，26 週的圖也被那一根拉到看不出其他週的差異。
+RUN_TYPES = {"run", "long-run", "tempo"}
 
 # 安全性文字的獨立基準。**故意不從 build_plan.py import**——那樣等於拿產生器檢查自己。
 # 這四段是 docs/計畫原文/訓練計畫.md 第 6、180、176、28 行的逐字內容；改一個標點就會失敗。
@@ -34,9 +38,8 @@ SAFETY_SHA = {
 
 # 第二節的項目類型 → 心率區間。原文第八節:175 指定強度以第二節為準。
 EXPECTED_HR = {
-    "walk-run": "50-60%",   # 第二節:32 恢復跑/走跑交替
     "run": None,            # 可能是 Zone 2 跑(60-70%)或輕鬆跑(50-60%)，不硬性綁
-    "long-run": "65-72%",   # 第二節:34 長跑
+    "long-run": None,       # 分兩段檢查：W1-6 是 60-70%、W7 起 65-72%（見 B2）
     "tempo": "70-75%",      # 內插值，標 intensityDerived
 }
 
@@ -128,11 +131,7 @@ def main():
     bad = []
     for w in weeks:
         kinds = [it["type"] for d in w["days"] for it in d["items"]]
-        n = kinds.count("long-run") + kinds.count("race")
-        # 二擇一的長跑不存在，所以這裡直接數；Phase 1 前 6 週長跑記成 walk-run
-        if w["weekNumber"] <= 6:
-            n += sum(1 for d in w["days"] for it in d["items"]
-                     if it["type"] == "walk-run" and "長跑" in it["title"])
+        n = kinds.count("long-run") + kinds.count("race")  # 二擇一的長跑不存在，直接數
         if n != 1:
             bad.append(f'W{w["weekNumber"]}={n}')
     check("每週恰好一次長跑或比賽", not bad, str(bad))
@@ -159,10 +158,21 @@ def main():
     bad = [f'W{a}D{b} {it["title"]} = {it["heartRateZone"]}' for a, b, it in items
            if EXPECTED_HR.get(it["type"]) and it["heartRateZone"] != EXPECTED_HR[it["type"]]]
     check("強度符合第二節對照表", not bad, str(bad[:4]))
-    # 走跑交替絕對不可以出現 65-72%（第一版就是這樣錯的：Phase 1 長跑被標成長跑強度）
+    # 決策紀錄第 12 條：走跑整個拿掉，Phase 1 一律 Zone 2 跑。W1-6 的長跑原本是走跑
+    # 50-60%，改成 Zone 2 跑之後**只能**進到 60-70%，不可以順手標成第二節「長跑」的
+    # 65-72%（那是連跳兩級，違反第 0 條）；W7-8 原文寫「40分鐘 全跑」才是 65-72%。
+    bad = [f'W{a}D{b} {it["title"]} = {it["heartRateZone"]}' for a, b, it in items
+           if it["type"] == "long-run" and it["heartRateZone"] != ("60-70%" if a <= 6 else "65-72%")]
+    check("長跑強度：W1-6 60-70%、W7 起 65-72%", not bad, str(bad[:4]))
+    bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items if it["type"] == "walk-run"]
+    check("沒有 walk-run 類型（第 12 條）", not bad, str(bad[:4]))
     bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items
-           if it["type"] == "walk-run" and it["heartRateZone"] != "50-60%"]
-    check("走跑交替一律 50-60%", not bad, str(bad[:4]))
+           if "走跑" in (it["title"] or "") or "走跑" in (it["notes"] or "")]
+    check("標題與備註不含「走跑」字樣", not bad, str(bad[:4]))
+    # Phase 1 所有跑步類項目都是 Zone 2（不是 50-60% 也不是 65-72%）——W7-8 長跑除外
+    bad = [f'W{a}D{b} {it["title"]} = {it["heartRateZone"]}' for a, b, it in items
+           if a <= 8 and it["type"] == "run" and it["heartRateZone"] != "60-70%"]
+    check("Phase 1 的 run 一律 60-70%", not bad, str(bad[:4]))
     # 內插出來的強度必須標記
     bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items
            if it["heartRateZone"] == "70-75%" and not it["intensityDerived"]]
@@ -201,13 +211,34 @@ def main():
            if isinstance(e.get("holdSeconds"), int) or isinstance(e.get("reps"), int)]
     check("reps/holdSeconds 一律用 {min,max}", not bad, str(bad[:4]))
 
-    # B6 週跑量是參考值，不可被誤讀成 days 的加總
-    bad = [w["weekNumber"] for w in weeks
-           if w["weeklyVolumeKm"] and w["weeklyVolumeKm"].get("kind") != "reference"]
-    check("weeklyVolumeKm 標明 kind=reference", not bad, str(bad[:4]))
-    bad = [w["weekNumber"] for w in weeks
-           if not w["weeklyVolumeKm"] and not w.get("weeklyVolumeNullReason")]
-    check("沒有週跑量的週都寫了理由", not bad, f"未說明的週：{bad[:6]}")
+    # B6 決策紀錄第 13 條：週跑量目標由 App 從跑步項目即時加總，資料檔不存那個數字
+    # （存了就是「兩個必須互相對應的數字」——教練改項目後它會過時）。
+    check('資料檔不含 "weeklyVolumeKm" 欄位', '"weeklyVolumeKm"' not in raw,
+          "週跑量目標由 js/store.js weekVolume 從項目加總，不存進 plan.json")
+    # 公里 = 分鐘 ÷ 分速：分速數字越小，換出來的目標越高。要守的是下限（原文 Zone 2 約 8-9
+    # 分速，取慢端 9 才是低估）；上限只是防打錯字。
+    pace = plan.get("timeBasedRunPaceMinPerKm")
+    check("timeBasedRunPaceMinPerKm 是 9-12 之間的數字（越小目標越高，下限才是要守的邊）",
+          isinstance(pace, (int, float)) and 9 <= pace <= 12, f"實際 {pace!r}")
+    # 賽週（W26）扣掉比賽日仍要有跑步類項目，否則賽週目標算不出來
+    w26 = weeks[-1]
+    check("賽週扣掉比賽日仍有跑步類項目",
+          any(it["type"] in RUN_TYPES for d in w26["days"] for it in d["items"]))
+    # 每週都算得出目標的前提：每週（扣掉過期日）至少一個跑步類項目
+    expired_before = date.fromisoformat(plan["expiredBefore"])
+    bad = []
+    for w in weeks:
+        has_run = any(it["type"] in RUN_TYPES
+                      for d in w["days"] for it in d["items"]
+                      if start + timedelta(days=(w["weekNumber"] - 1) * 7 + d["dayIndex"]) >= expired_before)
+        if not has_run:
+            bad.append(w["weekNumber"])
+    check("每週（扣掉過期日）至少一個跑步類項目", not bad, f"沒有跑步的週：{bad}")
+    # 只有時長沒距離的跑步項目，換算配速才用得上；有距離的不該再被換算——
+    # 這裡守的是「每個跑步項目至少有 duration 或 distanceKm 其中之一」，否則目標會少算它。
+    bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items
+           if it["type"] in RUN_TYPES and not it["duration"] and not it["distanceKm"]]
+    check("跑步類項目都有時長或距離（目標加總的前提）", not bad, str(bad[:4]))
 
     # ── 輸出 ──
     width = max(len(n) for n, _, _ in checks)

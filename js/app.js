@@ -56,9 +56,43 @@ const App = {
   setActualStats(weekNumber, dayIndex, field, value) {
     const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
     const num = value === '' ? null : Number(value);
+    if (num != null && (!Number.isFinite(num) || num < 0)) return;
     Store.setActualStats(dateKey, field === 'duration' ? { durationMinutes: num } : { distanceKm: num });
     render();
   },
+
+  setDayStatus(weekNumber, dayIndex, status) {
+    const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
+    Store.setDayStatus(dateKey, status);
+    render();
+  },
+
+  setActualNote(dateKey, value) {
+    Store.setActualNote(dateKey, value);
+    // 不 render()：跟 setNote 同理，避免 textarea 失焦。
+  },
+
+  setWeekViewMode(mode) {
+    Store.setWeekViewMode(mode);
+    render();
+  },
+
+  // ── 訓練目標（自己的 profile/goals）────────────────────────────────────────
+  setRaceGoal(value) { Store.setRaceGoal(value); render(); },
+  addGoal() {
+    const el = document.getElementById('goal-new');
+    if (!el || !el.value.trim()) return;
+    Store.addGoal(el.value);
+    render();
+  },
+  toggleGoal(id) { Store.toggleGoalDone(id); render(); },
+  // 清空不等於刪除（Store.setGoalText 空字串時直接不寫）——要刪一條目標請按 ×，
+  // 不要讓「打字打到一半、暫時清空重打」這個動作變成靜默刪除且沒有復原。
+  setGoalText(id, value) {
+    Store.setGoalText(id, value);
+    // 不 render()：避免 input 失焦。
+  },
+  removeGoal(id) { Store.removeGoal(id); render(); },
 
   toggleFlag(dateKey, flagKey) {
     const priv = Store.privateFor(dateKey);
@@ -169,7 +203,9 @@ const App = {
   // 一個負號或多打幾個 9，就會讓所有人看到「RPE 2-9999」，且不會有任何錯誤訊息。
   _validateItemFields(fields) {
     if (!fields.title) return '標題不能空白';
-    if (!VALID_TYPES.includes(fields.type)) return '類型不合法';
+    // 舊覆寫文件裡的 walk-run（v3 類型）會以「走跑交替（舊類型，請改選）」出現在下拉裡，
+    // 存檔時一律擋下要求改選——不能靜默存回去，也不能讓瀏覽器預設成第一個選項。
+    if (!VALID_TYPES.includes(fields.type)) return `類型「${TYPE_LABELS[fields.type] || fields.type}」已停用，請改選一個類型（走跑請選「跑步」）`;
     const r = fields.duration;
     if (r && (r.min < 0 || r.max > 300)) return '時長要在 0-300 分鐘之間';
     const k = fields.distanceKm;
@@ -257,8 +293,7 @@ const App = {
   setDayNotes(weekNumber, dayIndex, value) {
     const week = this._cloneEffectiveWeek(weekNumber);
     week.days[dayIndex].dayNotes = value || null;
-    Store.saveWeekOverride(weekNumber, week);
-    // 不 render()：跟 setNote 同理，避免 textarea 失焦。
+    Store.saveWeekOverride(weekNumber, week, true); // silent：避免 textarea 失焦時吃掉下一次點擊
   },
 
   setLongRunMetric(weekNumber, value) {
@@ -268,21 +303,36 @@ const App = {
     render();
   },
 
+  // 週跑量目標的教練覆寫（決策紀錄第 13 條）。預設沒有這個欄位——目標由
+  // Store.weekVolume 從課表跑步項目即時加總；教練設了才存 {min,max}。兩個都留空
+  // 等於「改回自動加總」，跟 clearWeeklyVolume 同義。
   setWeeklyVolume(weekNumber, minVal, maxVal) {
-    const week = this._cloneEffectiveWeek(weekNumber);
-    if (minVal === '' && maxVal === '') {
-      // 決策紀錄第 8 條：「不要讓 null 同時代表三件事」——weeklyVolumeKm 跟
-      // weeklyVolumeNullReason 不能一起是 null，否則週視圖的說明橫幅會無聲消失，
-      // 使用者不知道這週的跑量參考是「本來沒有」還是「教練清掉了」。
-      week.weeklyVolumeKm = null;
-      week.weeklyVolumeNullReason = '教練已清除本週跑量參考';
-    } else {
-      const a = minVal === '' ? Number(maxVal) : Number(minVal);
-      const b = maxVal === '' ? Number(minVal) : Number(maxVal);
-      if (Number.isNaN(a) || Number.isNaN(b) || a < 0 || b > 100) { alert('週跑量要在 0-100 公里之間'); return; }
-      week.weeklyVolumeKm = { min: Math.min(a, b), max: Math.max(a, b), kind: 'reference' };
-      week.weeklyVolumeNullReason = null;
+    if (minVal === '' && maxVal === '') { this.clearWeeklyVolume(weekNumber); return; }
+    const a = minVal === '' ? Number(maxVal) : Number(minVal);
+    const b = maxVal === '' ? Number(minVal) : Number(maxVal);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b > 100) { alert('週跑量要在 0-100 公里之間'); return; }
+    // 決策紀錄第 0 條：手動目標只能把數字往下調。比課表加總高的目標＝用一個數字催人
+    // 多跑，卻沒有任何一天的課表項目支撐它——要加量請改項目，那才看得見、也才會被審。
+    // planOnly=true：純課表加總，不看操作者自己的 entries——否則教練當週若標了主動休息
+    // 或改做，這條擋線會用「他自己剩下要跑的量」當上限，同樣的目標在別人的裝置上卻合法，
+    // 而且錯誤訊息會講出一個不是課表真實加總的數字（審查抓到：W3 標休息後上限從 9.4 縮到
+    // 6.7，換成沒有紀錄的 Annlin 身分同一個數字卻直接放行）。
+    const auto = Store.weekTargetAuto(weekNumber, Store.activeUserId, { planOnly: true });
+    if (Math.max(a, b) > auto.max + 0.05) {
+      alert(`目標上限不能高於課表加總（${auto.max} K）。要加量請直接改課表項目，不要只改數字。`);
+      return;
     }
+    const week = this._cloneEffectiveWeek(weekNumber);
+    week.weeklyVolumeKm = { min: Math.min(a, b), max: Math.max(a, b) };
+    delete week.weeklyVolumeNullReason; // 舊版欄位（第 8 條時代），不再有意義
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
+
+  clearWeeklyVolume(weekNumber) {
+    const week = this._cloneEffectiveWeek(weekNumber);
+    delete week.weeklyVolumeKm;
+    delete week.weeklyVolumeNullReason;
     Store.saveWeekOverride(weekNumber, week);
     render();
   },

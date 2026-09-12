@@ -31,10 +31,24 @@ const FLAG_LABELS = { leakage: '漏尿', pain: '疼痛', overTired: '過度疲�
 // 教練模式編輯表單的 type 下拉選單。⚠️ 跟 tools/verify_plan.py 的 VALID_TYPES 必須
 // 保持一致——那支腳本管出廠課表，這裡管教練模式的即時編輯，是兩個不同的執行環境
 // （Python / 瀏覽器 JS），沒辦法共用同一份常數，只能靠這條註解互相提醒同步改。
-const VALID_TYPES = ['recovery', 'walk-run', 'run', 'long-run', 'tempo', 'form-drill', 'strength', 'rest', 'race'];
+const VALID_TYPES = ['recovery', 'run', 'long-run', 'tempo', 'form-drill', 'strength', 'rest', 'race'];
 const TYPE_LABELS = {
-  recovery: '恢復', 'walk-run': '走跑交替', run: '跑步', 'long-run': '長跑',
+  recovery: '恢復', run: '跑步', 'long-run': '長跑',
   tempo: '節奏跑', 'form-drill': '跑姿訓練', strength: '重量訓練', rest: '休息', race: '比賽',
+  'walk-run': '走跑交替（舊類型，請改選）', // v3 舊覆寫文件裡可能還有；只供顯示，不在 VALID_TYPES 下拉
+};
+// Store.dayStatus() 的七種回傳值 → 畫面文字
+const DAY_STATUS_LABELS = {
+  expired: '已過期', substituted: '改做', missed: '錯過', rested: '主動休息',
+  done: '已完成', partial: '部分完成', pending: '待完成',
+};
+// 三顆可按的狀態 chip。「照表」（status=null）不是 chip，是 renderActualBox 右上角的
+// 唯讀文字——它是「沒有覆寫」而不是一個選項，見決策紀錄第 13b 條。
+const DAY_STATUS_CHIPS = [['substituted', '改做'], ['missed', '錯過'], ['rested', '主動休息']];
+const DAY_STATUS_HINTS = {
+  substituted: '改做只是記錄，不算補做，也不會把原本的量搬到別天。',
+  missed: '錯過就是錯過，不需要補做。',
+  rested: '主動休息不計入完成率——休息不是失敗。',
 };
 
 // ── 頂層外殼 ─────────────────────────────────────────────────────────────────
@@ -221,6 +235,9 @@ function renderDayDetail(weekNumber, dayIndex, opts) {
     html += `<div class="coach-add-row"><button class="btn coach-add-row" onclick="A.startAddItem(${weekNumber},${dayIndex})">+ 新增項目</button></div>`;
   }
 
+  if (!isExpired) {
+    html += renderActualBox(weekNumber, dayIndex, d, entry);
+  }
   if (opts.allowFlags && !isExpired) {
     html += renderFlagsBox(dateKey);
   }
@@ -304,7 +321,6 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
           ${item.notes ? `<div class="item-notes">${h(item.notes)}</div>` : ''}
           ${links.length ? `<div class="item-links">${links.join('')}</div>` : ''}
           ${workoutBlock}
-          ${!isExpired && (item.duration || item.distanceKm) ? renderActualInput(weekNumber, dayIndex, item, entry) : ''}
           ${isSelectOne && chosen ? `<div class="choice-note">✓ 這次選了這個</div>` : ''}
           ${coachToolbar}
         </div>
@@ -331,11 +347,11 @@ function renderItemEditForm(weekNumber, dayIndex, item) {
         <div class="row">
           <div class="field">
             <label class="field-lbl">類型</label>
-            <select name="type">${VALID_TYPES.map((t) => `<option value="${t}" ${it.type === t ? 'selected' : ''}>${TYPE_LABELS[t]}</option>`).join('')}</select>
+            <select name="type">${(VALID_TYPES.includes(it.type) ? VALID_TYPES : [it.type].concat(VALID_TYPES)).map((t) => `<option value="${t}" ${it.type === t ? 'selected' : ''}>${TYPE_LABELS[t] || t}</option>`).join('')}</select>
           </div>
           <div class="field wide">
             <label class="field-lbl">標題</label>
-            <input name="title" type="text" value="${h(it.title)}" placeholder="例如：走跑交替">
+            <input name="title" type="text" value="${h(it.title)}" placeholder="例如：Zone 2 跑">
           </div>
         </div>
         <div class="row">
@@ -374,13 +390,58 @@ function renderItemEditForm(weekNumber, dayIndex, item) {
   `;
 }
 
-function renderActualInput(weekNumber, dayIndex, item, entry) {
+// 當天的「實際操作」方塊——Notion 舊課表那欄「實際操作（完成度）」的對應物。
+// 一天一個（不是一項目一個）：entries 的 actualDurationMinutes / actualDistanceKm 本來就是
+// 一天一筆，之前畫在每張項目卡片上，一天有兩個有時長的項目時，兩個輸入框綁的是同一個值。
+// 狀態四顆 chip：照表（status=null，由打勾推導）／改做／錯過／主動休息。
+// 實際公里只在當天有跑步類項目時出現（Phase 1 全部以時間計，但實際跑了幾公里還是要記——
+// 週跑量的「實際」就是從這裡加總的）。
+// 「誰看得到」做進標題，不只放在 placeholder：這欄跟下面的私密欄長得很像，
+// 她以前在 Notion 是一格混寫身體感受的，寫錯框 Security Rules 擋不了。
+function othersLabel() {
+  const others = PlanData.users.filter((u) => u.userId !== Store.activeUserId).map((u) => u.displayName);
+  return others.length ? `${others.join('、')} 看得到` : '只有你';
+}
+
+function renderActualBox(weekNumber, dayIndex, d, entry) {
+  const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
+  const st = entry && DAY_STATUS_OVERRIDES.includes(entry.status) ? entry.status : null;
+  const derived = Store.dayStatus(weekNumber, dayIndex);
+  const isAllRest = d.items.every((it) => it.type === 'rest');
+  const chosenIsRest = d.selectOne && entry && entry.selectedItemId &&
+    d.items.some((it) => it.id === entry.selectedItemId && it.type === 'rest');
+  const isFuture = dateKey > PlanData.dayKey(PlanData.today());
+  const hasRun = d.items.some((it) => isRunType(it.type) || it.type === 'race');
+  const hasDuration = d.items.some((it) => it.duration);
+  const showMinutes = st === 'substituted' || (!st && hasDuration);
+  const showKm = st === 'substituted' || (!st && hasRun);
   const durVal = entry && entry.actualDurationMinutes != null ? entry.actualDurationMinutes : '';
   const kmVal = entry && entry.actualDistanceKm != null ? entry.actualDistanceKm : '';
-  const fields = [];
-  if (item.duration) fields.push(`<label class="actual-field">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onclick="event.stopPropagation()" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>`);
-  if (item.distanceKm) fields.push(`<label class="actual-field">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onclick="event.stopPropagation()" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>`);
-  return `<div class="actual-row" onclick="event.stopPropagation()">${fields.join('')}</div>`;
+  // 純休息日不放狀態 chip——在休息日提供「改做」等於 App 主動遞出「用訓練取代休息」的按鈕。
+  // 二擇一已選「完全休息」的日子不放「主動休息」——兩種休息只留一條路。
+  const chips = isAllRest ? [] : DAY_STATUS_CHIPS.filter(([k]) => !(k === 'rested' && chosenIsRest));
+  const hint = st ? DAY_STATUS_HINTS[st]
+    : (isAllRest ? '休息日。有做針灸、伸展之類的可以記在下面。'
+      : '完成用上面的打勾記錄；改做／錯過／主動休息才點下面的狀態。');
+  return `
+    <div class="card actual-box">
+      <div class="actual-box-head">
+        <span class="actual-box-title">實際操作 <span class="vis-tag">${h(othersLabel())}</span></span>
+        ${!isAllRest ? `<span class="derived-status ${derived}">${st ? '' : '照表 · '}${h(DAY_STATUS_LABELS[derived] || '')}</span>` : ''}
+      </div>
+      ${chips.length ? `<div class="status-row">
+        ${chips.map(([k, label]) => {
+          const disabled = isFuture && k !== 'rested';
+          return `<button class="status-chip ${k} ${st === k ? 'active' : ''}" ${disabled ? 'disabled title="未來的日子只能預先排休息"' : ''} onclick="A.setDayStatus(${weekNumber},${dayIndex},'${k}')">${label}</button>`;
+        }).join('')}
+      </div>` : ''}
+      <div class="status-hint">${h(hint)}</div>
+      ${(showMinutes || showKm) ? `<div class="actual-row">
+        ${showMinutes ? `<label class="actual-field">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
+        ${showKm ? `<label class="actual-field">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>` : ''}
+      </div>` : ''}
+      <textarea class="note-input" placeholder="例如：照表完成／改成快走 25 分／改騎飛輪 40 分" onchange="A.setActualNote('${dateKey}', this.value)">${h(entry && entry.actualNote || '')}</textarea>
+    </div>`;
 }
 
 function renderWeeklyReviewCard(weekNumber) {
@@ -406,18 +467,20 @@ function renderWeeklyReviewCard(weekNumber) {
   `;
 }
 
+// 預設展開（不是收合的 <details>）：兩個文字框都看得到，身體狀況才會分流到這裡，
+// 而不是照 Notion 的習慣全部打進上面那個別人看得到的框。
 function renderFlagsBox(dateKey) {
   const priv = Store.privateFor(dateKey) || { flags: {}, note: '' };
   return `
-    <details class="flagsbox card" style="margin-top:12px">
-      <summary>身體狀況備註</summary>
+    <div class="card flagsbox private-box">
+      <div class="actual-box-title">🔒 身體狀況 <span class="vis-tag private">只有你看得到</span></div>
       <div class="flag-row">
         ${Object.keys(FLAG_LABELS).map((k) => `
           <button class="flag-chip ${priv.flags && priv.flags[k] ? 'active' : ''}" onclick="A.toggleFlag('${dateKey}','${k}')">${FLAG_LABELS[k]}</button>
         `).join('')}
       </div>
-      <textarea class="note-input" placeholder="自由文字（選填）" onchange="A.setNote('${dateKey}', this.value)">${h(priv.note)}</textarea>
-    </details>
+      <textarea class="note-input" placeholder="例如：小腿有點緊、下墜感（選填）" onchange="A.setNote('${dateKey}', this.value)">${h(priv.note)}</textarea>
+    </div>
   `;
 }
 
@@ -446,6 +509,9 @@ function renderWeekPage(state) {
   const loc = PlanData.locateToday();
   const todayKey = loc.status === 'in-plan' ? loc.key : null;
 
+  const table = Store.weekViewMode === 'table';
+  const vol = Store.weekVolume(wn, Store.activeUserId);
+
   const rows = w.days.map((d, i) => {
     const status = Store.dayStatus(wn, i);
     const dateLabel = PlanData.dateForWeekDay(wn, i);
@@ -459,7 +525,7 @@ function renderWeekPage(state) {
         <div class="weekday-status ${status}">${statusIcon}</div>
         <div class="weekday-summary">
           <div class="t">${h(titles)}</div>
-          <div class="sub">${status === 'expired' ? '已過期' : status === 'partial' ? '部分完成' : status === 'done' ? '已完成' : '待完成'}</div>
+          <div class="sub">${DAY_STATUS_LABELS[status] || '待完成'}</div>
         </div>
       </div>
     `;
@@ -476,19 +542,111 @@ function renderWeekPage(state) {
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
-      <div class="card">${rows}</div>
-      ${w.weeklyVolumeKm ? `
-        <div class="banner info" style="margin-top:12px">${ICON.info}<div>本週跑量參考上限 ${w.weeklyVolumeKm.min}-${w.weeklyVolumeKm.max}K（第四節數字，是參考值，不是本週課表加總）</div></div>
-      ` : (w.weeklyVolumeNullReason ? `<div class="banner info" style="margin-top:12px">${ICON.info}<div>${h(w.weeklyVolumeNullReason)}</div></div>` : '')}
-      ${coach ? renderWeekCoachPanel(wn, w, hasOverride) : ''}
+      ${renderWeekVolumeCard(vol)}
+      <div class="view-toggle">
+        <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
+        <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
+      </div>
+      ${table ? renderWeekTable(wn, w, todayKey) : `<div class="card">${rows}</div>`}
+      ${coach ? renderWeekCoachPanel(wn, w, hasOverride, vol) : ''}
     </div>
   `;
 }
 
-function renderWeekCoachPanel(wn, w, hasOverride) {
+function fmtKmRange(t) { return t.min === t.max ? `${t.min}` : `${t.min}–${t.max}`; }
+
+// 本週跑量：目標 vs 實際。目標預設是課表跑步項目的加總（Store.weekVolume 的註解有算法）。
+// 進度條的 100% 點是目標**下限**——目標是區間，碰到下限就是滿格，超過下限不再畫「多出來」；
+// 超過上限改成警示文字。「填滿」型的條會催人往上限跑，這是第 0 條要防的方向。
+// 已標記降量的週不畫條、不比對，只顯示實際（第 0 條：降量週縮小分母）。
+function renderWeekVolumeCard(vol, opts) {
+  opts = opts || {};
+  const t = vol.target, actual = vol.actual;
+  const anchor = t.min > 0 ? t.min : t.max;
+  const reached = actual != null && anchor > 0 && actual >= anchor;
+  // 「超過上限」只在目標是真距離時才有意義。以時間計的項目換算出來的 max 本來就是刻意
+  // 低估的約略值（見下面 how 的文字），拿它當硬上限會冤枉完全照表、只是配速比 9 分速快
+  // 的人——Phase 1-4 的 Zone 2 跑幾乎每週都只有時長沒有公里，timeBased 這條路一直是 true，
+  // 審查實測：照表跑滿分鐘、用原文自己的 8 分速記公里，W1-W8 全部會被判「超過」。
+  const over = actual != null && t.max > 0 && !t.timeBased && actual > t.max;
+  const pct = anchor > 0 && actual != null ? Math.min(100, Math.round((actual / anchor) * 100)) : 0;
+  const pace = PlanData.plan.timeBasedRunPaceMinPerKm;
+  const how = t.source === 'coach'
+    ? '目標由教練模式設定。'
+    : `目標＝本週課表跑步項目的加總${t.timeBased ? `（以時間計的項目用 ${pace} 分速換算，約略值、偏低）` : ''}。`;
+  const actualStr = actual == null ? '—' : `${actual}${vol.estimated ? '<span class="approx">約</span>' : ''}`;
+  const raceLine = vol.race ? `<div class="vol-sub">週日比賽 ${vol.race.planned} km 另計${vol.race.actual != null ? `（已記錄 ${vol.race.actual} km）` : ''}。</div>` : '';
+  if (vol.reduced) {
+    return `
+      <div class="card vol-card">
+        <div class="vol-head">
+          <span class="vol-title">${h(opts.title || '本週跑量')}</span>
+          <span class="vol-nums"><b>${actualStr}</b> km</span>
+        </div>
+        <div class="vol-sub">本週已標記降量——只記錄實際，不比對目標（原定 ${fmtKmRange(t)} km）。</div>
+        ${raceLine}
+      </div>`;
+  }
+  return `
+    <div class="card vol-card">
+      <div class="vol-head">
+        <span class="vol-title">${h(opts.title || '本週跑量')}</span>
+        <span class="vol-nums"><b>${actualStr}</b> / ${fmtKmRange(t)} km${reached && !over ? ' ✓' : ''}</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill ${reached ? 'reached' : ''}" style="width:${pct}%"></div></div>
+      ${over ? `<div class="vol-sub over">已超過本週課表上限（${t.max} km）——下週不要再加。</div>` : ''}
+      <div class="vol-sub">${h(how)}實際＝各天「實際公里」的加總${vol.estimated ? '（沒填公里、只填分鐘的日子用同一個分速換算）' : ''}。</div>
+      ${raceLine}
+    </div>
+  `;
+}
+
+// 表格模式：課表｜實際 並排，模仿舊 Notion 課表那張表——給回顧用；手機上打勾用卡片模式。
+function renderWeekTable(wn, w, todayKey) {
+  const rows = w.days.map((d, i) => {
+    const status = Store.dayStatus(wn, i);
+    const dateLabel = PlanData.dateForWeekDay(wn, i);
+    const dateKey = PlanData.keyForWeekDay(wn, i);
+    const entry = Store.entryFor(Store.activeUserId, dateKey);
+    const planCell = d.items.map((it) => {
+      const meta = [PlanData.fmtItemMeta(it), it.heartRateZone || ''].filter(Boolean).join(' · ');
+      return `<div class="wt-item"><span class="wt-title">${h(it.title)}</span>${meta ? `<span class="wt-meta">${h(meta)}</span>` : ''}</div>`;
+    }).join(d.selectOne ? '<div class="wt-or">或</div>' : '');
+    const bits = [];
+    if (status !== 'pending') bits.push(`<span class="wt-status ${status}">${DAY_STATUS_LABELS[status]}</span>`);
+    const nums = [];
+    if (entry && entry.actualDurationMinutes != null) nums.push(`${entry.actualDurationMinutes} 分`);
+    if (entry && entry.actualDistanceKm != null) nums.push(`${entry.actualDistanceKm} km`);
+    if (nums.length) bits.push(`<span class="wt-nums">${h(nums.join(' · '))}</span>`);
+    if (entry && entry.actualNote) bits.push(`<div class="wt-note">${h(entry.actualNote)}</div>`);
+    return `
+      <tr class="${dateKey === todayKey ? 'today' : ''}" onclick="A.openDay(${wn},${i})">
+        <td class="wt-day">${PlanData.weekdayLabel(i)}<span class="num">${dateLabel.getDate()}</span></td>
+        <td class="wt-plan">${planCell}</td>
+        <td class="wt-actual">${bits.length ? bits.join(' ') : '<span class="wt-empty">—</span>'}</td>
+      </tr>`;
+  }).join('');
+  return `
+    <div class="card week-table-wrap">
+      <table class="week-table">
+        <thead><tr><th></th><th>課表</th><th>實際</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderWeekCoachPanel(wn, w, hasOverride, vol) {
+  const coachSet = vol.target.source === 'coach';
+  // planOnly：純課表加總，不看任何人的 entries。planOverrides 是三人共用的一份文件，
+  // 「課表加總」這個字眼講的是課表本身，不能取決於「誰的手機正在看這頁」——如果用
+  // Store.activeUserId 的個人紀錄過濾（例如教練自己那天標了主動休息），上限跟著縮小，
+  // 同樣的目標對別人來說卻是合法的，而且面板文字會講出一個不是課表真實加總的數字。
+  const auto = Store.weekTargetAuto(wn, Store.activeUserId, { planOnly: true });
+  const stale = hasOverride && (w.basePlanVersion || 3) < PlanData.plan.planVersion;
   return `
     <div class="card" style="margin-top:12px;border-color:var(--warn)">
       <div style="font-weight:700;font-size:12.5px;color:var(--warn);margin-bottom:10px">🛠 本週課表設定</div>
+      ${stale ? `<div class="banner warn" style="margin-bottom:10px">${ICON.warn}<div><b>這週的調整是基於舊版出廠課表（v${w.basePlanVersion || 3}）</b>出廠課表已更新到 v${PlanData.plan.planVersion}（例如走跑改成 Zone 2 跑），這週不會自動跟上。要套用新版請按下面「還原本週為出廠預設值」再重新調整。</div></div>` : ''}
       <div class="edit-form">
         <div class="row">
           <div class="field">
@@ -501,13 +659,15 @@ function renderWeekCoachPanel(wn, w, hasOverride) {
           </div>
         </div>
         <div class="row">
-          <div class="field"><label class="field-lbl">週跑量參考下限（K）</label><input id="wv-min-${wn}" type="number" min="0" value="${w.weeklyVolumeKm ? w.weeklyVolumeKm.min : ''}"></div>
-          <div class="field"><label class="field-lbl">週跑量參考上限（K）</label><input id="wv-max-${wn}" type="number" min="0" value="${w.weeklyVolumeKm ? w.weeklyVolumeKm.max : ''}"></div>
+          <div class="field"><label class="field-lbl">週跑量目標下限（K）</label><input id="wv-min-${wn}" type="number" min="0" step="0.5" value="${coachSet ? vol.target.min : ''}" placeholder="${auto.min}"></div>
+          <div class="field"><label class="field-lbl">週跑量目標上限（K）</label><input id="wv-max-${wn}" type="number" min="0" step="0.5" value="${coachSet ? vol.target.max : ''}" placeholder="${auto.max}"></div>
         </div>
         <div class="actions">
           <button class="btn" style="background:var(--warn);width:auto;padding:8px 14px;font-size:13px"
-            onclick="A.setWeeklyVolume(${wn}, document.getElementById('wv-min-${wn}').value, document.getElementById('wv-max-${wn}').value)">更新週跑量</button>
+            onclick="A.setWeeklyVolume(${wn}, document.getElementById('wv-min-${wn}').value, document.getElementById('wv-max-${wn}').value)">設定週跑量目標</button>
+          ${coachSet ? `<button class="btn secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="A.clearWeeklyVolume(${wn})">改回自動加總</button>` : ''}
         </div>
+        <div style="font-size:11.5px;color:var(--text3)">${coachSet ? `目前是教練手動設定的目標（課表加總是 ${auto.min}–${auto.max} K）。` : `目前依課表跑步項目自動加總（${auto.min}–${auto.max} K）；改了項目目標會跟著變。`}手動目標只能往下調，上限不能高於課表加總——要加量請改課表項目。</div>
       </div>
       ${hasOverride ? `
         <div class="actions" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--warn)">
@@ -552,6 +712,8 @@ function renderOverviewPage(state) {
   `;
 
   const trend = renderLongRunTrend(viewingUserId);
+  const goalsBlock = renderGoalsCard(viewingUserId, isSelf, viewingUser);
+  const volumeBlock = renderVolumeOverview(wn, viewingUserId);
 
   const others = PlanData.users.filter((u) => u.userId !== Store.activeUserId);
   const othersBlock = others.length ? `
@@ -565,6 +727,7 @@ function renderOverviewPage(state) {
         </div>
         ${others.map((u) => {
           Sync.subscribeOtherEntries(u.userId, () => window.render && window.render());
+          Sync.subscribeOtherProfile(u.userId, () => window.render && window.render());
           return `
           <div class="otheruser-row" style="cursor:pointer" onclick="A.viewProgress('${jsq(u.userId)}')">
             <div class="avatar">${h(u.displayName).slice(0, 1)}</div>
@@ -585,14 +748,96 @@ function renderOverviewPage(state) {
           ${stats}
           ${phaseStrip}
         </div>
+        ${goalsBlock}
+        ${volumeBlock}
+      </div>
+      <div>
         <div class="section">
           <div class="section-title">長跑距離趨勢</div>
           <div class="card">${trend}</div>
         </div>
+        ${othersBlock}
       </div>
-      <div>${othersBlock}</div>
     </div>
   `;
+}
+
+// 訓練目標（users/{userId}/profile/goals）：比賽目標一句 + 自訂目標清單。
+// 自己的可以編輯；看別人的是唯讀。目標不會改變任何一天的課表（決策紀錄第 0 條）。
+function renderGoalsCard(userId, isSelf, user) {
+  const g = Store.goalsFor(userId) || { raceGoal: '', items: [] };
+  const title = isSelf ? '我的目標' : `${h(user ? user.displayName : userId)} 的目標`;
+  if (!isSelf) {
+    const empty = !g.raceGoal && !g.items.length;
+    return `
+      <div class="section">
+        <div class="section-title">${title}</div>
+        <div class="card">
+          ${g.raceGoal ? `<div class="goal-race">🏁 ${h(g.raceGoal)}</div>` : ''}
+          ${g.items.map((it) => `<div class="goal-row ${it.done ? 'done' : ''}"><span class="goal-check">${ICON.check}</span><span class="goal-text">${h(it.text)}</span></div>`).join('')}
+          ${empty ? `<div style="color:var(--text3);font-size:13px">還沒設定目標</div>` : ''}
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="section">
+      <div class="section-title">我的目標</div>
+      <div class="card goals-card">
+        <label class="field-label">比賽目標</label>
+        <input class="goal-input" type="text" placeholder="例如：安全完賽、5 小時內、全程不走路" value="${h(g.raceGoal)}" onchange="A.setRaceGoal(this.value)">
+        <label class="field-label" style="margin-top:14px">訓練目標</label>
+        ${g.items.map((it) => `
+          <div class="goal-row ${it.done ? 'done' : ''}">
+            <button class="goal-check" onclick="A.toggleGoal('${jsq(it.id)}')" aria-label="達成">${ICON.check}</button>
+            <input class="goal-text-input" type="text" value="${h(it.text)}" onchange="A.setGoalText('${jsq(it.id)}', this.value)">
+            <button class="goal-del" onclick="A.removeGoal('${jsq(it.id)}')" aria-label="刪除">×</button>
+          </div>`).join('')}
+        <div class="goal-add">
+          <input id="goal-new" type="text" placeholder="例如：W8 結束可以連續跑 40 分不喘" onkeydown="if(event.key==='Enter'&&!event.isComposing){A.addGoal()}">
+          <button class="btn secondary" style="width:auto;padding:8px 12px;font-size:13px;flex:none" onclick="A.addGoal()">新增</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--text3);margin-top:10px;line-height:1.5">寫給自己（跟一起練的人）看的。目標不會改變任何一天的課表內容。</div>
+      </div>
+    </div>`;
+}
+
+// 週跑量總覽：本週的數字 + 26 週的「目標區間 vs 實際」圖。
+// y 軸上限釘在課表目標的最高點（W21-22 約 39K），實際若超過就貼著上緣畫——
+// 不讓某一週的離群值把其他 25 週壓成底部一條線。
+function renderVolumeOverview(wn, userId) {
+  const cur = Store.weekVolume(wn, userId);
+  const points = [];
+  for (let n = 1; n <= PlanData.plan.totalWeeks; n++) {
+    const v = Store.weekVolume(n, userId);
+    points.push({ wn: n, min: v.target.min, max: v.target.max, actual: v.actual });
+  }
+  const w = 520, ht = 150, pad = 24, bottom = 22;
+  const maxKm = Math.max(...points.map((p) => p.max), 5) * 1.05;
+  const x = (i) => pad + (i / (points.length - 1)) * (w - pad * 2);
+  const y = (v) => ht - bottom - (Math.min(v, maxKm) / maxKm) * (ht - bottom - 12);
+  const band = points.map((p, i) => `${x(i)},${y(p.max)}`).join(' ') + ' ' +
+    points.slice().reverse().map((p) => `${x(points.indexOf(p))},${y(p.min)}`).join(' ');
+  const actualPts = points.filter((p) => p.actual != null);
+  const actualPath = actualPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(points.indexOf(p))},${y(p.actual)}`).join(' ');
+  const ticks = PlanData.plan.phases.map((ph) => ph.weekRange[0]).concat([PlanData.plan.totalWeeks]);
+  return `
+    <div class="section">
+      <div class="section-title">週跑量</div>
+      ${renderWeekVolumeCard(cur, { title: `本週（第 ${wn} 週）` })}
+      <div class="card">
+        <svg class="trend-chart" viewBox="0 0 ${w} ${ht}" preserveAspectRatio="none">
+          <polygon points="${band}" fill="var(--track)" stroke="var(--text3)" stroke-width="0.5" stroke-opacity="0.6"/>
+          <line x1="${pad}" y1="${ht - bottom}" x2="${w - pad}" y2="${ht - bottom}" stroke="var(--line)" stroke-width="1"/>
+          ${ticks.map((t) => `<text x="${x(t - 1)}" y="${ht - 6}" font-size="10" text-anchor="middle" fill="var(--text3)">W${t}</text>`).join('')}
+          ${actualPath ? `<path d="${actualPath}" fill="none" stroke="var(--accent2)" stroke-width="2.5"/>` : ''}
+          ${actualPts.map((p) => `<circle cx="${x(points.indexOf(p))}" cy="${y(p.actual)}" r="3" fill="var(--accent2)"/>`).join('')}
+        </svg>
+        <div class="trend-legend">
+          <span><span class="sw" style="background:var(--track)"></span>課表目標區間</span>
+          <span><span class="sw" style="background:var(--accent2)"></span>實際</span>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderLongRunTrend(userId) {

@@ -48,7 +48,8 @@ SAFETY = {
 # 裁決：**第二節的項目類型對照表是強度的唯一真相來源**，第三節模板的「心率/強度」欄
 # 只是粗標籤。依據是原文第八節自己寫的操作順序（訓練計畫.md:175）：
 #   「跑步日 → 對照第四節長跑進度表確認距離/時間,用第二節心率區間確認強度」
-# 所以「走跑交替」一律 50-60%（第二節:32），不是模板欄那個籠統的 Zone 2。
+# 原文 Phase 1 的「走跑交替」（第二節:32，50-60%）已依使用者指示整個拿掉
+# （決策紀錄第 12 條：「走跑太含糊」），Phase 1 一律是 Zone 2 跑 60-70%。
 Z = {
     "recovery": {"hr": "50-60%", "rpe": [2, 3], "feel": "非常輕鬆，像散步", "derived": False},
     "zone2":    {"hr": "60-70%", "rpe": [4, 5], "feel": "輕鬆對話", "derived": False},
@@ -115,21 +116,15 @@ LONG_RUN = {
     # W26 沒有長跑——賽週是喚醒跑 + 比賽本身，寫在 week_race()。
 }
 
-# 第四節的「週跑量參考」欄。**這是參考上限，不是本週課表的加總**——
-# Phase 2 模板只有兩個跑步日，用原文的 8-9 分速換算湊不到這個數字。
-# 不自行補跑步日（那會違反第 0 條：轉檔不該替使用者加量），改成標明性質。
-WEEKLY_VOLUME = {
-    7: [8, 10], 8: [8, 10],
-    9: [15, 18], 10: [15, 18], 11: [18, 22], 12: [18, 22],
-    13: [22, 25], 14: [22, 25], 15: [25, 28], 16: [25, 28],
-    17: [30, 33], 18: [30, 33], 19: [33, 36], 20: [33, 36],
-    21: [36, 40], 22: [36, 40],
-}
-VOLUME_NULL_REASON = {
-    **{w: "原文第四節該列寫「走跑為主,不計公里」或「-」" for w in range(1, 7)},
-    **{w: "原文第四節該列只寫「遞減」，沒有給數字" for w in (23, 24, 25)},
-    26: "賽週，原文未給週跑量",
-}
+# 第四節的「週跑量參考」欄**不再進資料檔**（決策紀錄第 13 條，取代第 8 條）。
+# 那欄是原文的參考上限，課表本身加總達不到它（W13 課表 15-17K、欄位卻寫 22-25K）——
+# 拿它當「目標」跟「實際」比，等於用一個照表練也達不到的數字催使用者加跑，違反第 0 條。
+# 週跑量目標現在由 App 執行期從該週的跑步項目即時加總（js/store.js weekVolume），
+# 只有時長沒有距離的項目（Phase 1 全部以時間計）用下面這個配速換算。
+# ⚠️ 方向：公里 = 分鐘 ÷ 分速，**分速數字越大換出來的公里越少**。原文寫 Zone 2 約 8-9 分速，
+# 取慢的那一端 9——目標寧可低估不高估（第一版寫 8 還註解成「偏低」，方向抄反，
+# W7-8 算出 10-11.9K 直接超過原文自己的參考上限 8-10K）。verify_plan.py 守下限 ≥ 9。
+TIME_BASED_RUN_PACE_MIN_PER_KM = 9
 
 # --- 跑姿訓練（第七節）---------------------------------------------------------
 # 第七節:166 的產後提醒：核心/骨盆底沒練起來之前不建議做太多跳躍類(Skip、彈跳)，
@@ -153,30 +148,36 @@ def form_drill(w):
 
 # --- 每週模板 -----------------------------------------------------------------
 def week_p1(w):
-    """Phase 1 W1-8 恢復奠基。週四改用產後專門課程（決策紀錄第 3 條）。"""
+    """Phase 1 W1-8 恢復奠基。週四改用產後專門課程（決策紀錄第 3 條）。
+
+    原文這階段的跑步日與 W1-6 長跑都是「走跑交替」（50-60%）。使用者裁定拿掉
+    （決策紀錄第 12 條：走跑太含糊），全部改成 Zone 2 跑 60-70%。
+    W1-6 的長跑跟著用 60-70%，**不**跳到第二節「長跑」的 65-72%——那會比原本高兩級；
+    W7-8 第四節寫「40分鐘 全跑」，才適用 65-72%。verify_plan.py 有斷言綁住這條。
+    """
     _, lr = LONG_RUN[w]
-    # W1-6 的長跑本體是走跑交替 → 第二節「恢復跑/走跑交替」50-60%。
-    # W7-8 第四節寫「40分鐘 全跑」→ 才適用第二節的「長跑」65-72%。
     if w <= 6:
-        long_item = item("walk-run", "長跑（走跑交替起步）", "recovery", dur=lr,
-                         notes="這階段的「長跑」以時間而非距離計。走跑交替，不求連續。")
+        long_item = item("long-run", "長跑（Zone 2）", "zone2", dur=lr,
+                         notes="這階段的「長跑」以時間而非距離計，全程維持 Zone 2。"
+                               "若骨盆有下墜感就縮短當天時間，不要硬撐。")
     else:
-        long_item = item("long-run", "長跑（全跑）", "long", dur=lr,
-                         notes="第四節：本階段最後兩週轉為全程跑。仍以時間計。")
+        long_item = item("long-run", "長跑", "long", dur=lr,
+                         notes="第四節：本階段最後兩週長跑強度進到 65-72%。仍以時間計。")
     return [
         day(item("recovery", "產後核心/骨盆底啟動", "recovery", dur=[10, 15],
                  workout="pelvic-core-basic",
                  notes="死蟲式、鳥狗式、橋式呼吸。重點是「連結」不是「燃燒」。")),
-        day(item("walk-run", "走跑交替", "recovery", dur=[20, 25],
-                 notes="跑 1 分／走 1 分 x 8-10 組。若跑起來骨盆有下墜感就縮短跑段。")),
+        day(item("run", "Zone 2 跑", "zone2", dur=[20, 25],
+                 notes="心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。"
+                       "Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。")),
         day(item("strength", "重量訓練 A（下肢＋核心）", "none", dur=[30, 30],
                  workout="strength-a", notes="Phase 1 全部用徒手或極輕負荷，不追求痠痛感。")),
         day(item("recovery", "產後骨盆底／腹直肌專門課程", "recovery", dur=[10, 15],
                  video="fitnessblender-postpartum",
                  notes="原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，"
                        "Phase 2 之後再換。")),
-        day(item("walk-run", "走跑交替", "recovery", dur=[20, 30],
-                 notes="逐步拉長跑段比例。")),
+        day(item("run", "Zone 2 跑", "zone2", dur=[20, 30],
+                 notes="逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。")),
         day(long_item),
         choice(item("rest", "完全休息", "none"),
                item("recovery", "散步＋伸展", "recovery", dur=[10, 10],
@@ -191,8 +192,7 @@ def week_p2(w):
     return [
         day(item("recovery", "核心／骨盆底進階", "recovery", dur=[15, 15],
                  workout="pelvic-core-advanced")),
-        day(item("run", "Zone 2 跑", "zone2", dur=[30, 40],
-                 notes="全程跑，不再走跑交替。")),
+        day(item("run", "Zone 2 跑", "zone2", dur=[30, 40])),
         day(item("strength", "重量訓練 A（下肢主導）", "none", dur=[30, 30],
                  workout="strength-a", derived=True,
                  notes="Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）")),
@@ -283,7 +283,7 @@ def week_race(w):
 
 PHASES = [
     {"phaseId": "p1", "name": "恢復奠基期", "weekRange": [1, 8], "builder": week_p1,
-     "goal": "核心／骨盆底重建、走跑交替、建立跑步習慣、輕重量適應",
+     "goal": "核心／骨盆底重建、Zone 2 慢跑起步、建立跑步習慣、輕重量適應",
      "loadGuidance": "全部用徒手或極輕負荷，重點是動作品質與核心連結。"},
     {"phaseId": "p2", "name": "基礎期", "weekRange": [9, 16], "builder": week_p2,
      "goal": "提升 Zone 2 跑量、穩定長跑、重訓進階、跑姿定型",
@@ -317,20 +317,19 @@ def build():
                     it["id"] = f"{w}-{i}-{j}"
                 days.append(entry)
             assert len(days) == 7, f"W{w} 不是 7 天"
-            vol = WEEKLY_VOLUME.get(w)
             weeks.append({
                 "weekNumber": w,
                 "longRunMetric": LONG_RUN[w][0] if w in LONG_RUN else None,
-                "weeklyVolumeKm": ({"min": vol[0], "max": vol[1], "kind": "reference"}
-                                   if vol else None),
-                "weeklyVolumeNullReason": None if vol else VOLUME_NULL_REASON.get(w),
                 "days": days,
             })
 
     return {
         "planId": "tokyo-marathon-2027",
-        "planVersion": 3,
-        "schemaVersion": 3,  # v3：每個項目多了固定 id（教練模式用，見上方 build() 註解）
+        "planVersion": 4,
+        # v3：每個項目多了固定 id（教練模式用，見上方 build() 註解）
+        # v4：拿掉 walk-run 類型與 weeklyVolumeKm/weeklyVolumeNullReason 欄位，
+        #     新增 timeBasedRunPaceMinPerKm（決策紀錄第 12、13 條）
+        "schemaVersion": 4,
         "startDate": START_DATE,
         "raceDate": RACE_DATE,
         "expiredBefore": EXPIRED_BEFORE,
@@ -338,10 +337,12 @@ def build():
                                 "這三天不計入完成率分母，也不提示補做——要求補做等於第一週就加量，"
                                 "違反決策紀錄第 0 條。"),
         "totalWeeks": 26,
+        "timeBasedRunPaceMinPerKm": TIME_BASED_RUN_PACE_MIN_PER_KM,
         "safety": SAFETY,
         "_note": ("date 與 dayOfWeek 刻意不存在本檔。由 startDate + (weekNumber-1)*7 + dayIndex "
-                  "推導，見 docs/日曆基準.md。weeklyVolumeKm 的 kind=reference 表示那是原文的"
-                  "參考上限，不是本週 days 的加總。"),
+                  "推導，見 docs/日曆基準.md。週跑量目標也刻意不存在本檔——由 App 從該週的"
+                  "跑步項目即時加總（只有時長的項目用 timeBasedRunPaceMinPerKm 換算），"
+                  "教練模式改了項目目標就跟著變，不會有兩個必須互相對應的數字。"),
         "phases": [{k: v for k, v in ph.items() if k != "builder"} for ph in PHASES],
         "weeks": weeks,
     }

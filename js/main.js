@@ -6,7 +6,27 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', resolved);
 }
 
+let renderDeferred = false;
+function isTypingInRoot() {
+  const el = document.activeElement;
+  if (!el || !document.getElementById('root').contains(el)) return false;
+  const tag = el.tagName;
+  return tag === 'TEXTAREA' || (tag === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(el.type));
+}
+
 function render() {
+  // 使用者正在文字欄位打字時不重繪：整個 #root 換掉會把打到一半的字清掉、鍵盤收起——
+  // 登入後每筆寫入有兩次 Firestore 快照（本機 pending、伺服器 ack），第二次常常剛好落在
+  // 她點完狀態、開始打備註的那一秒。改成等欄位失焦後再補畫一次。
+  if (isTypingInRoot()) {
+    if (!renderDeferred) {
+      renderDeferred = true;
+      document.activeElement.addEventListener('focusout', () => {
+        setTimeout(() => { renderDeferred = false; render(); }, 250);
+      }, { once: true });
+    }
+    return;
+  }
   // Store.effectiveWeek 已經擋掉形狀不對的覆寫文件（見 store.js 的
   // _isValidWeekShape），這裡是第二道防線：任何沒被那道檢查涵蓋到的例外
   // （不管是哪個頁面、哪個原因），都不能讓畫面停在半個舊畫面上不動——那看起來

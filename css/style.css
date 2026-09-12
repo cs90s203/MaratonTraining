@@ -225,7 +225,7 @@ textarea.note-input {
 
 .trend-chart { width: 100%; height: 140px; display: block; }
 .trend-legend { display: flex; gap: 16px; font-size: 12px; color: var(--text2); margin-top: 6px; }
-.trend-legend .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 5px; vertical-align: -1px; }
+.trend-legend .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--text3); box-sizing: border-box; }
 
 .otheruser-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .otheruser-row:last-child { border-bottom: none; }
@@ -327,5 +327,100 @@ textarea.note-input {
 }
 .switch input:checked + .slider { background: var(--warn); }
 .switch input:checked + .slider::before { transform: translateX(18px); }
+
+/* ── 實際操作（一天一個方塊：狀態 chip + 實際分鐘/公里 + 自由文字）───────── */
+.actual-box { margin-top: 12px; }
+.actual-box-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.actual-box-title { font-size: 12.5px; font-weight: 700; color: var(--text2); margin-bottom: 8px; }
+.actual-box-head .actual-box-title { margin-bottom: 0; }
+.vis-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 1px 6px; margin-left: 4px;
+  background: var(--warnBg); color: var(--warn); vertical-align: 1px;
+}
+.vis-tag.private { background: var(--accentBg); color: var(--accent2); }
+.private-box { margin-top: 12px; border-color: var(--accent); }
+.derived-status { font-size: 12px; font-weight: 700; color: var(--text3); white-space: nowrap; }
+.derived-status.done { color: var(--accent2); }
+.derived-status.partial { color: var(--warn); }
+.status-chip:disabled { opacity: .35; cursor: default; }
+.approx { font-size: 11px; font-weight: 600; color: var(--text3); margin-left: 2px; }
+.vol-sub.over { color: var(--warn); font-weight: 600; }
+.status-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.status-chip {
+  border: 1.5px solid var(--inpBorder); background: var(--card); color: var(--text2);
+  border-radius: 99px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.status-chip.active { border-color: var(--accent2); background: var(--accentBg); color: var(--accent2); }
+.status-chip.substituted.active { border-color: var(--warn); background: var(--warnBg); color: var(--warn); }
+.status-chip.missed.active { border-color: var(--crit); background: var(--critBg); color: var(--crit); }
+.status-chip.rested.active { border-color: var(--text3); background: var(--card2); color: var(--text2); }
+.status-hint { font-size: 11.5px; color: var(--text3); margin: 8px 0 4px; line-height: 1.5; }
+.actual-box .actual-row { margin: 8px 0 10px; }
+.actual-box .note-input { min-height: 56px; }
+
+.weekday-status.substituted { border: 2px solid var(--warn); background: var(--warnBg); }
+.weekday-status.missed { border: 2px solid var(--crit); }
+.weekday-status.rested { background: var(--track); }
+
+/* ── 週視圖：卡片／表格切換、跑量卡 ─────────────────────────── */
+.view-toggle { display: flex; gap: 4px; background: var(--track); border-radius: 10px; padding: 3px; margin-bottom: 12px; }
+.view-toggle button {
+  flex: 1; border: none; background: transparent; color: var(--text2); font-size: 13px; font-weight: 700;
+  padding: 7px; border-radius: 8px; cursor: pointer;
+}
+.view-toggle button.active { background: var(--card); color: var(--text); box-shadow: 0 1px 2px var(--shadow2); }
+
+.vol-card { margin-bottom: 12px; padding: 13px 16px; }
+.vol-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; gap: 10px; }
+.vol-title { font-size: 12.5px; font-weight: 700; color: var(--text2); }
+.vol-nums { font-size: 13px; color: var(--text2); white-space: nowrap; }
+.vol-nums b { font-size: 18px; color: var(--text); }
+.vol-sub { font-size: 11.5px; color: var(--text3); margin-top: 6px; line-height: 1.5; }
+.progress-fill.reached { background: var(--accent2); }
+
+.week-table-wrap { padding: 4px 6px; overflow-x: auto; }
+.week-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.week-table th { text-align: left; font-size: 11px; color: var(--text3); font-weight: 700; padding: 8px 6px 4px; }
+.week-table td { vertical-align: top; padding: 9px 6px; border-top: 1px solid var(--line); }
+.week-table tr { cursor: pointer; }
+.week-table tr.today td { background: var(--accentBg); }
+.wt-day { width: 34px; text-align: center; font-size: 11px; font-weight: 700; color: var(--text3); white-space: nowrap; }
+.wt-day .num { display: block; font-size: 15px; font-weight: 800; color: var(--text); }
+.wt-plan { width: 46%; }
+.wt-item { line-height: 1.45; margin-bottom: 3px; }
+.wt-title { font-weight: 600; display: block; }
+.wt-meta { color: var(--text2); font-size: 11.5px; display: block; }
+.wt-or { font-size: 10.5px; font-weight: 700; color: var(--text3); margin: 2px 0; }
+.wt-status {
+  display: inline-block; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px;
+  margin: 0 4px 3px 0; border: 1px solid var(--inpBorder); color: var(--text2);
+}
+.wt-status.done { color: var(--accent2); border-color: var(--accent); background: var(--accentBg); }
+.wt-status.partial { color: var(--warn); border-color: var(--warn); }
+.wt-status.substituted { color: var(--warn); border-color: var(--warn); background: var(--warnBg); }
+.wt-status.missed { color: var(--crit); border-color: var(--crit); }
+.wt-status.rested, .wt-status.expired { color: var(--text3); }
+.wt-nums { color: var(--text2); font-size: 12px; }
+.wt-note { color: var(--text); font-size: 12.5px; margin-top: 3px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.wt-empty { color: var(--text3); }
+
+/* ── 訓練目標 ────────────────────────────────────────────── */
+.goal-input, .goal-text-input, .goal-add input {
+  width: 100%; border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text);
+  border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 13.5px; min-width: 0;
+}
+.goal-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.goal-check {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--inpBorder);
+  background: var(--card); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.goal-check svg { width: 12px; height: 12px; stroke: white; opacity: 0; }
+.goal-row.done .goal-check { background: var(--accent); border-color: var(--accent); }
+.goal-row.done .goal-check svg { opacity: 1; }
+.goal-row.done .goal-text-input, .goal-row.done .goal-text { text-decoration: line-through; color: var(--text3); }
+.goal-text { flex: 1; font-size: 13.5px; line-height: 1.45; }
+.goal-del { flex: none; border: none; background: transparent; color: var(--text3); font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; }
+.goal-add { display: flex; gap: 8px; margin-top: 10px; }
+.goal-race { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
