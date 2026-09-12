@@ -26,6 +26,7 @@ const ICON = {
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
   help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5"/><path d="M12 17.5h.01"/></svg>',
   alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>',
+  grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="19" r="1.8"/><circle cx="15" cy="19" r="1.8"/></svg>',
 };
 
 // 「改做」做了哪一類（Store 的 SUBSTITUTE_TYPES）→ 顯示文字
@@ -481,21 +482,37 @@ function renderEffortControl(weekNumber, dayIndex, d, entry) {
     </div>`;
 }
 
+// 週日的回顧：異常旗標天數、體感比課表吃力的天數（第 17 條的 effort vs 項目 rpe，
+// 二擇一取選中的那個）、本週已降量的標記。吃力天數只是提醒「下週不要加」，
+// 不是叫她補——第 0 條。
 function renderWeeklyReviewCard(weekNumber) {
-  let flaggedDays = 0;
+  let flaggedDays = 0, overDays = 0;
+  const w = Store.effectiveWeek(weekNumber);
+  const order = Store.effectiveDayOrder(weekNumber, Store.activeUserId);
   for (let i = 0; i < 7; i++) {
     const key = PlanData.keyForWeekDay(weekNumber, i);
     const p = Store.privateFor(key);
     if (p && p.flags && (p.flags.leakage || p.flags.pain || p.flags.overTired)) flaggedDays++;
+    const e = Store.entryFor(Store.activeUserId, key);
+    if (e && Number.isInteger(e.effort)) {
+      const d = w.days[order[i]];
+      const items = d.selectOne ? d.items.filter((it) => it.id === e.selectedItemId) : d.items;
+      const maxes = items.filter((it) => it.rpe && Number.isFinite(it.rpe.max)).map((it) => it.rpe.max);
+      if (maxes.length && e.effort > Math.max(...maxes)) overDays++;
+    }
   }
   const adj = Store.weekAdjustmentFor(weekNumber);
-  if (flaggedDays === 0 && !adj) return '';
+  if (flaggedDays === 0 && overDays === 0 && !adj) return '';
+  const summary = flaggedDays > 0
+    ? `這週有 ${flaggedDays} 天記錄異常。${h(PlanData.plan.safety.weeklySelfCheck)}`
+    : (overDays > 0 ? '' : '這週狀況正常。');
+  const overLine = overDays > 0 ? `<div style="margin-top:${flaggedDays > 0 ? 6 : 0}px">這週有 ${overDays} 天體感比課表要求吃力——下週照表，不要加。</div>` : '';
   return `
     <div class="banner ${flaggedDays > 0 ? 'warn' : 'info'}">
       ${ICON.flag}
       <div>
         <b>本週回顧</b>
-        ${flaggedDays > 0 ? `這週有 ${flaggedDays} 天記錄異常。${h(PlanData.plan.safety.weeklySelfCheck)}` : '這週狀況正常。'}
+        ${summary}${overLine}
         ${adj && adj.reduced
           ? `<div style="margin-top:6px;font-weight:600">✓ 已標記本週降量${adj.note ? '：' + h(adj.note) : ''}</div>`
           : `<button class="btn secondary" style="margin-top:8px;width:auto;padding:7px 12px;font-size:12.5px" onclick="A.markWeekReduced(${weekNumber})">標記本週已降量</button>`}
@@ -542,6 +559,10 @@ function renderWeekPage(state) {
   const order = Store.effectiveDayOrder(wn, Store.activeUserId);
   const expanded = state.expandedDay && state.expandedDay.weekNumber === wn ? state.expandedDay.dayIndex : -1;
 
+  // 拖曳換順序（第 18 條）：教練模式下 effectiveDayOrder 一律回傳出廠順序，拖了也不會生效，
+  // 所以不畫把手；SortableJS 沒載到（離線、CDN 被擋）也不畫，免得把手看起來像壞了。
+  const canDrag = !coach && !table && typeof Sortable !== 'undefined';
+
   // 手風琴（決策紀錄第 17 條）：一次只展開一列，展開的列身就是原本「今日」頁的內容。
   const rows = order.map((contentIndex, i) => {
     const d = w.days[contentIndex];
@@ -563,6 +584,7 @@ function renderWeekPage(state) {
             <div class="sub">${h(dayStatusText(status, entry))}${isToday ? ' · 今天' : ''}</div>
           </div>
           <span class="weekday-chevron">${ICON.chevron}</span>
+          ${canDrag ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="按住拖曳換順序" title="按住拖曳換順序">${ICON.grip}</span>` : ''}
         </div>
         ${isOpen ? `<div class="weekday-body">${renderDayBody(wn, i)}</div>` : ''}
       </div>
@@ -591,36 +613,25 @@ function renderWeekPage(state) {
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
       </div>
-      ${table ? renderWeekTable(wn, w, order, todayKey) : `<div class="card">${rows}</div>`}
-      ${!coach ? renderDaySwapPanel(wn, order) : ''}
+      ${table ? renderWeekTable(wn, w, order, todayKey) : `<div class="card" ${canDrag ? `data-daylist="${wn}"` : ''}>${rows}</div>`}
+      ${!coach ? renderDayOrderHint(wn, order, canDrag) : ''}
       ${coach ? renderWeekCoachPanel(wn, w, hasOverride, vol) : ''}
     </div>
   `;
 }
 
-// 決策紀錄第 14 條：環境因素讓這週某天跟另一天對調，課表項目不變，只是重新標籤。
-// 教練模式開著時不顯示——那個模式下 effectiveDayOrder 一律回傳出廠順序，這裡的對調
-// 完全不會生效，顯示出來只會讓人以為壞了。
-function renderDaySwapPanel(wn, order) {
-  const hasSwap = order.some((v, i) => v !== i);
-  const dayOpt = (selected) => Array.from({ length: 7 }, (_, i) =>
-    `<option value="${i}" ${i === selected ? 'selected' : ''}>${PlanData.weekdayLabel(i)}</option>`).join('');
+// 決策紀錄第 14、18 條：環境因素讓這週某天跟另一天對調，課表項目不變，只是重新標籤。
+// 對調本身靠拖曳列上的把手；這裡只剩一行提示，跟對調過之後的「已對調＋還原」。
+// 教練模式開著時整行不顯示（那個模式下 effectiveDayOrder 一律回傳出廠順序）。
+function renderDayOrderHint(wn, order, canDrag) {
+  const swapped = order.map((v, i) => v !== i ? `${PlanData.weekdayLabel(i)}顯示${PlanData.weekdayLabel(v)}的內容` : null).filter(Boolean);
+  if (!swapped.length && !canDrag) return '';
   return `
-    <div class="card" style="margin-top:12px">
-      <div style="font-weight:700;font-size:12.5px;color:var(--text2);margin-bottom:10px">本週順序（只有你自己看得到）</div>
-      <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <select id="swap-a-${wn}">${dayOpt(0)}</select>
-        <span style="color:var(--text3);font-size:13px">對調</span>
-        <select id="swap-b-${wn}">${dayOpt(2)}</select>
-        <button class="btn secondary" style="width:auto;padding:7px 12px;font-size:13px"
-          onclick="A.swapWeekDays(${wn}, document.getElementById('swap-a-${wn}').value, document.getElementById('swap-b-${wn}').value)">對調</button>
-      </div>
-      ${hasSwap ? `
-        <div style="font-size:11.5px;color:var(--text3);margin-top:10px">
-          已對調：${order.map((v, i) => v !== i ? `${PlanData.weekdayLabel(i)}顯示${PlanData.weekdayLabel(v)}的內容` : null).filter(Boolean).join('、')}
-        </div>
-        <div class="actions" style="margin-top:10px"><button class="btn secondary" style="width:auto;padding:7px 12px;font-size:13px" onclick="A.resetDayOrder(${wn})">還原本週順序</button></div>
-      ` : `<div style="font-size:11.5px;color:var(--text3);margin-top:10px">課表內容不會變，只是這週哪天顯示哪天的內容——例如環境因素讓週一跟週三對調。</div>`}
+    <div class="day-order-hint">
+      <span>${swapped.length
+        ? `已對調（只有你自己看得到）：${h(swapped.join('、'))}`
+        : '按住 ⋮⋮ 拖曳可換這週的順序，課表內容不變（只有你自己看得到）'}</span>
+      ${swapped.length ? `<button class="link-btn" onclick="A.resetDayOrder(${wn})">還原順序</button>` : ''}
     </div>
   `;
 }

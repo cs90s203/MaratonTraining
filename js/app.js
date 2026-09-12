@@ -133,8 +133,40 @@ const App = {
   },
   removeGoal(id, userId) { Store.removeGoal(id, userId); render(); },
 
-  // ── 本週順序對調（決策紀錄第 14 條）───────────────────────────────────────
-  swapWeekDays(weekNumber, a, b) { Store.swapWeekDays(weekNumber, a, b); render(); },
+  // ── 本週順序：拖曳換（決策紀錄第 14、18 條）────────────────────────────────
+  // 每次整頁重繪後重新掛 SortableJS——render() 整個換掉 #root，舊的實例跟著舊 DOM 一起沒了。
+  // SortableJS 沒載到（離線、CDN 被擋）時 views 不畫把手，這裡也不掛；「還原順序」照常。
+  _sortable: null,
+  afterRender() {
+    if (this._sortable) { try { this._sortable.destroy(); } catch (e) { /* 舊 DOM 已被換掉 */ } this._sortable = null; }
+    const list = document.querySelector('[data-daylist]');
+    if (!list || typeof Sortable === 'undefined') return;
+    const wn = Number(list.dataset.daylist);
+    this._sortable = Sortable.create(list, {
+      handle: '.drag-handle', draggable: '.weekday-acc', animation: 150,
+      delay: 150, delayOnTouchOnly: true,        // 手指要按住一下才開始拖，不然跟捲動打架
+      forceFallback: true, fallbackTolerance: 4, // 桌機／手機同一套行為，不靠瀏覽器原生 DnD
+      onEnd: (evt) => {
+        const from = evt.oldDraggableIndex, to = evt.newDraggableIndex;
+        if (from === to) return;
+        // 等 Sortable 自己收尾完再重繪——render() 整個換掉 #root，不能在它還握著節點時做。
+        setTimeout(() => this.moveWeekDay(wn, from, to), 0);
+      },
+    });
+  },
+  moveWeekDay(weekNumber, from, to) {
+    // 展開的那一列跟著內容走：被拖的就是它 → 落點；在拖動範圍內的 → 順移一格。
+    const e = this.state.expandedDay;
+    if (e && e.weekNumber === weekNumber) {
+      let d = e.dayIndex;
+      if (d === from) d = to;
+      else if (from < d && d <= to) d -= 1;
+      else if (to <= d && d < from) d += 1;
+      this.state.expandedDay = { weekNumber, dayIndex: d };
+    }
+    Store.moveWeekDay(weekNumber, from, to);
+    render();
+  },
   resetDayOrder(weekNumber) { Store.resetDayOrder(weekNumber); render(); },
 
   toggleFlag(dateKey, flagKey) {

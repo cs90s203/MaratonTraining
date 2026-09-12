@@ -422,13 +422,16 @@ const Store = {
     return next;
   },
 
-  // 對調兩天（UI 的唯一入口）。對調回出廠順序時直接清掉 dayOrder，不留一筆
-  // 「順序其實跟出廠一樣」的空紀錄。
-  swapWeekDays(weekNumber, a, b) {
-    a = Number(a); b = Number(b);
-    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 6 || b < 0 || b > 6 || a === b) return null;
+  // 拖曳（UI 的唯一入口，決策紀錄第 18 條）：把第 from 格拿出來插到第 to 格——插入語意，
+  // 中間的格子順移一格，跟 iOS 清單拖曳一致。回到出廠順序時直接清掉 dayOrder，
+  // 不留一筆「順序其實跟出廠一樣」的空紀錄。
+  moveWeekDay(weekNumber, from, to) {
+    from = Number(from); to = Number(to);
+    const ok = (n) => Number.isInteger(n) && n >= 0 && n <= 6;
+    if (!ok(from) || !ok(to) || from === to) return null;
     const order = this.effectiveDayOrder(weekNumber, this.activeUserId).slice();
-    const tmp = order[a]; order[a] = order[b]; order[b] = tmp;
+    const [moved] = order.splice(from, 1);
+    order.splice(to, 0, moved);
     const isIdentity = order.every((v, i) => v === i);
     return this.setDayOrder(weekNumber, isIdentity ? null : order);
   },

@@ -358,6 +358,19 @@ textarea.note-input {
 .weekday-chevron { flex: none; width: 18px; height: 18px; color: var(--text3); transition: transform .15s; }
 .weekday-chevron svg { width: 18px; height: 18px; }
 .weekday-acc.open .weekday-chevron { transform: rotate(90deg); }
+/* 拖曳換順序（決策紀錄第 18 條）：把手要夠大（36px 高）讓手指按得到；touch-action:none
+   讓按住把手時不捲頁，其他地方照常捲。SortableJS 的 ghost（留在清單裡的原位）跟 drag
+   （跟著手指走的複本）都把展開的列身藏起來，拖的時候清單不會被一整塊今日內容撐開。 */
+.drag-handle {
+  flex: none; width: 28px; height: 36px; margin: -6px -8px -6px -4px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text3); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.drag-handle svg { width: 16px; height: 16px; }
+.sortable-chosen .drag-handle { cursor: grabbing; color: var(--accent2); }
+.sortable-ghost { opacity: .35; }
+.sortable-drag { background: var(--card2); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); opacity: .95; }
+.sortable-ghost .weekday-body, .sortable-drag .weekday-body { display: none; }
+.day-order-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--text3); margin: 8px 6px 0; line-height: 1.5; }
 .weekday-body { padding: 4px 0 10px; }
 .weekday-body .day-body { padding: 0; }
 .weekday-body .item { margin-top: 8px; }

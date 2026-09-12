@@ -33,6 +33,7 @@ function render() {
   // 像「按鈕壞了」，使用者連「教練模式」的重試/還原按鈕都不知道還在不在。
   try {
     document.getElementById('root').innerHTML = renderApp(App.state);
+    App.afterRender(); // 本週頁的拖曳把手要在新 DOM 上重新掛（見 app.js）
   } catch (e) {
     console.error('render() 失敗：', e);
     document.getElementById('root').innerHTML = `
@@ -40,7 +41,7 @@ function render() {
         <div class="card" style="text-align:center">
           <div style="font-weight:700;margin-bottom:8px">畫面渲染失敗</div>
           <div style="color:var(--text2);font-size:13px;margin-bottom:14px">${h(String(e && e.message || e))}</div>
-          <button class="btn secondary" onclick="A.goTo('today')">回到今日視圖</button>
+          <button class="btn secondary" onclick="A.goTo('week')">回到本週</button>
         </div>
       </div>`;
   }
