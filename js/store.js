@@ -24,6 +24,11 @@
 //                     不另存一個 'done'，避免兩個欄位各自宣稱完成卻互相矛盾。
 //   actualNote        string                         實際做了什麼／改做了什麼（白名單三人都看得到；
 //                                                    身體狀況要寫 private.note，那個只有本人可讀）
+//   substituteType    null|SUBSTITUTE_TYPES 之一      「改做」時做了哪一類（決策紀錄第 17 條）——
+//                                                    只有 'run' 的公里才算進週跑量
+//   effort            null|1..10                     練完自己打的體感強度（Apple Fitness 的
+//                                                    Rate Your Effort；1-3 輕鬆 4-6 中等 7-8 困難 9-10 全力）
+//                                                    這是「實際」，課表項目的 rpe 是「要求」，兩者分開存
 //   fieldAt           {欄位: ISO 時間}               每個欄位各自的最後修改時間（見 mergeDocs）
 //
 // ── 跨裝置合併：欄位各有時間戳，雲端只送這次改的欄位 ──────────────────────────
@@ -58,6 +63,8 @@ const WEEK_VIEW_KEY = 'mt_local_weekview';
 
 // 一天的狀態覆寫值（entries.status）。'done' 刻意不在裡面——完成永遠由打勾推導。
 const DAY_STATUS_OVERRIDES = ['substituted', 'missed', 'rested'];
+// 「改做」做了哪一類（entries.substituteType）。views.js 的 SUBSTITUTE_LABELS 是它的顯示文字。
+const SUBSTITUTE_TYPES = ['run', 'strength', 'core', 'bike', 'swim', 'walk', 'other'];
 // 週跑量目標只加總這三種 type。⚠️ 跟 tools/verify_plan.py 的 RUN_TYPES 必須一致
 //（Python／瀏覽器 JS 兩個執行環境，沒辦法共用常數，只能靠註解互相提醒）。
 // race 刻意不在裡面：比賽是整份計畫的終點，不是賽週的跑量目標（算進去賽週目標會變 47K+）。
@@ -215,7 +222,7 @@ const Store = {
     // pushDoc 卻把它剝掉不送——本機刪、雲端留）。要清空一律寫 null。
     const userId = this.activeUserId;
     if (!this.entries[userId]) this.entries[userId] = {};
-    const prev = this.entries[userId][dateKey] || { done: {}, selectedItemId: null, actualDurationMinutes: null, actualDistanceKm: null, status: null, actualNote: '' };
+    const prev = this.entries[userId][dateKey] || { done: {}, selectedItemId: null, actualDurationMinutes: null, actualDistanceKm: null, status: null, actualNote: '', substituteType: null, effort: null };
     const { next, push } = applyPatch(prev, patch);
     this.entries[userId][dateKey] = next;
     this.persist(silent);
@@ -291,7 +298,7 @@ const Store = {
       const loc = PlanData.locateKey(dateKey);
       const order = loc ? this.effectiveDayOrder(loc.weekNumber, this.activeUserId) : IDENTITY_ORDER;
       const day = loc && this.effectiveDay(loc.weekNumber, order[loc.dayIndex]);
-      const patch = { status: null };
+      const patch = { status: null, substituteType: null };
       if (day) {
         if (!day.items.some((it) => isRunType(it.type) || it.type === 'race')) patch.actualDistanceKm = null;
         if (!day.items.some((it) => it.duration)) patch.actualDurationMinutes = null;
@@ -299,8 +306,30 @@ const Store = {
       return this._writeOwnEntry(dateKey, patch);
     }
     const patch = { status: next, done: this._fullDone(dateKey, {}), selectedItemId: null };
-    if (next !== 'substituted') { patch.actualDurationMinutes = null; patch.actualDistanceKm = null; }
+    // 錯過／主動休息：沒有做，所以實際數字、改做類型、體感強度都清掉——「錯過卻有 5 公里」
+    // 或「休息卻打了 7 分」是兩套表示互相矛盾。改做保留數字跟體感（改做的內容也有量、也有感受）。
+    if (next !== 'substituted') { patch.actualDurationMinutes = null; patch.actualDistanceKm = null; patch.substituteType = null; patch.effort = null; }
     return this._writeOwnEntry(dateKey, patch);
+  },
+
+  // 改做做了哪一類。再點同一個＝取消。不合法的值一律當 null。
+  setSubstituteType(dateKey, type) {
+    const prev = this.entryFor(this.activeUserId, dateKey);
+    const valid = SUBSTITUTE_TYPES.includes(type) ? type : null;
+    const next = prev && prev.substituteType === valid ? null : valid;
+    const patch = { substituteType: next };
+    // 改成非跑步類：之前填的公里沒有意義了（週跑量只算跑步），清掉，免得畫面上看不到卻被加總
+    if (next && next !== 'run') patch.actualDistanceKm = null;
+    return this._writeOwnEntry(dateKey, patch);
+  },
+
+  // 體感強度 1-10。再點同一個數字＝清掉。範圍外一律當 null。
+  setEffort(dateKey, n) {
+    const prev = this.entryFor(this.activeUserId, dateKey);
+    const v = Number(n);
+    const valid = Number.isInteger(v) && v >= 1 && v <= 10 ? v : null;
+    const next = prev && prev.effort === valid ? null : valid;
+    return this._writeOwnEntry(dateKey, { effort: next });
   },
 
   setActualNote(dateKey, note) {
@@ -368,7 +397,7 @@ const Store = {
   },
 
   // 顯示順序：教練模式一律回傳出廠順序（identity），不管本人有沒有對調過——教練模式
-  // 編輯的是所有人共用的課表結構，且 renderDayDetail 在教練模式下把「日曆格子」直接
+  // 編輯的是所有人共用的課表結構，且 renderDayBody 在教練模式下把「日曆格子」直接
   // 當成「要編輯的出廠天」用，順序被打亂會編輯到錯的一天。不合法的 dayOrder（缺值、
   // 舊格式）一律退回 identity，不讓壞資料讓畫面錯位——跟 _isValidWeekShape 同一個精神。
   effectiveDayOrder(weekNumber, userId) {
@@ -648,9 +677,10 @@ const Store = {
       if (!d.items.some((it) => isRunType(it.type))) continue;
       const e = planOnly ? null : this.entryFor(uid, PlanData.keyForWeekDay(weekNumber, i));
       if (e && e.status === 'rested') continue;
-      // 改做：有記公里（改做的也是跑步）就照算，跟實際對得上；沒記公里（改騎車、改核心）
-      // 這天就不算——不然畫面會出現一個她已經決定不跑的缺口。
-      if (e && e.status === 'substituted' && e.actualDistanceKm == null) continue;
+      // 改做：改做的是跑步且有記公里才照算，跟實際對得上；改騎車／核心，或沒記公里，
+      // 這天就不算——不然畫面會出現一個她已經決定不跑的缺口。substituteType 沒填的舊紀錄
+      // 維持原本的規則（有公里就算）。
+      if (e && e.status === 'substituted' && (e.actualDistanceKm == null || (e.substituteType && e.substituteType !== 'run'))) continue;
       const ranges = d.items.map(kmRange);
       if (d.selectOne) {
         min += Math.min(...ranges.map((r) => r[0]));
@@ -689,6 +719,7 @@ const Store = {
         continue;
       }
       if (e && (e.status === 'rested' || e.status === 'missed')) continue;
+      if (e && e.status === 'substituted' && e.substituteType && e.substituteType !== 'run') continue; // 改騎車的公里不是跑量
       if (Number.isFinite(km)) { actual = (actual || 0) + km; continue; }
       // 分鐘換公里只在「照表、且當天所有有時長的項目都是跑步」時做——一天一個分鐘欄，
       // 跑姿訓練＋節奏跑那種混合日換算會把跑姿的分鐘也當跑步；二擇一以選中的那個為準；

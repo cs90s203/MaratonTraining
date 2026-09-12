@@ -24,7 +24,15 @@ const ICON = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4l14 6-14 6"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+  help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5"/><path d="M12 17.5h.01"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>',
 };
+
+// 「改做」做了哪一類（Store 的 SUBSTITUTE_TYPES）→ 顯示文字
+const SUBSTITUTE_LABELS = { run: '跑步', strength: '重訓', core: '核心', bike: '騎車', swim: '游泳', walk: '走路', other: '其他' };
+// 體感強度：Apple Fitness「Rate Your Effort」的四段（1-10）
+const EFFORT_BANDS = [[1, 3, '輕鬆'], [4, 6, '中等'], [7, 8, '困難'], [9, 10, '全力']];
+function effortLabel(n) { const b = EFFORT_BANDS.find(([a, z]) => n >= a && n <= z); return b ? b[2] : ''; }
 
 const FLAG_LABELS = { leakage: '漏尿', pain: '疼痛', overTired: '過度疲勞' };
 
@@ -70,7 +78,27 @@ function renderApp(state) {
       ${renderPage(state)}
     </div>
     ${renderBottomNav(state)}
+    ${renderModal(state)}
   `;
+}
+
+// 全域彈窗。目前只有安全提醒（週視圖標題旁的「！」）。決策紀錄第 10 條：那四段文字
+// 可以藏在按鈕後面，但不能少——verify_plan.py 只驗 plan.json，這裡要靠自己守。
+function renderModal(state) {
+  if (state.modal !== 'safety') return '';
+  const s = PlanData.plan.safety;
+  return `
+    <div class="modal-backdrop" onclick="A.closeModal()">
+      <div class="modal card" onclick="event.stopPropagation()">
+        <div class="modal-head"><b>⚠️ 開始前 / 安全提醒</b><button class="icon-btn" onclick="A.closeModal()" aria-label="關閉">✕</button></div>
+        <div class="modal-body">
+          <p>${h(s.prerequisite)}</p>
+          <p>${h(s.intensityPrinciple)}</p>
+          <p>${h(s.weeklySelfCheck)}</p>
+          <p style="font-style:italic">${h(s.disclaimer)}</p>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderSyncPill() {
@@ -115,14 +143,15 @@ function renderSyncPill() {
   return `<span class="sync-pill ok"><span class="dot"></span>已同步</span>`;
 }
 
+// 決策紀錄第 17 條：沒有「今日」頁了——本週頁預設展開今天那一列。
 function renderDesktopNav(state) {
-  const tabs = [['today', '今日'], ['week', '本週'], ['overview', '總覽'], ['settings', '設定']];
+  const tabs = [['week', '本週'], ['overview', '總覽'], ['settings', '設定']];
   return `<div class="desktopnav">${tabs.map(([id, label]) =>
     `<button class="${state.page === id ? 'active' : ''}" onclick="A.goTo('${id}')">${label}</button>`).join('')}</div>`;
 }
 
 function renderBottomNav(state) {
-  const tabs = [['today', '今日', ICON.today], ['week', '本週', ICON.week], ['overview', '總覽', ICON.chart], ['settings', '設定', ICON.user]];
+  const tabs = [['week', '本週', ICON.week], ['overview', '總覽', ICON.chart], ['settings', '設定', ICON.user]];
   return `
     <div class="bottomnav"><div class="bottomnav-inner">
       ${tabs.map(([id, label, icon]) => `
@@ -134,55 +163,14 @@ function renderBottomNav(state) {
 }
 
 function renderPage(state) {
-  if (state.page === 'week') return renderWeekPage(state);
   if (state.page === 'overview') return renderOverviewPage(state);
   if (state.page === 'settings') return renderSettingsPage(state);
-  return renderTodayPage(state);
+  return renderWeekPage(state);
 }
 
-// ── 頁面 1：今日視圖 ─────────────────────────────────────────────────────────
-function renderTodayPage(state) {
-  const loc = PlanData.locateToday();
-
-  if (loc.status === 'before-start') {
-    return `
-      <div class="section">
-        <div class="empty-state card">
-          ${ICON.today}
-          <div style="font-weight:700;font-size:16px;margin-bottom:4px">還沒開始</div>
-          <div>距離開訓還有 ${loc.daysUntilStart} 天（${h(PlanData.plan.startDate)} 起）</div>
-        </div>
-      </div>
-      ${renderSafetyCard()}
-    `;
-  }
-  if (loc.status === 'after-plan') {
-    return `
-      <div class="section">
-        <div class="empty-state card">
-          ${ICON.check}
-          <div style="font-weight:700;font-size:16px;margin-bottom:4px">計畫已結束</div>
-          <div>已完賽 ${loc.daysSincePlanEnd} 天。到「總覽」看整體回顧。</div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (state.focusDay) {
-    const isRealToday = loc.status === 'in-plan' && loc.weekNumber === state.focusDay.weekNumber && loc.dayIndex === state.focusDay.dayIndex;
-    return (isRealToday ? '' : `
-      <div class="section" style="padding-bottom:0">
-        <button class="btn secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="A.goTo('today')">← 回到今天</button>
-      </div>
-    `) + renderDayDetail(state.focusDay.weekNumber, state.focusDay.dayIndex, { showWeekHeader: true, allowFlags: true });
-  }
-
-  const { weekNumber, dayIndex } = loc;
-  return renderDayDetail(weekNumber, dayIndex, { showWeekHeader: true, allowFlags: true });
-}
-
-function renderDayDetail(weekNumber, dayIndex, opts) {
-  opts = opts || {};
+// ── 一天展開後的內容（本週頁手風琴的列身；決策紀錄第 17 條）──────────────────
+// 順序照使用者要的：訓練說明（項目）→ 實際操作（快速按鈕、體感強度、數字、備註）→ 身體狀況。
+function renderDayBody(weekNumber, dayIndex) {
   const w = Store.effectiveWeek(weekNumber);
   // dayIndex 是日曆格子；教練模式下 effectiveDayOrder 一律回傳出廠順序，所以這裡
   // 同時是「要編輯的出廠天」（coach 專用的按鈕都掛在這條路徑上，見下方 coachToolbar）。
@@ -190,40 +178,26 @@ function renderDayDetail(weekNumber, dayIndex, opts) {
   const order = Store.effectiveDayOrder(weekNumber, Store.activeUserId);
   const contentIndex = order[dayIndex];
   const d = w.days[contentIndex];
-  const swapped = contentIndex !== dayIndex;
-  const phase = PlanData.phaseForWeek(weekNumber);
   const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
   const isExpired = PlanData.isExpired(weekNumber, dayIndex);
   const entry = Store.entryFor(Store.activeUserId, dateKey);
-  const dateLabel = PlanData.dateForWeekDay(weekNumber, dayIndex);
-  const dateStr = `${dateLabel.getMonth() + 1}/${dateLabel.getDate()}（${PlanData.weekdayLabel(dayIndex)}）`;
   const coach = Store.coachMode;
 
-  let html = `<div class="section">`;
-
-  if (opts.showWeekHeader) {
-    html += `
-      <div class="today-head">
-        <span class="wk">第 ${weekNumber} 週 · 第 ${dayIndex + 1} 天</span>
-        <span class="ph">${h(phase.name)}</span>
-      </div>
-      <div class="today-date">${dateStr}${swapped ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : ''}</div>
-    `;
-  }
+  let html = `<div class="section day-body">`;
 
   if (isExpired) {
     html += `<div class="banner info">${ICON.info}<div><b>這天已過期</b>起算日修正後，${h(PlanData.plan.expiredBefore)} 之前的日期不計入完成率，也不需要補做。</div></div>`;
   }
 
-  if (opts.allowFlags) {
+  {
     const priv = Store.privateFor(dateKey);
     if (priv && priv.flags && (priv.flags.leakage || priv.flags.pain || priv.flags.overTired)) {
       const active = Object.keys(priv.flags).filter((k) => priv.flags[k]).map((k) => FLAG_LABELS[k]).join('、');
-      html += `<div class="banner crit">${ICON.warn}<div><b>今天記錄了異常：${h(active)}</b>建議明天視狀況減量或休息。若持續出現，${h(PlanData.plan.safety.disclaimer)}</div></div>`;
+      html += `<div class="banner crit">${ICON.warn}<div><b>這天記錄了異常：${h(active)}</b>建議隔天視狀況減量或休息。若持續出現，${h(PlanData.plan.safety.disclaimer)}</div></div>`;
     }
   }
 
-  if (dayIndex === 6 && opts.showWeekHeader && !isExpired) {
+  if (dayIndex === 6 && !isExpired) {
     html += renderWeeklyReviewCard(weekNumber);
   }
 
@@ -259,13 +233,10 @@ function renderDayDetail(weekNumber, dayIndex, opts) {
 
   if (!isExpired) {
     html += renderActualBox(weekNumber, dayIndex, d, entry);
-  }
-  if (opts.allowFlags && !isExpired) {
     html += renderFlagsBox(dateKey);
   }
 
   html += `</div>`;
-  if (opts.showWeekHeader) html += renderSafetyCard();
   return html;
 }
 
@@ -428,6 +399,7 @@ function othersLabel() {
 function renderActualBox(weekNumber, dayIndex, d, entry) {
   const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
   const st = entry && DAY_STATUS_OVERRIDES.includes(entry.status) ? entry.status : null;
+  const subType = entry && SUBSTITUTE_LABELS[entry.substituteType] ? entry.substituteType : null;
   const derived = Store.dayStatus(weekNumber, dayIndex);
   const isAllRest = d.items.every((it) => it.type === 'rest');
   const chosenIsRest = d.selectOne && entry && entry.selectedItemId &&
@@ -436,20 +408,23 @@ function renderActualBox(weekNumber, dayIndex, d, entry) {
   const hasRun = d.items.some((it) => isRunType(it.type) || it.type === 'race');
   const hasDuration = d.items.some((it) => it.duration);
   const showMinutes = st === 'substituted' || (!st && hasDuration);
-  const showKm = st === 'substituted' || (!st && hasRun);
+  // 改做的公里只在「改做的是跑步」（或還沒選類型的舊紀錄）才有意義——改騎車填公里不算跑量
+  const showKm = (st === 'substituted' && (!subType || subType === 'run')) || (!st && hasRun);
+  const showEffort = !isAllRest && !chosenIsRest && (st === null || st === 'substituted');
   const durVal = entry && entry.actualDurationMinutes != null ? entry.actualDurationMinutes : '';
   const kmVal = entry && entry.actualDistanceKm != null ? entry.actualDistanceKm : '';
   // 純休息日不放狀態 chip——在休息日提供「改做」等於 App 主動遞出「用訓練取代休息」的按鈕。
   // 二擇一已選「完全休息」的日子不放「主動休息」——兩種休息只留一條路。
   const chips = isAllRest ? [] : DAY_STATUS_CHIPS.filter(([k]) => !(k === 'rested' && chosenIsRest));
-  const hint = st ? DAY_STATUS_HINTS[st]
+  const hint = st === 'substituted' && !subType ? '改做了哪一類？點一個。'
+    : st ? DAY_STATUS_HINTS[st]
     : (isAllRest ? '休息日。有做針灸、伸展之類的可以記在下面。'
       : '完成用上面的打勾記錄；改做／錯過／主動休息才點下面的狀態。');
   return `
     <div class="card actual-box">
       <div class="actual-box-head">
         <span class="actual-box-title">實際操作 <span class="vis-tag">${h(othersLabel())}</span></span>
-        ${!isAllRest ? `<span class="derived-status ${derived}">${st ? '' : '照表 · '}${h(DAY_STATUS_LABELS[derived] || '')}</span>` : ''}
+        ${!isAllRest ? `<span class="derived-status ${derived}">${st ? '' : '照表 · '}${h(DAY_STATUS_LABELS[derived] || '')}${st === 'substituted' && subType ? '·' + SUBSTITUTE_LABELS[subType] : ''}</span>` : ''}
       </div>
       ${chips.length ? `<div class="status-row">
         ${chips.map(([k, label]) => {
@@ -457,12 +432,52 @@ function renderActualBox(weekNumber, dayIndex, d, entry) {
           return `<button class="status-chip ${k} ${st === k ? 'active' : ''}" ${disabled ? 'disabled title="未來的日子只能預先排休息"' : ''} onclick="A.setDayStatus(${weekNumber},${dayIndex},'${k}')">${label}</button>`;
         }).join('')}
       </div>` : ''}
+      ${st === 'substituted' ? `<div class="status-row sub-row">
+        ${SUBSTITUTE_TYPES.map((k) => `<button class="status-chip sub ${subType === k ? 'active' : ''}" onclick="A.setSubstituteType(${weekNumber},${dayIndex},'${k}')">${SUBSTITUTE_LABELS[k]}</button>`).join('')}
+      </div>` : ''}
       <div class="status-hint">${h(hint)}</div>
+      ${showEffort ? renderEffortControl(weekNumber, dayIndex, d, entry) : ''}
       ${(showMinutes || showKm) ? `<div class="actual-row">
         ${showMinutes ? `<label class="actual-field">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
         ${showKm ? `<label class="actual-field">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>` : ''}
       </div>` : ''}
       <textarea class="note-input" placeholder="例如：照表完成／改成快走 25 分／改騎飛輪 40 分" onchange="A.setActualNote('${dateKey}', this.value)">${h(entry && entry.actualNote || '')}</textarea>
+    </div>`;
+}
+
+// 體感強度（決策紀錄第 17 條）：Apple Fitness「Rate Your Effort」的四階梯，十個點，
+// 點哪個就是幾分，再點一次清掉。淡色的點是課表要求的 RPE 區間（項目的 rpe 欄位，
+// 二擇一取選中的那個）。只有「打得比課表高」才提示——第 0 條：實際比要求吃力是要
+// 留意的訊號，不是反過來要往上打。
+function renderEffortControl(weekNumber, dayIndex, d, entry) {
+  const val = entry && Number.isInteger(entry.effort) ? entry.effort : null;
+  const items = d.selectOne
+    ? d.items.filter((it) => entry && entry.selectedItemId === it.id)
+    : d.items;
+  const rpes = items.filter((it) => it.rpe && Number.isFinite(it.rpe.min) && Number.isFinite(it.rpe.max)).map((it) => it.rpe);
+  const plan = rpes.length ? { min: Math.min(...rpes.map((r) => r.min)), max: Math.max(...rpes.map((r) => r.max)) } : null;
+  const over = val != null && plan && val > plan.max;
+  const helpOpen = !!App.state.helpOpen.effort;
+  const bands = EFFORT_BANDS.map(([a, z, label], bi) => {
+    let dots = '';
+    for (let n = a; n <= z; n++) {
+      const cls = ['effort-dot', val === n ? 'sel' : '', plan && n >= plan.min && n <= plan.max ? 'plan' : ''].filter(Boolean).join(' ');
+      dots += `<button class="${cls}" onclick="A.setEffort(${weekNumber},${dayIndex},${n})" aria-label="${n} ${label}"></button>`;
+    }
+    const on = val != null && val >= a && val <= z;
+    return `<div class="effort-band b${bi} ${on ? 'on' : ''}">${dots}</div>`;
+  }).join('');
+  return `
+    <div class="effort">
+      <div class="effort-head">
+        <span class="actual-box-title" style="margin:0">體感強度</span>
+        <span class="effort-val">${val != null ? `<b>${val}</b> · ${effortLabel(val)}` : '<span class="muted">練完點一下</span>'}</span>
+        <button class="help-btn ${helpOpen ? 'on' : ''}" onclick="A.toggleHelp('effort')" aria-label="說明">${ICON.help}</button>
+      </div>
+      <div class="effort-bar">${bands}</div>
+      <div class="effort-legend">${EFFORT_BANDS.map((b) => `<span>${b[2]}</span>`).join('')}</div>
+      ${over ? `<div class="status-hint over">比課表要求（RPE ${plan.min}-${plan.max}）吃力——隔天看狀況，不要硬撐。</div>` : ''}
+      ${helpOpen ? `<div class="status-hint">練完自己打 1-10：1-3 輕鬆（可以聊天）、4-6 中等（能講短句）、7-8 困難（只能講幾個字）、9-10 全力。${plan ? `淡綠的點是課表要求的 RPE ${plan.min}-${plan.max}；` : ''}打得比課表高才需要注意，打得低不用追。</div>` : ''}
     </div>`;
 }
 
@@ -489,35 +504,26 @@ function renderWeeklyReviewCard(weekNumber) {
   `;
 }
 
-// 預設展開（不是收合的 <details>）：兩個文字框都看得到，身體狀況才會分流到這裡，
-// 而不是照 Notion 的習慣全部打進上面那個別人看得到的框。
+// 三顆旗標常駐一排（一點就記）；私密備註的文字框預設收起，有旗標、有內容、或點了「＋備註」
+// 才展開——省手風琴的高度，但「只有你看得到」的標籤跟上面共用欄的「誰看得到」一樣常駐，
+// 分流靠標題，不靠 placeholder。
 function renderFlagsBox(dateKey) {
   const priv = Store.privateFor(dateKey) || { flags: {}, note: '' };
+  const hasFlag = !!(priv.flags && Object.keys(priv.flags).some((k) => priv.flags[k]));
+  const open = hasFlag || !!(priv.note && String(priv.note).trim()) || App.state.privateNoteOpen === dateKey;
   return `
     <div class="card flagsbox private-box">
-      <div class="actual-box-title">🔒 身體狀況 <span class="vis-tag private">只有你看得到</span></div>
+      <div class="actual-box-head">
+        <span class="actual-box-title" style="margin:0">🔒 身體狀況 <span class="vis-tag private">只有你看得到</span></span>
+        ${open ? '' : `<button class="link-btn" onclick="A.openPrivateNote('${dateKey}')">＋備註</button>`}
+      </div>
       <div class="flag-row">
         ${Object.keys(FLAG_LABELS).map((k) => `
           <button class="flag-chip ${priv.flags && priv.flags[k] ? 'active' : ''}" onclick="A.toggleFlag('${dateKey}','${k}')">${FLAG_LABELS[k]}</button>
         `).join('')}
       </div>
-      <textarea class="note-input" placeholder="例如：小腿有點緊、下墜感（選填）" onchange="A.setNote('${dateKey}', this.value)">${h(priv.note)}</textarea>
+      ${open ? `<textarea class="note-input" placeholder="例如：小腿有點緊、下墜感（選填）" onchange="A.setNote('${dateKey}', this.value)">${h(priv.note)}</textarea>` : ''}
     </div>
-  `;
-}
-
-function renderSafetyCard() {
-  const s = PlanData.plan.safety;
-  return `
-    <details class="card" style="margin-top:14px">
-      <summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--text2)">⚠️ 開始前 / 安全提醒</summary>
-      <div style="margin-top:10px;font-size:13px;color:var(--text2);line-height:1.65">
-        <p style="margin-bottom:10px">${h(s.prerequisite)}</p>
-        <p style="margin-bottom:10px">${h(s.intensityPrinciple)}</p>
-        <p style="margin-bottom:10px">${h(s.weeklySelfCheck)}</p>
-        <p style="font-style:italic">${h(s.disclaimer)}</p>
-      </div>
-    </details>
   `;
 }
 
@@ -534,38 +540,52 @@ function renderWeekPage(state) {
   const table = Store.weekViewMode === 'table';
   const vol = Store.weekVolume(wn, Store.activeUserId);
   const order = Store.effectiveDayOrder(wn, Store.activeUserId);
+  const expanded = state.expandedDay && state.expandedDay.weekNumber === wn ? state.expandedDay.dayIndex : -1;
 
+  // 手風琴（決策紀錄第 17 條）：一次只展開一列，展開的列身就是原本「今日」頁的內容。
   const rows = order.map((contentIndex, i) => {
     const d = w.days[contentIndex];
     const status = Store.dayStatus(wn, i);
     const dateLabel = PlanData.dateForWeekDay(wn, i);
     const dateKey = PlanData.keyForWeekDay(wn, i);
+    const entry = Store.entryFor(Store.activeUserId, dateKey);
     const isToday = dateKey === todayKey;
+    const isOpen = i === expanded;
     const titles = d.items.map((it) => it.title).join(d.selectOne ? ' 或 ' : '、');
     const statusIcon = status === 'done' ? ICON.check : '';
     return `
-      <div class="weekday-row" onclick="A.openDay(${wn},${i})" style="cursor:pointer">
-        <div class="weekday-badge ${isToday ? 'today' : ''}">${PlanData.weekdayLabel(i)}<span class="num">${dateLabel.getDate()}</span></div>
-        <div class="weekday-status ${status}">${statusIcon}</div>
-        <div class="weekday-summary">
-          <div class="t">${h(titles)}${contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : ''}</div>
-          <div class="sub">${DAY_STATUS_LABELS[status] || '待完成'}</div>
+      <div class="weekday-acc ${isOpen ? 'open' : ''}" id="day-${wn}-${i}">
+        <div class="weekday-row" onclick="A.openDay(${wn},${i})" style="cursor:pointer">
+          <div class="weekday-badge ${isToday ? 'today' : ''}">${PlanData.weekdayLabel(i)}<span class="num">${dateLabel.getDate()}</span></div>
+          <div class="weekday-status ${status}">${statusIcon}</div>
+          <div class="weekday-summary">
+            <div class="t">${h(titles)}${contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : ''}</div>
+            <div class="sub">${h(dayStatusText(status, entry))}${isToday ? ' · 今天' : ''}</div>
+          </div>
+          <span class="weekday-chevron">${ICON.chevron}</span>
         </div>
+        ${isOpen ? `<div class="weekday-body">${renderDayBody(wn, i)}</div>` : ''}
       </div>
     `;
   }).join('');
 
   const canPrev = wn > 1, canNext = wn < PlanData.plan.totalWeeks;
+  const planBanner = loc.status === 'before-start'
+    ? `<div class="banner info">${ICON.info}<div>距離開訓還有 ${loc.daysUntilStart} 天（${h(PlanData.plan.startDate)} 起）。</div></div>`
+    : loc.status === 'after-plan'
+      ? `<div class="banner info">${ICON.check}<div>計畫已結束，已完賽 ${loc.daysSincePlanEnd} 天。到「總覽」看整體回顧。</div></div>`
+      : '';
   return `
     <div class="section">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="week-head">
         <button class="navbtn" style="opacity:${canPrev ? 1 : .3}" ${canPrev ? `onclick="A.setWeekView(${wn - 1})"` : 'disabled'}>‹ 上週</button>
         <div style="text-align:center">
-          <div style="font-weight:800;font-size:17px">第 ${wn} 週</div>
+          <div style="font-weight:800;font-size:17px">第 ${wn} 週 <button class="icon-btn alert" onclick="A.openModal('safety')" aria-label="安全提醒" title="開始前 / 安全提醒">${ICON.alert}</button></div>
           <div style="font-size:12px;color:var(--text2)">${h(phase.name)}</div>
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
+      ${planBanner}
       ${renderWeekVolumeCard(vol)}
       <div class="view-toggle">
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
@@ -607,6 +627,14 @@ function renderDaySwapPanel(wn, order) {
 
 function fmtKmRange(t) { return t.min === t.max ? `${t.min}` : `${t.min}–${t.max}`; }
 
+// 週視圖列的第二行文字：狀態，改做時帶類型（「改做·重訓」），有體感就帶上。
+function dayStatusText(status, entry) {
+  let s = DAY_STATUS_LABELS[status] || '待完成';
+  if (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType]) s += '·' + SUBSTITUTE_LABELS[entry.substituteType];
+  if (entry && Number.isInteger(entry.effort) && status !== 'missed' && status !== 'rested' && status !== 'expired') s += ` · 體感 ${entry.effort}`;
+  return s;
+}
+
 // 本週跑量：目標 vs 實際。目標預設是課表跑步項目的加總（Store.weekVolume 的註解有算法）。
 // 進度條的 100% 點是目標**下限**——目標是區間，碰到下限就是滿格，超過下限不再畫「多出來」；
 // 超過上限改成警示文字。「填滿」型的條會催人往上限跑，這是第 0 條要防的方向。
@@ -628,14 +656,20 @@ function renderWeekVolumeCard(vol, opts) {
     : `目標＝本週課表跑步項目的加總${t.timeBased ? `（以時間計的項目用 ${pace} 分速換算，約略值、偏低）` : ''}。`;
   const actualStr = actual == null ? '—' : `${actual}${vol.estimated ? '<span class="approx">約</span>' : ''}`;
   const raceLine = vol.race ? `<div class="vol-sub">週日比賽 ${vol.race.planned} km 另計${vol.race.actual != null ? `（已記錄 ${vol.race.actual} km）` : ''}。</div>` : '';
+  // 說明文字收進「？」（使用者要的）：卡片平常只留數字跟進度條。
+  const helpOpen = !!App.state.helpOpen.vol;
+  const helpBtn = `<button class="help-btn ${helpOpen ? 'on' : ''}" onclick="A.toggleHelp('vol')" aria-label="說明">${ICON.help}</button>`;
+  const helpText = helpOpen ? `<div class="vol-sub">${h(how)}實際＝各天「實際公里」的加總${vol.estimated ? '（沒填公里、只填分鐘的日子用同一個分速換算）' : ''}。目標下限＝進度條滿格；超過上限會提醒，不會畫「多出來」。</div>` : '';
   if (vol.reduced) {
     return `
       <div class="card vol-card">
         <div class="vol-head">
           <span class="vol-title">${h(opts.title || '本週跑量')}</span>
           <span class="vol-nums"><b>${actualStr}</b> km</span>
+          ${helpBtn}
         </div>
         <div class="vol-sub">本週已標記降量——只記錄實際，不比對目標（原定 ${fmtKmRange(t)} km）。</div>
+        ${helpText}
         ${raceLine}
       </div>`;
   }
@@ -644,10 +678,11 @@ function renderWeekVolumeCard(vol, opts) {
       <div class="vol-head">
         <span class="vol-title">${h(opts.title || '本週跑量')}</span>
         <span class="vol-nums"><b>${actualStr}</b> / ${fmtKmRange(t)} km${reached && !over ? ' ✓' : ''}</span>
+        ${helpBtn}
       </div>
       <div class="progress-track"><div class="progress-fill ${reached ? 'reached' : ''}" style="width:${pct}%"></div></div>
       ${over ? `<div class="vol-sub over">已超過本週課表上限（${t.max} km）——下週不要再加。</div>` : ''}
-      <div class="vol-sub">${h(how)}實際＝各天「實際公里」的加總${vol.estimated ? '（沒填公里、只填分鐘的日子用同一個分速換算）' : ''}。</div>
+      ${helpText}
       ${raceLine}
     </div>
   `;
@@ -667,10 +702,11 @@ function renderWeekTable(wn, w, order, todayKey) {
         return `<div class="wt-item"><span class="wt-title">${h(it.title)}</span>${meta ? `<span class="wt-meta">${h(meta)}</span>` : ''}</div>`;
       }).join(d.selectOne ? '<div class="wt-or">或</div>' : '');
     const bits = [];
-    if (status !== 'pending') bits.push(`<span class="wt-status ${status}">${DAY_STATUS_LABELS[status]}</span>`);
+    if (status !== 'pending') bits.push(`<span class="wt-status ${status}">${h(DAY_STATUS_LABELS[status] + (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType] ? '·' + SUBSTITUTE_LABELS[entry.substituteType] : ''))}</span>`);
     const nums = [];
     if (entry && entry.actualDurationMinutes != null) nums.push(`${entry.actualDurationMinutes} 分`);
     if (entry && entry.actualDistanceKm != null) nums.push(`${entry.actualDistanceKm} km`);
+    if (entry && Number.isInteger(entry.effort) && status !== 'missed' && status !== 'rested') nums.push(`體感 ${entry.effort} ${effortLabel(entry.effort)}`);
     if (nums.length) bits.push(`<span class="wt-nums">${h(nums.join(' · '))}</span>`);
     if (entry && entry.actualNote) bits.push(`<div class="wt-note">${h(entry.actualNote)}</div>`);
     return `

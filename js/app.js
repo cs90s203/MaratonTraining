@@ -3,35 +3,71 @@
 
 const App = {
   state: {
-    page: 'today',
+    page: 'week',          // 決策紀錄第 17 條：沒有「今日」頁，本週頁預設展開今天那一列
     weekViewNumber: 1,
     viewingUserId: null,   // null = 預設看自己；總覽頁「查看別人」用，跟 Store.activeUserId（寫入身分）分開
-    focusDay: null,        // {weekNumber,dayIndex}：週視圖點某一天要跳去看時用；null = 顯示真正的「今天」
+    expandedDay: null,     // {weekNumber,dayIndex}：本週頁手風琴目前展開的那一列；null = 全收
     editingItem: null,     // 教練模式：{weekNumber,dayIndex,itemId}，itemId==='new' 表示正在新增項目
+    helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
+    modal: null,           // 'safety' | null
+    privateNoteOpen: null, // 身體狀況的備註框被手動展開的那一天（dateKey）
+  },
+
+  // 本週頁的預設定位：今天那一週、今天那一列展開。開 App、按「本週」、或切回本週都走這裡。
+  _focusToday() {
+    const loc = PlanData.locateToday();
+    this.state.weekViewNumber = loc.status === 'in-plan' ? loc.weekNumber
+      : (loc.status === 'before-start' ? 1 : PlanData.plan.totalWeeks);
+    this.state.expandedDay = loc.status === 'in-plan' ? { weekNumber: loc.weekNumber, dayIndex: loc.dayIndex } : null;
   },
 
   goTo(page) {
+    if (page === 'today') page = 'week'; // 舊的入口一律導到本週頁
     this.state.page = page;
-    if (page === 'today') this.state.focusDay = null; // 點「今日」永遠跳回真正的今天
-    if (page === 'week' && !this.state.focusDay) {
-      const loc = PlanData.locateToday();
-      this.state.weekViewNumber = loc.status === 'in-plan' ? loc.weekNumber
-        : (loc.status === 'before-start' ? 1 : PlanData.plan.totalWeeks);
-    }
+    if (page === 'week') this._focusToday();
     this.state.editingItem = null;
+    this.state.modal = null;
     render();
   },
 
+  // 手風琴：點已展開的列＝收起；點別列＝切換過去。
   openDay(weekNumber, dayIndex) {
-    this.state.focusDay = { weekNumber, dayIndex };
-    this.state.page = 'today';
+    const e = this.state.expandedDay;
+    const same = e && e.weekNumber === weekNumber && e.dayIndex === dayIndex;
+    this.state.expandedDay = same ? null : { weekNumber, dayIndex };
+    this.state.editingItem = null;
     render();
   },
 
   setWeekView(weekNumber) {
     this.state.weekViewNumber = weekNumber;
+    // 切到今天那一週就展開今天；其他週全收，等使用者點。
+    const loc = PlanData.locateToday();
+    this.state.expandedDay = (loc.status === 'in-plan' && loc.weekNumber === weekNumber)
+      ? { weekNumber, dayIndex: loc.dayIndex } : null;
+    this.state.editingItem = null;
     render();
   },
+
+  setEffort(weekNumber, dayIndex, n) {
+    Store.setEffort(PlanData.keyForWeekDay(weekNumber, dayIndex), n);
+    render();
+  },
+
+  setSubstituteType(weekNumber, dayIndex, type) {
+    Store.setSubstituteType(PlanData.keyForWeekDay(weekNumber, dayIndex), type);
+    render();
+  },
+
+  toggleHelp(key) {
+    this.state.helpOpen[key] = !this.state.helpOpen[key];
+    render();
+  },
+
+  openModal(name) { this.state.modal = name; render(); },
+  closeModal() { this.state.modal = null; render(); },
+
+  openPrivateNote(dateKey) { this.state.privateNoteOpen = dateKey; render(); },
 
   viewProgress(userId) {
     this.state.viewingUserId = userId;

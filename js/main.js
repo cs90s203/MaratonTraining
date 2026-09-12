@@ -73,7 +73,15 @@ async function boot() {
   Sync.onChange(render);
   Sync.init();
 
+  App._focusToday();
   render();
+  // 今天那一列在第一次畫面上要看得到：它可能排在週四以後，被上面的跑量卡推到螢幕外。
+  // 只在啟動時捲一次；之後使用者自己點列展開時不捲（那時列本來就在她手指底下）。
+  const e = App.state.expandedDay;
+  if (e) {
+    const el = document.getElementById(`day-${e.weekNumber}-${e.dayIndex}`);
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', boot);
