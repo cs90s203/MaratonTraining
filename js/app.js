@@ -169,6 +169,9 @@ const App = {
   },
   resetDayOrder(weekNumber) { Store.resetDayOrder(weekNumber); render(); },
 
+  // 同步膠囊「寫入被拒」：手機沒有 hover 看不到 title，點了直接把原因講出來。
+  showSyncMessage() { alert(Sync.message || '寫入被拒。'); },
+
   toggleFlag(dateKey, flagKey) {
     const priv = Store.privateFor(dateKey);
     const cur = !!(priv && priv.flags && priv.flags[flagKey]);
@@ -253,7 +256,6 @@ const App = {
     const root = document.getElementById(formId);
     if (!root) return null;
     const val = (name) => { const el = root.querySelector(`[name="${name}"]`); return el ? el.value.trim() : ''; };
-    const checked = (name) => { const el = root.querySelector(`[name="${name}"]`); return !!(el && el.checked); };
     const range = (minName, maxName) => {
       const min = val(minName), max = val(maxName);
       if (min === '' && max === '') return null;
@@ -270,11 +272,13 @@ const App = {
       heartRateZone: val('heartRateZone') || null,
       rpe: range('rpeMin', 'rpeMax'),
       intensityNote: val('intensityNote') || null,
-      intensityDerived: checked('intensityDerived'),
       videoRef: val('videoRef') || null,
       workoutRef: val('workoutRef') || null,
       notes: val('notes') || null,
-      derived: checked('derived'),
+      // 決策紀錄第 19 條：這兩個是轉檔留下的「沒人確認過」標記，不是教練填的欄位。
+      // 教練存過就是確認過——一律清掉，「推導值」「（內插）」標籤跟著消失。
+      intensityDerived: false,
+      derived: false,
     };
   },
 
@@ -315,6 +319,11 @@ const App = {
       fields.id = itemIdOrNew; // id 永遠不變，這是教練模式安全性的核心
       day.items[idx] = fields;
     }
+    // 二擇一是一組：兩個選項並排在同一天，教練存了其中一個就是整組看過了——一起
+    // 清掉 derived，不然「推導值」標籤只剩在另一個選項上，兩個對等的選擇顯示不對等
+    // （tools/verify_plan.py B4 對出廠資料守的就是這件事）。intensityDerived 是逐項的
+    // 心率來源標記，不跟著清。
+    if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
     Store.saveWeekOverride(weekNumber, week);
     this.state.editingItem = null;
     render();

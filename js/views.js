@@ -133,7 +133,8 @@ function renderSyncPill() {
     return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.goTo('settings')"><span class="dot"></span>身分不符</button>`;
   }
   if (Sync.state === 'write-denied') {
-    return `<button class="sync-pill off" title="${h(Sync.message)}"><span class="dot"></span>寫入被拒</button>`;
+    // 手機沒有 hover，title 看不到——原因要點得出來，不然只剩四個字猜不出哪筆、為什麼。
+    return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.showSyncMessage()"><span class="dot"></span>寫入被拒，點擊看原因</button>`;
   }
   if (Sync.state === 'fail') {
     return `<button class="sync-pill off" onclick="A.retrySync()"><span class="dot"></span>離線，點擊重試</button>`;
@@ -335,9 +336,23 @@ function renderItemEditForm(weekNumber, dayIndex, item) {
   const [kmMin, kmMax] = rangeVal(it.distanceKm);
   const [rpeMin, rpeMax] = rangeVal(it.rpe);
 
+  // 決策紀錄第 19 條：derived / intensityDerived 是轉檔時留下的「來源」標記（原課表沒寫、
+  // 是推出來的），不是教練要填的欄位。這裡只把它講清楚；存檔後兩個標記一律清掉——
+  // 教練存過就是確認過。
+  // 「推導值」有三種來源（整天內容、只有時長、A／B 哪一種），措辭不能一概說「原課表沒寫」
+  // ——Phase 2 的重訓原課表有寫，只是時長是補的；細節在各項目的備註裡。
+  const provenance = [
+    it.derived ? '這一項標著<b>推導值</b>——原課表沒寫清楚的部分（整天的內容、時長、或 A／B 哪一種）是轉檔時補上的，細節看備註。' : '',
+    it.intensityDerived ? '心率區間是<b>內插值</b>——原課表沒給這種跑法的心率，取 Zone 2 跟馬拉松配速中間的值。' : '',
+  ].filter(Boolean);
+  const provenanceNote = provenance.length
+    ? `<div class="edit-provenance">${provenance.join('<br>')}<br>你存檔後就當作你確認過了，標題旁的標籤會拿掉。</div>`
+    : '';
+
   return `
     <div class="item coach-editing" id="${formId}">
       <div class="edit-form">
+        ${provenanceNote}
         <div class="row">
           <div class="field">
             <label class="field-lbl">類型</label>
@@ -371,10 +386,6 @@ function renderItemEditForm(weekNumber, dayIndex, item) {
           </div>
         </div>
         <div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>
-        <div class="row">
-          <label class="checkrow"><input type="checkbox" name="intensityDerived" ${it.intensityDerived ? 'checked' : ''}> 強度是內插值</label>
-          <label class="checkrow"><input type="checkbox" name="derived" ${it.derived ? 'checked' : ''}> 內容是推導值</label>
-        </div>
         <div class="actions">
           <button class="btn" style="background:var(--warn)" onclick="A.saveItemEdit(${weekNumber},${dayIndex},'${isNew ? 'new' : jsq(it.id)}')">儲存</button>
           <button class="btn secondary" onclick="A.cancelEditItem()">取消</button>

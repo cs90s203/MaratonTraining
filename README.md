@@ -73,7 +73,7 @@ Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表�
       [決策紀錄第 11 條](docs/決策紀錄.md#11-教練模式課表從共用唯讀改成三人皆可寫)
 - [x] **CP5** 部署到 GitHub Pages——**https://cs90s203.github.io/MaratonTraining/**
       （2026-09-11 上線；邀請新的共用者仍要補 `data/users.json` +
-      `firestore.rules.local` 的 `isMember()`／`ownerEmail()`）
+      `firestore.rules.local` 的 `isMember()`／`isSelf()`）
 - [x] **v0.5.0** 舊 Notion 課表格式整合：每天「實際操作」（改做／錯過／主動休息＋自由文字）、
       週跑量目標 vs 實際、我的目標、週視圖表格模式；課表拿掉走跑改 Zone 2，見
       [決策紀錄第 12、13 條](docs/決策紀錄.md)

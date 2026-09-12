@@ -6,7 +6,7 @@
 // 身分模型（重要，跟 babylog 不一樣的地方）：
 //   Store.activeUserId 是「我是誰」——data/users.json 裡的人類可讀字串（例如 "mick"），
 //   跟 Firebase Auth 的 uid（登入產生的隨機字串）是兩個不同的識別系統，天生不相等。
-//   firestore.rules 用 email → userId 的對照表（ownerEmail()）接起兩者，不是用 uid。
+//   firestore.rules 用 email → userId 的對照表（isSelf()）接起兩者，不是用 uid。
 //
 // 真正的防線一定是 Security Rules，前端這裡的白名單檢查只是體驗優化——
 // 不符合就能立刻顯示「此帳號未被授權」，而不是讓使用者看到一堆 permission-denied。
@@ -184,7 +184,10 @@ const Sync = {
           if (c.type === 'removed') return;
           Store.mergeRemoteEntry(userId, c.doc.id, c.doc.data());
         });
-        if (!['fail', 'unauthorized', 'wrong-identity'].includes(this.state)) this._set('done', '已同步');
+        // write-denied 也不能洗回「已同步」：被拒的那筆寫入 SDK 會回滾，回滾本身就會再觸發
+        // 一次這個快照（includeMetadataChanges），沒排除的話膠囊會在使用者來得及點之前變回
+        // 「已同步」。要等那些 key 重寫成功（pushDoc 的 then）才回到 done。
+        if (!['fail', 'unauthorized', 'wrong-identity', 'write-denied'].includes(this.state)) this._set('done', '已同步');
         else this._notify();
       }, (err) => this._handleSnapErr(err, 'entries'));
 
@@ -333,7 +336,7 @@ const Sync = {
     if (err && err.code === 'permission-denied') {
       if (collectionName === 'private') {
         // entries 跟 weekAdjustments 只需要 isMember() 就能讀，private 卻要
-        // isSelf(userId)（authEmail() == ownerEmail(userId)）——三個訂閱裡只有這個
+        // isSelf(userId)（userId 對 authEmail() 的對照）——三個訂閱裡只有這個
         // 會在「白名單內的成員切到不是自己的身分」時單獨失敗。這不是「未授權」，
         // 是「選錯身分」，不該把整個帳號登出（之前這裡跟 entries 共用同一個
         // permission-denied 分支，會誤判成未授權並強制 signOut，使用者連原因都
@@ -376,7 +379,12 @@ const Sync = {
     Object.keys(data).forEach((k) => { if (data[k] !== undefined) clean[k] = data[k]; });
     try {
       fbDb.collection(`users/${userId}/${kind}`).doc(docId).set(clean, { merge: true })
-        .then(() => { if (this.failedWrites.delete(key)) this._notify(); })
+        .then(() => {
+          if (!this.failedWrites.delete(key)) return;
+          // 之前被拒的那筆現在寫成功了：全部都補上就解除「寫入被拒」，否則只重繪
+          if (this.state === 'write-denied' && this.failedWrites.size === 0) this._set('done', '已同步');
+          else this._notify();
+        })
         .catch((err) => this._onWriteError(kind, docId, userId, key, err));
     } catch (err) {
       this._onWriteError(kind, docId, userId, key, err);
@@ -390,9 +398,15 @@ const Sync = {
         // 這個集合任何白名單成員都能寫（isMember()），跟 userId 身分無關——
         // 會被拒絕只可能是這個帳號根本不在白名單裡。
         this._set('write-denied', '這個 Google 帳號不在白名單裡，無法編輯共用課表。');
+      } else if (kind === 'profile') {
+        // profile/goals 從 v0.6.0 起也是 isMember()（決策紀錄第 15 條：教練幫別人設目標）。
+        // 被拒最可能是 Firebase Console 上還是舊規則（只允許本人寫）——不是帳號跟身分不一致，
+        // 那個建議在「幫別人設目標」這個情境下根本無從照做。
+        this._set('write-denied',
+          `「${userId}」的訓練目標寫入被拒。Firebase 上的規則可能還是舊版（只允許本人寫自己的目標）——請把 firestore.rules.local 整份重新貼到 Firebase Console 發布。`);
       } else {
         // 最常見的原因：這個 Google 帳號沒有被授權寫入 activeUserId 這個身分
-        // （firestore.rules 的 ownerEmail() 對不上）。不要讓使用者以為資料存好了。
+        // （firestore.rules 的 isSelf() 對不上）。不要讓使用者以為資料存好了。
         this._set('write-denied',
           `這個 Google 帳號不能寫入「${userId}」的紀錄。請確認登入的帳號跟裝置上選的身分一致。`);
       }

@@ -26,15 +26,16 @@ service cloud.firestore {
     // 兩者是不同的識別系統：uid 是「這次登入的裝置/帳號」，userId 是「App 裡的這個人」。
     // 這個對照表就是把兩者接起來的地方——只能放在 rules（gitignore 的 .local 版本），
     // 不能放進 data/users.json，那是公開的靜態資料，不該含任何人的 email。
-    function ownerEmail(userId) {
-      return userId == 'mick' ? 'cs90s203@gmail.com'
-        // : userId == 'partner' ? '伴侶的@gmail.com'
-        // : userId == 'coach' ? '教練的@gmail.com'
-        : null;
-    }
-
+    //
+    // 寫法跟 babylog 的 isXxxFamily() 一樣：純 && / ||，不用連鎖的 ?:——Firebase 的規則
+    // 編輯器在第三層 ?: 標了紅點（決策紀錄第 20 條），而 babylog 這種寫法已經在線上
+    // 跑很久。加人＝加一行 ||（userId 要跟 data/users.json 一模一樣，大小寫也是）。
     function isSelf(userId) {
-      return isMember() && authEmail() == ownerEmail(userId);
+      return isMember() && (
+        (userId == 'mick' && authEmail() == 'cs90s203@gmail.com')
+        // || (userId == 'partner' && authEmail() == '伴侶的@gmail.com')
+        // || (userId == 'coach'   && authEmail() == '教練的@gmail.com')
+      );
     }
 
     // 顯示名稱等個人設定 + 訓練目標（profile/goals）：白名單內都看得到。
