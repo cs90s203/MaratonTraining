@@ -955,6 +955,52 @@ function renderWeekCoachPanel(wn, w, hasOverride, vol) {
   `;
 }
 
+// 階段時間軸：26 週一週一格，照階段分組（組寬＝週數，組間留空隙）。過去的週填滿、這週亮起來，
+// 階段名稱在格子下面、目前的階段加粗。取代原本「階段色塊＋塊內進度＋另一條整體進度條」——
+// 那版塊內進度是一塊比底色還深的色塊蓋在字上，而且設了 480px 最小寬度，手機上要左右捲、
+// 最後的「賽週」被切掉；兩條進度條講的又是同一件事。
+function renderPhaseTimeline(loc, wn, phase) {
+  const phases = PlanData.plan.phases;
+  const total = PlanData.plan.totalWeeks;
+  // 已經過完的週：計畫進行中＝這週之前；結束後＝全部；還沒開始＝沒有
+  const doneBefore = loc.status === 'in-plan' ? wn : (loc.status === 'after-plan' ? total + 1 : 1);
+  const isNow = (w) => loc.status === 'in-plan' && w === wn;
+  const groups = phases.map((ph) => {
+    const [a, b] = ph.weekRange;
+    const cells = [];
+    for (let w = a; w <= b; w++) {
+      cells.push(`<span class="ptl-cell ${isNow(w) ? 'now' : (w < doneBefore ? 'done' : '')}"></span>`);
+    }
+    const cls = loc.status === 'in-plan' && ph.phaseId === phase.phaseId ? 'current' : (b < doneBefore ? 'past' : '');
+    return `
+      <div class="ptl-group ${cls}" style="flex-grow:${b - a + 1}" title="${h(ph.name)}：第 ${a}–${b} 週">
+        <div class="ptl-cells">${cells.join('')}</div>
+        <div class="ptl-name">${h(ph.name)}</div>
+      </div>`;
+  }).join('');
+
+  const span = phase.weekRange[1] - phase.weekRange[0] + 1;
+  const idx = phases.findIndex((ph) => ph.phaseId === phase.phaseId);
+  const next = phases[idx + 1];
+  let head, foot;
+  if (loc.status === 'before-start') {
+    head = `<span class="ptl-phase">還沒開訓</span><span class="ptl-weeks">${loc.daysUntilStart} 天後開始</span>`;
+    foot = `第一階段：${h(phases[0].name)}（第 ${phases[0].weekRange[0]}–${phases[0].weekRange[1]} 週）`;
+  } else if (loc.status === 'after-plan') {
+    head = `<span class="ptl-phase">計畫已完成</span><span class="ptl-weeks">共 ${total} 週</span>`;
+    foot = '';
+  } else {
+    head = `<span class="ptl-phase">${h(phase.name)}</span><span class="ptl-weeks">${span > 1 ? `本階段第 ${wn - phase.weekRange[0] + 1} 週／共 ${span} 週` : '最後一週'}</span>`;
+    foot = next ? `下一階段：${h(next.name)}，第 ${next.weekRange[0]} 週開始` : '';
+  }
+  return `
+    <div class="ptl">
+      <div class="ptl-head">${head}</div>
+      <div class="ptl-track">${groups}</div>
+      ${foot ? `<div class="ptl-foot">${foot}</div>` : ''}
+    </div>`;
+}
+
 // ── 頁面 3：整體進度總覽 ─────────────────────────────────────────────────────
 function renderOverviewPage(state) {
   const loc = PlanData.locateToday();
@@ -965,10 +1011,6 @@ function renderOverviewPage(state) {
   const viewingUser = PlanData.userById[viewingUserId];
   const isSelf = viewingUserId === Store.activeUserId;
 
-  const totalDays = PlanData.plan.totalWeeks * 7;
-  const elapsedDays = loc.status === 'in-plan' ? (wn - 1) * 7 + loc.dayIndex + 1 : (loc.status === 'after-plan' ? totalDays : 0);
-  const overallPct = elapsedDays / totalDays;
-
   const stats = `
     <div class="stat-row">
       <div class="stat-tile"><div class="n">${wn}</div><div class="l">目前週次 / ${PlanData.plan.totalWeeks}</div></div>
@@ -977,15 +1019,7 @@ function renderOverviewPage(state) {
     </div>
   `;
 
-  const phaseStrip = `
-    <div class="phase-strip-scroll"><div class="phase-strip">
-      ${PlanData.plan.phases.map((ph) => {
-        const width = ph.weekRange[1] - ph.weekRange[0] + 1;
-        return `<div class="phase-seg ${phase.phaseId === ph.phaseId ? 'current' : ''}" style="flex-grow:${width}"><div class="bar" style="width:${phase.phaseId === ph.phaseId ? Math.round(((wn - ph.weekRange[0] + 1) / width) * 100) : (wn > ph.weekRange[1] ? 100 : 0)}%"></div><div class="lbl">${h(ph.name)}</div></div>`;
-      }).join('')}
-    </div></div>
-    <div class="progress-track"><div class="progress-fill" style="width:${Math.round(overallPct * 100)}%"></div></div>
-  `;
+  const phaseStrip = renderPhaseTimeline(loc, wn, phase);
 
   const trend = renderLongRunTrend(viewingUserId);
   const phaseTargetsBlock = renderPhaseTargetsCard(phase, viewingUserId, isSelf, viewingUser, state);
