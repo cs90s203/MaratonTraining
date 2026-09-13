@@ -76,6 +76,12 @@ service cloud.firestore {
       allow read, write: if isMember();
     }
 
+    // 常用項目庫（決策紀錄第 26 條）：教練模式存的常用項目、自訂動作清單、自訂影片。
+    // 跟 planOverrides 同一套：白名單內任何人都能讀寫，不限定誰是教練。
+    match /library/{docId} {
+      allow read, write: if isMember();
+    }
+
     // 其餘一律拒絕。
     match /{document=**} {
       allow read, write: if false;

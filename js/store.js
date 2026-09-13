@@ -11,6 +11,8 @@
 //                             5K 技術指標目標，教練模式下任何白名單成員都能幫別人設（第 15 條）。
 //   planOverrides          -> Firestore planOverrides/{weekNumber}（白名單內都可讀寫——
 //                             教練模式改的課表內容，跟上面「個人紀錄」是不同的共用資源）
+//   library                -> Firestore library/{id}（白名單內都可讀寫，同上）——常用項目、
+//                             自訂動作清單、自訂影片（決策紀錄第 26 條）
 //   mt_active_user         -> 本機限定，不同步。「我是誰」跟 Google 登入身分是分開的兩件事。
 //   mt_local_theme         -> 本機限定。
 //   mt_local_coachmode     -> 本機限定。教練模式開關，久久才切一次，跟裝置綁定不是跟人綁定。
@@ -155,9 +157,11 @@ const Store = {
   goals: {},            // { [userId]: goalsDoc }     — 自己的會存 localStorage；別人的只在記憶體（總覽頁唯讀）
   phaseTargets: {},     // { [userId]: { [phaseId]: {zone2Pace,volumeKm,cadence,verticalOscillation,groundContactTime,strideLength} } } — 同上
   planOverrides: {},    // { [weekNumber]: weekDoc }  — 白名單共用，教練模式改過的週
+  library: {},          // { [id]: libraryDoc }       — 白名單共用，常用項目／自訂動作清單／自訂影片（第 26 條）
   listeners: [],
 
   _cloudPush: null, // wired by firebase-sync.js: (kind, docId, data) => void
+  _cloudPushLibrary: null, // wired by firebase-sync.js: (docId, data) => void
 
   init() {
     this.activeUserId = localStorage.getItem(ACTIVE_USER_KEY) || (PlanData.users[0] && PlanData.users[0].userId) || null;
@@ -711,6 +715,155 @@ const Store = {
 
   clearRemoteWeekOverride(weekNumber) {
     delete this.planOverrides[weekNumber];
+    this._notify();
+  },
+
+  // ── 常用項目庫（Firestore library/{id}；決策紀錄第 26 條）─────────────────────
+  // 教練模式用，白名單三人共用（跟 planOverrides 同一套「誰都能改」）。三種文件：
+  //   kind:'item'    常用項目：{ name, item:{type,title,duration,...} }——帶入新項目時「複製」，
+  //                  之後改範本不會改到已經排好的日子（使用者選的是複製式，不是連動式）
+  //   kind:'workout' 自訂動作清單：跟 data/workouts.json 同形狀 { name, loadGuidance, exercises }
+  //   kind:'video'   自訂影片：跟 data/videos.json 同形狀 { title, creator, linkType, searchQuery, url, notes }
+  // 刪除是軟刪除（deleted:true）：從選單跟清單拿掉，但已經被課表引用的動作清單／影片照樣
+  // 查得到、照樣顯示——硬刪會讓排好的項目安靜地少掉「查看動作」，沒有人會發現。
+  // 跟 planOverrides 一樣只在記憶體＋Firestore（離線快取靠 SDK 的 enablePersistence），
+  // 不另存 localStorage。
+  // 讀取時的形狀檢查（跟 _isValidWeekShape 同一個精神）：_cleanLibraryFields 只擋得住這台
+  // 裝置自己的寫入，從 Firebase Console 手動改壞、或其他版本寫進來的文件擋不住——少了
+  // exercises 或 item，整個設定頁（連教練模式開關一起）會渲染失敗、關不掉。形狀不對一律當沒有。
+  _libraryDocOk(d) {
+    if (!d) return false;
+    const rangeOk = (r) => !!(r && Number.isFinite(r.min) && Number.isFinite(r.max));
+    if (d.kind === 'item') return !!(d.item && typeof d.item.type === 'string' && d.item.title);
+    if (d.kind === 'workout') {
+      return !!(d.name && Array.isArray(d.exercises) && d.exercises.length &&
+        d.exercises.every((ex) => ex && ex.name && Number.isFinite(ex.sets) && (rangeOk(ex.reps) || rangeOk(ex.holdSeconds))));
+    }
+    if (d.kind === 'video') return !!(d.title && (d.linkType === 'video' ? d.url : d.searchQuery));
+    return false;
+  },
+
+  libraryList(kind) {
+    return Object.keys(this.library)
+      .map((id) => ({ ...this.library[id], id }))
+      .filter((d) => d.kind === kind && !d.deleted && this._libraryDocOk(d))
+      .sort((a, b) => String(a.name || a.title || '').localeCompare(String(b.name || b.title || ''), 'zh-Hant'));
+  },
+
+  libraryDoc(id) {
+    const d = this.library[id];
+    return d ? { ...d, id } : null;
+  },
+
+  // 內建（data/*.json）優先，查不到再找庫裡的自訂——包含已刪除的，理由見上面。
+  // 自訂的 id 一律是 newItemId() 產生的 'c-…'，內建 id 沒有這個前綴，兩邊不會撞。
+  videoById(id) {
+    if (!id) return null;
+    if (PlanData.videoById[id]) return PlanData.videoById[id];
+    const d = this.library[id];
+    return d && d.kind === 'video' && this._libraryDocOk(d) ? { ...d, id } : null;
+  },
+  workoutById(id) {
+    if (!id) return null;
+    if (PlanData.workoutById[id]) return PlanData.workoutById[id];
+    const d = this.library[id];
+    return d && d.kind === 'workout' && this._libraryDocOk(d) ? { ...d, id } : null;
+  },
+  allVideos() { return PlanData.videos.concat(this.libraryList('video')); },
+  allWorkouts() { return PlanData.workouts.concat(this.libraryList('workout')); },
+
+  // 寫入前的第二道防線（app.js 表單已經先檢查過一次）：不合形狀的一律不存。
+  // 影片網址只收 https:// ——href 放 javascript: 會變成可以執行的連結，h() 擋不了這個。
+  _cleanLibraryFields(kind, fields) {
+    const text = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
+    const rng = (r, lo, hi) => {
+      if (!r) return null;
+      const a = Number(r.min), b = Number(r.max);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+      const min = Math.min(a, b), max = Math.max(a, b);
+      return min >= lo && max <= hi ? { min, max } : null;
+    };
+    if (kind === 'video') {
+      const title = text(fields.title, 120);
+      const linkType = fields.linkType === 'video' ? 'video' : 'search';
+      const searchQuery = text(fields.searchQuery, 200);
+      const url = text(fields.url, 500);
+      if (!title) return null;
+      if (linkType === 'search' && !searchQuery) return null;
+      if (linkType === 'video' && !/^https:\/\//i.test(url)) return null;
+      return {
+        title, creator: text(fields.creator, 60), linkType,
+        searchQuery: linkType === 'search' ? searchQuery : null,
+        url: linkType === 'video' ? url : null,
+        notes: text(fields.notes, 300),
+      };
+    }
+    if (kind === 'workout') {
+      const name = text(fields.name, 80);
+      const exercises = (Array.isArray(fields.exercises) ? fields.exercises : []).map((ex) => {
+        const exName = text(ex && ex.name, 80);
+        const sets = Math.round(Number(ex && ex.sets));
+        if (!exName || !Number.isFinite(sets) || sets < 1 || sets > 20) return null;
+        const reps = rng(ex.reps, 1, 200);
+        const holdSeconds = reps ? null : rng(ex.holdSeconds, 1, 600);
+        if (!reps && !holdSeconds) return null;
+        return { name: exName, sets, reps, holdSeconds, perSide: !!ex.perSide, notes: text(ex.notes, 200) };
+      }).filter(Boolean);
+      if (!name || !exercises.length) return null;
+      return { name, loadGuidance: text(fields.loadGuidance, 200), exercises, derived: false };
+    }
+    if (kind === 'item') {
+      const it = fields.item;
+      if (!it || !text(it.title, 80) || !it.type) return null;
+      const item = {
+        type: it.type, title: text(it.title, 80),
+        duration: rng(it.duration, 0, 300), distanceKm: rng(it.distanceKm, 0, 100),
+        heartRateZone: it.heartRateZone ? text(it.heartRateZone, 30) : null,
+        rpe: rng(it.rpe, 0, 10),
+        intensityNote: it.intensityNote ? text(it.intensityNote, 120) : null,
+        videoRef: it.videoRef || null, workoutRef: it.workoutRef || null,
+        notes: it.notes ? text(it.notes, 500) : null,
+      };
+      return { name: text(fields.name, 80) || item.title, item };
+    }
+    return null;
+  },
+
+  // id 為 null＝新增。回傳存好的文件（含 id），形狀不合回傳 null。
+  saveLibraryDoc(id, kind, fields) {
+    const clean = this._cleanLibraryFields(kind, fields);
+    if (!clean) return null;
+    const docId = id || newItemId();
+    const prev = this.library[docId];
+    if (prev && (prev.kind !== kind || prev.deleted)) return null;
+    // deleted 的時間戳：新文件把 deleted:false 放進 patch（才會蓋時間戳）；既有文件完全不送
+    // deleted。applyPatch 會無條件塞 deleted:false 卻不蓋時間戳——跟別台幾乎同時的刪除撞在
+    // 一起時，雲端會變成「值是 false、時間戳卻是刪除那一刻」，各台合併結果不一致，重新整理
+    // 後被刪掉的東西又跑回來。
+    const patch = { ...clean, kind, updatedBy: this.activeUserId };
+    if (!prev) patch.deleted = false;
+    const { next, push } = applyPatch(prev || {}, patch);
+    if (prev) { delete push.deleted; next.deleted = !!prev.deleted; }
+    this.library[docId] = next;
+    this._notify();
+    if (this._cloudPushLibrary) this._cloudPushLibrary(docId, push);
+    return { ...next, id: docId };
+  },
+
+  deleteLibraryDoc(id) {
+    const prev = this.library[id];
+    if (!prev) return null;
+    // applyPatch 會把 deleted 壓回 false（它是給一般寫入用的），刪除要在它之後蓋回 true
+    const { next, push } = applyPatch(prev, { deleted: true, updatedBy: this.activeUserId });
+    next.deleted = true; push.deleted = true;
+    this.library[id] = next;
+    this._notify();
+    if (this._cloudPushLibrary) this._cloudPushLibrary(id, push);
+    return next;
+  },
+
+  mergeRemoteLibrary(id, doc) {
+    this.library[id] = mergeDocs(this.library[id], doc);
     this._notify();
   },
 

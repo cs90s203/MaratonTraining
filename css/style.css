@@ -273,7 +273,7 @@ textarea.note-input {
   text-align: center; padding: 7px 12px; border-bottom: 1px solid var(--warn);
 }
 .coach-toolbar {
-  display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--warn);
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--warn);
 }
 .coach-toolbar button {
   border: 1.5px solid var(--warn); background: var(--warnBg); color: var(--warn);
@@ -286,6 +286,26 @@ textarea.note-input {
 .coach-add-row .btn { border: 1.5px dashed var(--warn); background: transparent; color: var(--warn); }
 
 .item.coach-editing { border-color: var(--warn); background: var(--warnBg); }
+
+/* ── 常用項目庫（決策紀錄第 26 條）─────────────────────────── */
+.lib-card { padding: 0; overflow: hidden; }
+.lib-group { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.lib-group + .lib-group { border-top: 1px solid var(--line); }
+.lib-head { font-size: 13.5px; font-weight: 800; color: var(--text); }
+.lib-note, .tpl-hint { font-size: 11.5px; color: var(--text3); line-height: 1.5; }
+.lib-empty { font-size: 12.5px; color: var(--text3); padding: 6px 0; }
+.lib-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--line); }
+.lib-row-main { min-width: 0; flex: 1; }
+.lib-name { font-size: 14px; font-weight: 700; }
+.lib-meta { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.45; overflow-wrap: anywhere; }
+.lib-actions { display: flex; gap: 12px; flex: none; padding-top: 2px; }
+.link-btn.lib-del { color: var(--crit); }
+.btn.lib-add { width: auto; align-self: flex-start; padding: 7px 12px; font-size: 13px; }
+.ex-row { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--warn); }
+.ex-foot { align-items: center; }
+.ex-perside { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text2); flex: none; }
+.edit-form .ex-perside input { width: auto; }
+.tpl-picker { padding-bottom: 10px; border-bottom: 1px dashed var(--warn); }
 
 .edit-form { display: flex; flex-direction: column; gap: 10px; }
 .edit-form .row { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -14,6 +14,7 @@
 let fbApp = null, fbAuth = null, fbDb = null;
 let unsubEntries = null, unsubPrivate = null, unsubWeekAdj = null, unsubProfile = null;
 let unsubOtherEntries = {}, unsubOtherProfile = {}, unsubOtherWeekAdj = {};
+let unsubLibrary = null; // 常用項目庫（第 26 條）：跟 planOverrides 一樣是共用資源，登入/登出時掛/拆
 let unsubPlanOverrides = null; // 跟上面三個不一樣：這個是共用資源，只在登入/登出時掛/拆，不隨切換身分重訂
 
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
@@ -97,12 +98,14 @@ const Sync = {
     Store._cloudPush = this.pushDoc.bind(this);
     Store._cloudPushPlanOverride = this.pushPlanOverride.bind(this);
     Store._cloudDeletePlanOverride = this.deletePlanOverride.bind(this);
+    Store._cloudPushLibrary = this.pushLibrary.bind(this);
 
     fbAuth.onAuthStateChanged((user) => {
       if (!user) {
         this.user = null;
         this._detachListeners();
         this._detachPlanOverrides();
+        this._detachLibrary();
         // ⚠️ 「未授權」是 _handleSnapErr 先設好狀態再呼叫 signOut() 走到這裡的——
         // 這時不能把狀態洗回 idle，否則畫面會回到「點擊登入以同步」，使用者看到的是
         // 「登入完全沒發生」，而不是真正的原因（這個 Google 帳號不在白名單／規則沒發布）。
@@ -119,6 +122,7 @@ const Sync = {
       this._set('syncing', '同步中…');
       this._attachListeners();
       this._attachPlanOverrides();
+      this._attachLibrary();
       this._backfillLocal(Store.activeUserId);
     });
 
@@ -170,6 +174,11 @@ const Sync = {
     this._detachListeners();
     this.pendingByCollection = { entries: false, private: false, weekAdjustments: false, profile: false };
     this._attachListeners();
+    // 常用項目庫的訂閱出錯時會自己拆掉（見 _handleSnapErr）；重試時要一起重掛，不然
+    // 教練發布完規則後，「還沒開通」的提示跟舊的庫會一直留到重新整理。
+    this._detachLibrary();
+    this.libraryDenied = false;
+    this._attachLibrary();
     this._backfillLocal(Store.activeUserId);
   },
 
@@ -243,6 +252,69 @@ const Sync = {
   _detachPlanOverrides() {
     if (unsubPlanOverrides) unsubPlanOverrides();
     unsubPlanOverrides = null;
+  },
+
+  // 常用項目庫（決策紀錄第 26 條）。libraryDenied：讀取被 rules 拒絕——最可能是 Firebase
+  // Console 上的規則還沒加上 library 那一段。這**不能**走 _handleSnapErr 的通用分支：那條會
+  // 判成「帳號未授權」直接登出，結果只是規則少貼一段，三個人全部被踢出去。
+  libraryDenied: false,
+  _attachLibrary() {
+    if (unsubLibrary) return;
+    let backfilled = false;
+    // includeMetadataChanges：要等到「伺服器確認過」的快照才補推（見 _backfillLibrary）。
+    // 第一個快照常常是離線快取，拿快取比較時間戳可能用本機比較舊的欄位蓋掉雲端比較新的。
+    unsubLibrary = fbDb.collection('library')
+      .onSnapshot({ includeMetadataChanges: true }, (snap) => {
+        this.libraryDenied = false;
+        snap.docChanges().forEach((c) => {
+          if (c.type === 'removed') { delete Store.library[c.doc.id]; return; }
+          Store.mergeRemoteLibrary(c.doc.id, c.doc.data());
+        });
+        if (!backfilled && !snap.metadata.fromCache) { backfilled = true; this._backfillLibrary(snap); }
+        this._notify();
+      }, (err) => this._handleSnapErr(err, 'library'));
+  },
+
+  // 沒登入時存進庫裡的東西（那時 pushLibrary 直接略過）在第一次拿到伺服器快照時補推：
+  // 雲端沒有的整份推；雲端有的只推「本機時間戳比較新」的欄位——整份推會拿本機比較舊的
+  // 欄位蓋掉別人剛改的（逐欄位合併，決策紀錄第 13 條同一個原則）。快照已經先合併進
+  // Store.library，所以「雲端比較新」的欄位本機時間戳已經跟雲端一樣，不會被推。
+  _backfillLibrary(snap) {
+    const remote = {};
+    snap.forEach((doc) => { remote[doc.id] = doc.data() || {}; });
+    Object.keys(Store.library).forEach((id) => {
+      const local = Store.library[id];
+      if (!local) return;
+      const r = remote[id];
+      if (!r) { this.pushLibrary(id, local); return; }
+      const keys = Object.keys(local).filter((k) => k !== 'fieldAt' && k !== 'updatedAt' && fieldTime(local, k) > fieldTime(r, k));
+      if (!keys.length) return;
+      const push = { updatedAt: [local.updatedAt || '', r.updatedAt || ''].sort().pop(), fieldAt: {} };
+      keys.forEach((k) => { push[k] = local[k]; push.fieldAt[k] = fieldTime(local, k); });
+      this.pushLibrary(id, push);
+    });
+  },
+
+  _detachLibrary() {
+    if (unsubLibrary) unsubLibrary();
+    unsubLibrary = null;
+  },
+
+  pushLibrary(docId, data) {
+    if (!this.isSignedIn()) return;
+    const key = `library:${docId}`;
+    const clean = JSON.parse(JSON.stringify(data)); // 深層清掉 undefined（exercises 陣列裡的欄位）
+    try {
+      fbDb.collection('library').doc(docId).set(clean, { merge: true })
+        .then(() => {
+          if (!this.failedWrites.delete(key)) return;
+          if (this.state === 'write-denied' && this.failedWrites.size === 0) this._set('done', '已同步');
+          else this._notify();
+        })
+        .catch((err) => this._onWriteError('library', docId, '(常用項目庫)', key, err));
+    } catch (err) {
+      this._onWriteError('library', docId, '(常用項目庫)', key, err);
+    }
   },
 
   // 三個白名單成員都能寫同一份共用課表，所以「兩人幾乎同時編輯同一週」是真的會
@@ -335,6 +407,14 @@ const Sync = {
   },
 
   _handleSnapErr(err, collectionName) {
+    if (collectionName === 'library') {
+      // 見 _attachLibrary 的註解：常用項目庫讀不到只影響這個功能，不登出、不改整體同步狀態。
+      console.warn('常用項目庫訂閱失敗：', err && (err.code || err.message));
+      if (err && err.code === 'permission-denied') this.libraryDenied = true;
+      this._detachLibrary();
+      this._notify();
+      return;
+    }
     if (err && err.code === 'permission-denied') {
       if (collectionName === 'private') {
         // entries 跟 weekAdjustments 只需要 isMember() 就能讀，private 卻要
@@ -396,7 +476,9 @@ const Sync = {
   _onWriteError(kind, docId, userId, key, err) {
     this.failedWrites.add(key);
     if (err && err.code === 'permission-denied') {
-      if (kind === 'planOverrides') {
+      if (kind === 'library') {
+        this._set('write-denied', '常用項目庫寫入被拒。Firebase 上的規則可能還沒加上常用項目庫那一段——請把 firestore.rules.local 整份重新貼到 Firebase Console 發布。');
+      } else if (kind === 'planOverrides') {
         // 這個集合任何白名單成員都能寫（isMember()），跟 userId 身分無關——
         // 會被拒絕只可能是這個帳號根本不在白名單裡。
         this._set('write-denied', '這個 Google 帳號不在白名單裡，無法編輯共用課表。');

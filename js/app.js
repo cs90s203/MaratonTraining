@@ -12,6 +12,7 @@ const App = {
     helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
     modal: null,           // 'safety' | null
     privateNoteOpen: null, // 身體狀況的備註框被手動展開的那一天（dateKey）
+    libraryEdit: null,     // 常用項目庫正在編輯的東西（決策紀錄第 26 條）：{kind, id|'new', draft}
   },
 
   // 本週頁的預設定位：今天那一週、今天那一列展開。開 App、按「本週」、或切回本週都走這裡。
@@ -27,6 +28,7 @@ const App = {
     this.state.page = page;
     if (page === 'week') this._focusToday();
     this.state.editingItem = null;
+    this.state.libraryEdit = null;
     this.state.modal = null;
     render();
   },
@@ -255,6 +257,7 @@ const App = {
   toggleCoachMode() {
     Store.setCoachMode(!Store.coachMode);
     this.state.editingItem = null;
+    this.state.libraryEdit = null;
     render();
   },
 
@@ -270,6 +273,166 @@ const App = {
 
   cancelEditItem() {
     this.state.editingItem = null;
+    render();
+  },
+
+  // ── 常用項目庫（決策紀錄第 26 條）─────────────────────────────────────────────
+  // 課表上的項目「存成常用」：把整套設定（類型、標題、時長、距離、心率、RPE、影片、動作、
+  // 備註）存一份到共用庫。不帶 id／derived——範本不屬於任何一天，帶入時會拿到新的 id。
+  saveItemAsTemplate(weekNumber, dayIndex, itemId) {
+    const day = Store.effectiveWeek(weekNumber).days[dayIndex];
+    const it = day && day.items.find((x) => x.id === itemId);
+    if (!it) return;
+    const same = Store.libraryList('item').some((t) => t.name === it.title);
+    if (same && !confirm(`常用項目裡已經有「${it.title}」，要再存一份嗎？（兩份會並存，名稱可以到設定頁改）`)) return;
+    const saved = Store.saveLibraryDoc(null, 'item', { name: it.title, item: it });
+    if (!saved) { alert('這個項目的內容不完整，沒辦法存成常用項目。'); return; }
+    alert(`已存成常用項目「${saved.name}」。之後在任何一天按「＋ 新增項目」就能帶入；到「設定」頁的常用項目庫可以改名、改內容或刪除。`);
+  },
+
+  // 新增項目表單上選了一個常用項目：把它的內容複製進表單（深拷貝，改表單不會動到範本）。
+  // 選回「（空白項目）」就清空。
+  applyTemplateToNewItem(weekNumber, dayIndex, templateId) {
+    const tpl = templateId ? Store.libraryDoc(templateId) : null;
+    this.state.editingItem = {
+      weekNumber, dayIndex, itemId: 'new',
+      prefill: tpl ? JSON.parse(JSON.stringify(tpl.item)) : null,
+      templateId: tpl ? tpl.id : '',
+    };
+    render();
+  },
+
+  _blankExercise() { return { name: '', sets: 2, qty: 'reps', min: 8, max: 10, perSide: false, notes: '' }; },
+
+  startLibraryEdit(kind, id) {
+    const doc = id !== 'new' ? Store.libraryDoc(id) : null;
+    if (id !== 'new' && !doc) return;
+    let draft = null;
+    if (kind === 'workout') {
+      const exs = doc ? doc.exercises : [];
+      draft = {
+        name: doc ? doc.name : '',
+        loadGuidance: doc ? (doc.loadGuidance || '') : '',
+        exercises: exs.length ? exs.map((ex) => {
+          const r = ex.holdSeconds || ex.reps || {};
+          return { name: ex.name, sets: ex.sets, qty: ex.holdSeconds ? 'hold' : 'reps', min: r.min, max: r.max, perSide: !!ex.perSide, notes: ex.notes || '' };
+        }) : [this._blankExercise()],
+      };
+    } else if (kind === 'video') {
+      draft = {
+        title: doc ? doc.title : '', creator: doc ? (doc.creator || '') : '',
+        linkType: doc && doc.linkType === 'video' ? 'video' : 'search',
+        searchQuery: doc ? (doc.searchQuery || '') : '', url: doc ? (doc.url || '') : '',
+        notes: doc ? (doc.notes || '') : '',
+      };
+    }
+    // kind === 'item'：範本內容直接用 renderItemEditForm 的表單讀，不需要 draft
+    this.state.libraryEdit = { kind, id, draft };
+    render();
+  },
+
+  cancelLibraryEdit() {
+    this.state.libraryEdit = null;
+    render();
+  },
+
+  // draft 欄位 onchange：只存不重繪（見 renderWorkoutEditor 的註解），會改版面的才傳 rerender
+  libDraft(field, value, rerender) {
+    const e = this.state.libraryEdit;
+    if (!e || !e.draft) return;
+    e.draft[field] = value;
+    if (rerender) render();
+  },
+  libDraftExercise(i, field, value, rerender) {
+    const e = this.state.libraryEdit;
+    if (!e || !e.draft || !e.draft.exercises || !e.draft.exercises[i]) return;
+    e.draft.exercises[i][field] = value;
+    if (rerender) render();
+  },
+  addLibExercise() {
+    const e = this.state.libraryEdit;
+    if (!e || !e.draft) return;
+    e.draft.exercises.push(this._blankExercise());
+    render();
+  },
+  removeLibExercise(i) {
+    const e = this.state.libraryEdit;
+    if (!e || !e.draft) return;
+    if (e.draft.exercises.length <= 1) { alert('動作清單至少要有一個動作。'); return; }
+    e.draft.exercises.splice(i, 1);
+    render();
+  },
+
+  saveLibraryWorkout() {
+    const e = this.state.libraryEdit;
+    if (!e || e.kind !== 'workout') return;
+    const d = e.draft;
+    if (!String(d.name || '').trim()) { alert('請填動作清單名稱。'); return; }
+    const exercises = [];
+    for (const ex of d.exercises) {
+      const name = String(ex.name || '').trim();
+      if (!name) continue; // 名稱空白的那一列當作沒填，直接略過
+      const sets = Number(ex.sets);
+      if (!Number.isInteger(sets) || sets < 1 || sets > 20) { alert(`「${name}」的組數要是 1 到 20 的整數。`); return; }
+      const lo = Number(ex.min);
+      const hi = ex.max === '' || ex.max == null ? lo : Number(ex.max);
+      const cap = ex.qty === 'hold' ? 600 : 200;
+      if (ex.min === '' || ex.min == null || !Number.isFinite(lo) || !Number.isFinite(hi) || Math.min(lo, hi) < 1 || Math.max(lo, hi) > cap) {
+        alert(`「${name}」的${ex.qty === 'hold' ? '秒數要在 1 到 600' : '次數要在 1 到 200'} 之間。`); return;
+      }
+      const r = { min: Math.min(lo, hi), max: Math.max(lo, hi) };
+      exercises.push({ name, sets, reps: ex.qty === 'hold' ? null : r, holdSeconds: ex.qty === 'hold' ? r : null, perSide: !!ex.perSide, notes: ex.notes });
+    }
+    if (!exercises.length) { alert('至少要有一個有名稱的動作。'); return; }
+    const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'workout', { name: d.name, loadGuidance: d.loadGuidance, exercises });
+    if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    this.state.libraryEdit = null;
+    render();
+  },
+
+  saveLibraryVideo() {
+    const e = this.state.libraryEdit;
+    if (!e || e.kind !== 'video') return;
+    const d = e.draft;
+    if (!String(d.title || '').trim()) { alert('請填影片標題。'); return; }
+    if (d.linkType === 'video' && !/^https:\/\//i.test(String(d.url || '').trim())) {
+      alert('影片網址要以 https:// 開頭——直接從 YouTube 複製網址貼上。'); return;
+    }
+    if (d.linkType !== 'video' && !String(d.searchQuery || '').trim()) { alert('請填搜尋關鍵字。'); return; }
+    const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'video', d);
+    if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    this.state.libraryEdit = null;
+    render();
+  },
+
+  // 編輯常用項目的內容：同一份項目表單（_readItemForm／_validateItemFields），只是存到庫裡
+  saveTemplateEdit(id) {
+    const tpl = Store.libraryDoc(id);
+    if (!tpl) return;
+    const formId = `tpl-edit-${id}`;
+    const fields = this._readItemForm(formId);
+    if (!fields) return;
+    const err = this._validateItemFields(fields);
+    if (err) { alert(err); return; }
+    const root = document.getElementById(formId);
+    const nameEl = root && root.querySelector('[name="templateName"]');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const saved = Store.saveLibraryDoc(id, 'item', { name: name || fields.title, item: fields });
+    if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    this.state.libraryEdit = null;
+    render();
+  },
+
+  deleteLibraryDoc(id) {
+    const doc = Store.libraryDoc(id);
+    if (!doc) return;
+    const label = doc.name || doc.title;
+    const msg = doc.kind === 'item'
+      ? `刪除常用項目「${label}」？已經排進課表的日子不受影響。`
+      : `刪除「${label}」？會從選單拿掉；已經用到它的課表項目照樣顯示。`;
+    if (!confirm(msg)) return;
+    if (this.state.libraryEdit && this.state.libraryEdit.id === id) this.state.libraryEdit = null;
+    Store.deleteLibraryDoc(id);
     render();
   },
 

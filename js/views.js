@@ -266,7 +266,7 @@ function renderDayBody(weekNumber, dayIndex) {
   }
 
   if (isEditingThisDay && editing.itemId === 'new') {
-    html += renderItemEditForm(weekNumber, dayIndex, null);
+    html += renderItemEditForm(weekNumber, dayIndex, null, { prefill: editing.prefill || null, templateId: editing.templateId || '' });
   } else {
     html += `<div class="coach-add-row"><button class="btn coach-add-row" onclick="A.startAddItem(${weekNumber},${dayIndex})">+ 新增項目</button></div>`;
   }
@@ -288,8 +288,9 @@ function itemPlanParts(item) {
 
   const links = [];
   if (item.videoRef) {
-    const v = PlanData.videoById[item.videoRef];
-    if (v && v.linkType === 'video' && v.url) {
+    const v = Store.videoById(item.videoRef);
+    // 自訂影片的網址是教練貼的（第 26 條）：只接受 https://，擋掉 javascript: 之類會執行的連結
+    if (v && v.linkType === 'video' && v.url && /^https:\/\//i.test(v.url)) {
       links.push(`<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICON.play} 看影片</a>`);
     } else if (v && v.linkType === 'search') {
       const q = encodeURIComponent(v.searchQuery || v.title);
@@ -298,7 +299,7 @@ function itemPlanParts(item) {
   }
   let workoutBlock = '';
   if (item.workoutRef) {
-    const wo = PlanData.workoutById[item.workoutRef];
+    const wo = Store.workoutById(item.workoutRef);
     if (wo) {
       workoutBlock = `
         <details style="margin-top:8px" onclick="event.stopPropagation()">
@@ -496,6 +497,7 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
       <button onclick="A.startEditItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">${ICON.chevron} 編輯</button>
       <button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)">↑</button>
       <button ${itemIndexInDay === itemCountInDay - 1 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',1)">↓</button>
+      <button onclick="A.saveItemAsTemplate(${weekNumber},${dayIndex},'${jsq(item.id)}')">存成常用</button>
       <button class="danger" ${itemCountInDay <= 1 ? 'disabled' : ''} onclick="A.deleteItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">刪除</button>
     </div>
   ` : '';
@@ -518,10 +520,39 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
 // 教練模式的項目編輯表單。item 為 null 時是「新增項目」。用 scoped querySelector
 // 讀值（A.saveItemEdit 會找 #item-edit-... 容器內的 [name=...]），不是把每個欄位
 // 塞進 onclick 參數——12 個欄位塞進 inline onclick 字串太脆弱（引號/特殊字元）。
-function renderItemEditForm(weekNumber, dayIndex, item) {
-  const isNew = !item;
-  const it = item || { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, videoRef: null, workoutRef: null, notes: '', derived: false };
-  const formId = `item-edit-${weekNumber}-${dayIndex}-${isNew ? 'new' : it.id}`;
+// opts.prefill：新增項目時從常用項目帶入的內容（複製，決策紀錄第 26 條）；opts.templateId：
+// 新增表單上目前選了哪個常用項目。opts.libraryTemplate：在設定頁的常用項目庫編輯範本本身——
+// 同一份表單，存檔按鈕改走 A.saveTemplateEdit，多一個「範本名稱」欄位。
+function renderItemEditForm(weekNumber, dayIndex, item, opts) {
+  opts = opts || {};
+  const tpl = opts.libraryTemplate || null;
+  const isNew = !item && !tpl;
+  const blank = { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, videoRef: null, workoutRef: null, notes: '', derived: false };
+  const it = item || (tpl && tpl.item) || opts.prefill || blank;
+  const formId = tpl ? `tpl-edit-${tpl.id}` : `item-edit-${weekNumber}-${dayIndex}-${isNew ? 'new' : it.id}`;
+  // 下拉選單：內建＋庫裡的自訂。這個項目現在引用的若是已經從庫裡刪掉的，也要放進選項，
+  // 不然 <select> 找不到對應值會落回「（無）」，教練按儲存就把引用安靜地洗掉了。
+  // 連這台裝置都查不到的（庫還沒同步到、或文件壞了）也一樣保留成一個選項，存檔才不會洗掉。
+  const refOptions = (list, currentId, lookup, label) => {
+    const opts2 = list.slice();
+    if (currentId && !opts2.some((x) => x.id === currentId)) {
+      const cur = lookup(currentId);
+      opts2.unshift(cur ? { ...cur, __deleted: true } : { id: currentId, __missing: true });
+    }
+    return opts2.map((x) => `<option value="${h(x.id)}" ${currentId === x.id ? 'selected' : ''}>${x.__missing
+      ? '（這台裝置找不到這個自訂項目，存檔會保留原設定）'
+      : `${h(label(x))}${String(x.id).startsWith('c-') ? '（自訂）' : ''}${x.__deleted ? '（已從庫中刪除）' : ''}`}</option>`).join('');
+  };
+  const templates = isNew ? Store.libraryList('item') : [];
+  const templatePicker = templates.length ? `
+        <div class="field wide tpl-picker">
+          <label class="field-lbl">從常用項目帶入</label>
+          <select onchange="A.applyTemplateToNewItem(${weekNumber},${dayIndex},this.value)">
+            <option value="">（空白項目）</option>
+            ${templates.map((t) => `<option value="${h(t.id)}" ${opts.templateId === t.id ? 'selected' : ''}>${h(t.name)} · ${h(TYPE_LABELS[t.item.type] || t.item.type)}</option>`).join('')}
+          </select>
+          <div class="tpl-hint">帶入是複製一份：之後改範本，不會改到已經排好的日子。</div>
+        </div>` : '';
   const rangeVal = (r) => r ? [r.min, r.max] : ['', ''];
   const [durMin, durMax] = rangeVal(it.duration);
   const [kmMin, kmMax] = rangeVal(it.distanceKm);
@@ -543,6 +574,8 @@ function renderItemEditForm(weekNumber, dayIndex, item) {
   return `
     <div class="item coach-editing" id="${formId}">
       <div class="edit-form">
+        ${templatePicker}
+        ${tpl ? `<div class="field wide"><label class="field-lbl">範本名稱</label><input name="templateName" type="text" value="${h(tpl.name)}" placeholder="例如：Zone 2 跑（Phase 2）"></div>` : ''}
         ${provenanceNote}
         <div class="row">
           <div class="field">
@@ -569,17 +602,20 @@ function renderItemEditForm(weekNumber, dayIndex, item) {
         <div class="row">
           <div class="field">
             <label class="field-lbl">影片參照</label>
-            <select name="videoRef"><option value="">（無）</option>${PlanData.videos.map((v) => `<option value="${v.id}" ${it.videoRef === v.id ? 'selected' : ''}>${h(v.title)}</option>`).join('')}</select>
+            <select name="videoRef"><option value="">（無）</option>${refOptions(Store.allVideos(), it.videoRef, (id) => Store.videoById(id), (v) => v.title)}</select>
           </div>
           <div class="field">
             <label class="field-lbl">動作參照</label>
-            <select name="workoutRef"><option value="">（無）</option>${PlanData.workouts.map((w) => `<option value="${w.id}" ${it.workoutRef === w.id ? 'selected' : ''}>${h(w.name)}</option>`).join('')}</select>
+            <select name="workoutRef"><option value="">（無）</option>${refOptions(Store.allWorkouts(), it.workoutRef, (id) => Store.workoutById(id), (w) => w.name)}</select>
           </div>
         </div>
         <div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>
         <div class="actions">
-          <button class="btn" style="background:var(--warn)" onclick="A.saveItemEdit(${weekNumber},${dayIndex},'${isNew ? 'new' : jsq(it.id)}')">儲存</button>
-          <button class="btn secondary" onclick="A.cancelEditItem()">取消</button>
+          ${tpl
+            ? `<button class="btn" style="background:var(--warn)" onclick="A.saveTemplateEdit('${jsq(tpl.id)}')">儲存範本</button>
+               <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>`
+            : `<button class="btn" style="background:var(--warn)" onclick="A.saveItemEdit(${weekNumber},${dayIndex},'${isNew ? 'new' : jsq(it.id)}')">儲存</button>
+               <button class="btn secondary" onclick="A.cancelEditItem()">取消</button>`}
         </div>
       </div>
     </div>
@@ -1246,6 +1282,135 @@ function renderLongRunTrend(userId) {
 }
 
 // ── 頁面 4：使用者切換 / 分享設定 ────────────────────────────────────────────
+// ── 常用項目庫（決策紀錄第 26 條）─────────────────────────────────────────────
+// 教練模式開著時出現在設定頁。三區：
+//   常用項目——從課表上任何一個項目按「存成常用」而來；這裡改名、改內容、刪除
+//   動作清單——自訂的（內建 4 份來自 data/workouts.json，不在這裡改）；可以新增
+//   影片——自訂的搜尋關鍵字或貼上的網址；可以新增
+// 帶入是複製：改範本不會改到已經排好的日子（使用者選的是複製式）。
+function renderLibraryPanel(state) {
+  const edit = state.libraryEdit;
+  const banners = [
+    Sync.libraryDenied ? `<div class="banner warn">${ICON.warn}<div><b>常用項目庫還沒開通</b>Firebase 上的規則還沒加上常用項目庫——請把 firestore.rules.local 整份重新貼到 Firebase Console 發布。<div><button class="btn secondary lib-add" style="margin-top:8px" onclick="A.retrySync()">發布好了，重新讀取</button></div></div></div>` : '',
+    !Sync.isSignedIn() ? `<div class="banner info">${ICON.info}<div>還沒登入：存進常用項目庫的東西先留在這台裝置，登入後會自動同步給其他人；登入前重新整理就不見了。</div></div>` : '',
+  ].join('');
+  const isEditing = (kind, id) => edit && edit.kind === kind && edit.id === id;
+  const row = (doc, main, meta) => `
+    <div class="lib-row">
+      <div class="lib-row-main"><div class="lib-name">${main}</div>${meta ? `<div class="lib-meta">${meta}</div>` : ''}</div>
+      <div class="lib-actions">
+        <button class="link-btn" onclick="A.startLibraryEdit('${doc.kind}','${jsq(doc.id)}')">編輯</button>
+        <button class="link-btn lib-del" onclick="A.deleteLibraryDoc('${jsq(doc.id)}')">刪除</button>
+      </div>
+    </div>`;
+
+  const items = Store.libraryList('item');
+  const itemRows = items.map((t) => isEditing('item', t.id)
+    ? renderItemEditForm(0, 0, null, { libraryTemplate: t })
+    : row(t, h(t.name), h([TYPE_LABELS[t.item.type] || t.item.type, PlanData.fmtItemMeta(t.item)].filter(Boolean).join(' · ')))).join('');
+
+  const workouts = Store.libraryList('workout');
+  const workoutRows = workouts.map((w) => isEditing('workout', w.id)
+    ? renderWorkoutEditor(edit)
+    : row(w, h(w.name), `${w.exercises.length} 個動作：${h(w.exercises.map((ex) => ex.name).join('、'))}`)).join('');
+
+  const videos = Store.libraryList('video');
+  const videoRows = videos.map((v) => isEditing('video', v.id)
+    ? renderVideoEditor(edit)
+    : row(v, h(v.title), v.linkType === 'video' ? '貼上的影片網址' : `搜尋「${h(v.searchQuery)}」`)).join('');
+
+  return `
+    <div class="section">
+      <div class="section-title">常用項目庫 <span class="coach-tag">三人共用</span></div>
+      ${banners}
+      <div class="card lib-card">
+        <div class="lib-group">
+          <div class="lib-head">常用項目</div>
+          <div class="lib-note">在「本週」教練模式的任何一個項目下面按「存成常用」就會出現在這裡；新增項目時可以直接帶入。帶入是複製一份，之後改範本不會改到已經排好的日子。</div>
+          ${itemRows || '<div class="lib-empty">還沒有常用項目。</div>'}
+        </div>
+        <div class="lib-group">
+          <div class="lib-head">動作清單</div>
+          <div class="lib-note">內建 ${PlanData.workouts.length} 份（${h(PlanData.workouts.map((w) => w.name).join('、'))}）不在這裡改。</div>
+          ${workoutRows}
+          ${isEditing('workout', 'new') ? renderWorkoutEditor(edit) : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('workout','new')">＋ 新增動作清單</button>`}
+        </div>
+        <div class="lib-group">
+          <div class="lib-head">影片</div>
+          <div class="lib-note">內建 ${PlanData.videos.length} 支不在這裡改。可以存搜尋關鍵字，或直接貼上 YouTube 網址。</div>
+          ${videoRows}
+          ${isEditing('video', 'new') ? renderVideoEditor(edit) : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('video','new')">＋ 新增影片</button>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+// 自訂動作清單的編輯器。欄位值存在 App.state.libraryEdit.draft：每個欄位 onchange 只更新
+// draft、不重繪（重繪會把使用者緊接著點的「儲存」「新增一個動作」吞掉）；只有會改變
+// 版面的操作（切換次數／秒數、新增／移除動作）才重繪。
+function renderWorkoutEditor(edit) {
+  const d = edit.draft;
+  const rows = d.exercises.map((ex, i) => `
+    <div class="ex-row">
+      <div class="row">
+        <div class="field wide"><label class="field-lbl">動作 ${i + 1}</label><input type="text" value="${h(ex.name)}" placeholder="例如：死蟲式 Dead Bug" onchange="A.libDraftExercise(${i},'name',this.value)"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="field-lbl">組數</label><input type="number" inputmode="numeric" min="1" max="20" value="${h(ex.sets)}" onchange="A.libDraftExercise(${i},'sets',this.value)"></div>
+        <div class="field"><label class="field-lbl">算法</label><select onchange="A.libDraftExercise(${i},'qty',this.value,true)"><option value="reps" ${ex.qty !== 'hold' ? 'selected' : ''}>次數</option><option value="hold" ${ex.qty === 'hold' ? 'selected' : ''}>秒數</option></select></div>
+        <div class="field"><label class="field-lbl">${ex.qty === 'hold' ? '秒數' : '次數'}下限</label><input type="number" inputmode="numeric" min="1" value="${h(ex.min)}" onchange="A.libDraftExercise(${i},'min',this.value)"></div>
+        <div class="field"><label class="field-lbl">上限</label><input type="number" inputmode="numeric" min="1" value="${h(ex.max)}" onchange="A.libDraftExercise(${i},'max',this.value)"></div>
+      </div>
+      <div class="row ex-foot">
+        <label class="ex-perside"><input type="checkbox" ${ex.perSide ? 'checked' : ''} onchange="A.libDraftExercise(${i},'perSide',this.checked)"> 每邊</label>
+        <div class="field"><input type="text" value="${h(ex.notes)}" placeholder="備註（選填）" onchange="A.libDraftExercise(${i},'notes',this.value)"></div>
+        <button class="link-btn lib-del" onclick="A.removeLibExercise(${i})">移除</button>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="item coach-editing">
+      <div class="edit-form">
+        <div class="field wide"><label class="field-lbl">動作清單名稱</label><input type="text" value="${h(d.name)}" placeholder="例如：產後核心（Phase 2 版）" onchange="A.libDraft('name',this.value)"></div>
+        <div class="field wide"><label class="field-lbl">負荷說明（選填）</label><input type="text" value="${h(d.loadGuidance)}" placeholder="例如：全程徒手，做到有感覺就停" onchange="A.libDraft('loadGuidance',this.value)"></div>
+        ${rows}
+        <button class="btn secondary lib-add" onclick="A.addLibExercise()">＋ 新增一個動作</button>
+        <div class="actions">
+          <button class="btn" style="background:var(--warn)" onclick="A.saveLibraryWorkout()">儲存動作清單</button>
+          <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// 自訂影片的編輯器（同上，draft 模式）。網址只收 https://（Store 端也會再擋一次）。
+// data/videos.json 的規則是「不要生成 YouTube 網址」——這裡的網址是教練自己貼上的真實網址，
+// 不是程式產生的，不違反那條。
+function renderVideoEditor(edit) {
+  const d = edit.draft;
+  const isUrl = d.linkType === 'video';
+  return `
+    <div class="item coach-editing">
+      <div class="edit-form">
+        <div class="field wide"><label class="field-lbl">標題</label><input type="text" value="${h(d.title)}" placeholder="例如：產後骨盆底放鬆" onchange="A.libDraft('title',this.value)"></div>
+        <div class="field wide"><label class="field-lbl">作者／頻道（選填）</label><input type="text" value="${h(d.creator)}" onchange="A.libDraft('creator',this.value)"></div>
+        <div class="field wide"><label class="field-lbl">連結方式</label>
+          <select onchange="A.libDraft('linkType',this.value,true)">
+            <option value="search" ${isUrl ? '' : 'selected'}>用關鍵字搜尋 YouTube</option>
+            <option value="video" ${isUrl ? 'selected' : ''}>貼上影片網址</option>
+          </select>
+        </div>
+        ${isUrl
+          ? `<div class="field wide"><label class="field-lbl">影片網址</label><input type="url" inputmode="url" value="${h(d.url)}" placeholder="https://www.youtube.com/watch?v=…" onchange="A.libDraft('url',this.value)"></div>`
+          : `<div class="field wide"><label class="field-lbl">搜尋關鍵字</label><input type="text" value="${h(d.searchQuery)}" placeholder="例如：Pamela Reif 10 min ab workout" onchange="A.libDraft('searchQuery',this.value)"></div>`}
+        <div class="field wide"><label class="field-lbl">備註（選填）</label><input type="text" value="${h(d.notes)}" onchange="A.libDraft('notes',this.value)"></div>
+        <div class="actions">
+          <button class="btn" style="background:var(--warn)" onclick="A.saveLibraryVideo()">儲存影片</button>
+          <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderSettingsPage(state) {
   const users = PlanData.users;
   return `
@@ -1299,11 +1464,12 @@ function renderSettingsPage(state) {
       <div class="coach-toggle-row">
         <div>
           <div style="font-weight:700;font-size:14px">編輯課表內容</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px">開啟後可以在「今日」「本週」直接調整項目、順序、二擇一，改的是所有人共用的課表。</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">開啟後可以在「本週」直接調整項目、順序、二擇一，改的是所有人共用的課表。</div>
         </div>
         <label class="switch"><input type="checkbox" ${Store.coachMode ? 'checked' : ''} onchange="A.toggleCoachMode()"><span class="slider"></span></label>
       </div>
     </div>
+    ${Store.coachMode ? renderLibraryPanel(state) : ''}
 
     <div class="section">
       <div class="section-title">外觀</div>
