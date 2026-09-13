@@ -9,6 +9,7 @@
   --track:#E9EDE6; --text:#1B231D; --text2:#5C6B5E; --text3:#95A398; --accent:#2E6B54;
   --accent2:#1F4D3D; --accentBg:#E6EFE9; --nav:rgba(250,251,249,.94);
   --crit:#B0402A; --critBg:#FBEBE6; --warn:#9A6B14; --warnBg:#F8F0DC;
+  --hard:#B8632B; --hardBg:#F5E4D4;
   --inpBg:#FFFFFF; --inpBorder:#DCE3D9; --shadow:rgba(30,40,32,.06); --shadow2:rgba(30,40,32,.14);
   --raceGold:#B8862E;
 }
@@ -17,6 +18,7 @@
   --track:#2F372F; --text:#E7ECE6; --text2:#9CAB9E; --text3:#5E6B60; --accent:#6FBF9C;
   --accent2:#8FD4B3; --accentBg:#1B2A22; --nav:rgba(21,26,22,.95);
   --crit:#E38A72; --critBg:#2A1B16; --warn:#D9B15C; --warnBg:#2A2412;
+  --hard:#E0954A; --hardBg:#2E2013;
   --inpBg:#252C26; --inpBorder:#333B33; --shadow:rgba(0,0,0,.35); --shadow2:rgba(0,0,0,.55);
   --raceGold:#D9A94A;
 }
@@ -393,21 +395,29 @@ textarea.note-input {
 .link-btn { border: none; background: transparent; color: var(--accent2); font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 0; }
 .muted { color: var(--text3); }
 
-/* ── 體感強度（Apple Fitness「Rate Your Effort」的四階梯）────────── */
+/* ── 體感強度（Apple Fitness「Rate Your Effort」的四階梯）──────────
+   決策紀錄第 21 條：四組拿掉高低階梯，改成等高＋四色（輕鬆綠／中等黃／
+   困難橘／全力紅，跟 App 既有的 accent/warn/crit 色沿用同一套語言，
+   只多一個「困難」用的 --hard/--hardBg）。 */
 .effort { margin: 10px 0 6px; }
 .effort-head { display: flex; align-items: center; gap: 8px; }
 .effort-val { margin-left: auto; font-size: 13px; color: var(--text2); }
 .effort-val b { font-size: 16px; color: var(--text); }
-.effort-bar { display: flex; gap: 4px; align-items: flex-end; height: 48px; margin-top: 8px; }
-.effort-band {
-  flex: 1; display: flex; justify-content: space-around; align-items: flex-end;
-  background: var(--track); border-radius: 8px 8px 6px 6px; padding: 0 4px 6px; opacity: .6;
-}
-.effort-band.b0 { height: 40%; } .effort-band.b1 { height: 60%; } .effort-band.b2 { height: 80%; } .effort-band.b3 { height: 100%; }
-.effort-band.on { opacity: 1; background: var(--accentBg); }
-.effort-dot { width: 12px; height: 12px; border-radius: 50%; border: none; background: var(--text3); opacity: .45; padding: 0; cursor: pointer; }
-.effort-dot.plan { opacity: .85; background: var(--accent); }
-.effort-dot.sel { width: 16px; height: 28px; border-radius: 8px; background: var(--text); opacity: 1; }
+.effort-bar { display: flex; gap: 4px; height: 44px; margin-top: 8px; }
+.effort-band { flex: 1; display: flex; justify-content: space-around; align-items: center; border-radius: 10px; padding: 0 4px; }
+.effort-band.b0 { background: var(--accentBg); }
+.effort-band.b1 { background: var(--warnBg); }
+.effort-band.b2 { background: var(--hardBg); }
+.effort-band.b3 { background: var(--critBg); }
+.effort-dot { width: 14px; height: 14px; border-radius: 50%; border: none; padding: 0; cursor: pointer; opacity: .45; }
+.effort-band.b0 .effort-dot { background: var(--accent); }
+.effort-band.b1 .effort-dot { background: var(--warn); }
+.effort-band.b2 .effort-dot { background: var(--hard); }
+.effort-band.b3 .effort-dot { background: var(--crit); }
+/* 課表建議的 RPE 區間：外框（不填色），避免跟等級本身的顏色打架 */
+.effort-dot.plan { opacity: .75; box-shadow: 0 0 0 2px var(--text2); }
+/* 目前選中的那一格：實心＋深框，靠框線跳出來，不再靠「變大變高」 */
+.effort-dot.sel { opacity: 1; width: 18px; height: 18px; box-shadow: 0 0 0 2px var(--text); }
 .effort-legend { display: flex; margin-top: 4px; font-size: 10.5px; color: var(--text3); }
 .effort-legend span { flex: 1; text-align: center; }
 .status-hint.over { color: var(--warn); font-weight: 600; }

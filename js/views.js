@@ -476,8 +476,8 @@ function renderEffortControl(weekNumber, dayIndex, d, entry) {
       const cls = ['effort-dot', val === n ? 'sel' : '', plan && n >= plan.min && n <= plan.max ? 'plan' : ''].filter(Boolean).join(' ');
       dots += `<button class="${cls}" onclick="A.setEffort(${weekNumber},${dayIndex},${n})" aria-label="${n} ${label}"></button>`;
     }
-    const on = val != null && val >= a && val <= z;
-    return `<div class="effort-band b${bi} ${on ? 'on' : ''}">${dots}</div>`;
+    // 決策紀錄第 21 條：四組不再靠高度分輕重，等高＋各自的底色（CSS 的 .b0-.b3）就夠分辨。
+    return `<div class="effort-band b${bi}">${dots}</div>`;
   }).join('');
   return `
     <div class="effort">
