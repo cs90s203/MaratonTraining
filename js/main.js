@@ -14,6 +14,33 @@ function isTypingInRoot() {
   return tag === 'TEXTAREA' || (tag === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(el.type));
 }
 
+// iOS Safari 把 focus 的 input 字型小於 16px 時自動放大畫面（這裡幾乎每個數字欄都比
+// 16px 小），失焦後理應自動縮回，但常常縮不回去——因為失焦的原因是「整個 #root 被
+// 我們自己的 render() 換掉」，不是使用者悠悠地點別處（跟 babylog 同一個坑，同一個修法：
+// ~/Documents/Projects/babylog/js/app.js 的 resetZoom()）。強制把 maximum-scale 壓到
+// 1.0 會立刻把畫面縮回來；用完馬上還原，使用者之後還是能正常雙指縮放。
+// ⚠️ babylog 只在一個特定時機呼叫這個函式，這裡是每次 render() 都呼叫（頻率高很多）——
+// 短時間內疊呼叫會一直把 ', maximum-scale=1.0' 疊加上去、且每次都把「疊過的內容」誤存成
+// original，還原時就再也回不去了（縮放永久被鎖住）。用同一個計時器＋只在第一次呼叫時
+// 記 original，後續呼叫只延長還原時間，不重複疊加、不重新讀取（已經被污染的）內容。
+let zoomResetTimer = null;
+let zoomOriginalViewport = null;
+function resetZoom() {
+  const viewport = document.querySelector('meta[name=viewport]');
+  if (!viewport) return;
+  if (zoomResetTimer) {
+    clearTimeout(zoomResetTimer);
+  } else {
+    zoomOriginalViewport = viewport.getAttribute('content');
+    viewport.setAttribute('content', zoomOriginalViewport + ', maximum-scale=1.0');
+  }
+  zoomResetTimer = setTimeout(() => {
+    viewport.setAttribute('content', zoomOriginalViewport);
+    zoomResetTimer = null;
+    zoomOriginalViewport = null;
+  }, 350);
+}
+
 function render() {
   // 使用者正在文字欄位打字時不重繪：整個 #root 換掉會把打到一半的字清掉、鍵盤收起——
   // 登入後每筆寫入有兩次 Firestore 快照（本機 pending、伺服器 ack），第二次常常剛好落在
@@ -34,6 +61,7 @@ function render() {
   try {
     document.getElementById('root').innerHTML = renderApp(App.state);
     App.afterRender(); // 本週頁的拖曳把手要在新 DOM 上重新掛（見 app.js）
+    resetZoom(); // 每次 #root 被換掉都順手檢查一次；沒放大時這行沒有任何視覺效果
   } catch (e) {
     console.error('render() 失敗：', e);
     document.getElementById('root').innerHTML = `
