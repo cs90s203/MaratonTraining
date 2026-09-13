@@ -1,0 +1,342 @@
+<title>本週頁卡片整併</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg2:#F0F3EF; --bg:#FAFBF9; --card:#FFFFFF; --card2:#F2F5F1; --line:#E6EAE3; --track:#E9EDE6;
+  --text:#1B231D; --text2:#5C6B5E; --text3:#95A398; --accent:#2E6B54; --accent2:#1F4D3D; --accentBg:#E6EFE9;
+  --crit:#B0402A; --critBg:#FBEBE6; --warn:#9A6B14; --warnBg:#F8F0DC; --inpBg:#FFFFFF; --inpBorder:#DCE3D9;
+  --hard:#B8632B; --hardBg:#F5E4D4; --shadow:rgba(30,40,32,.06); --onAccent:#FFFFFF;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg2:#0E120F; --bg:#151A16; --card:#1D231E; --card2:#252C26; --line:#2B322C; --track:#2F372F;
+    --text:#E7ECE6; --text2:#9CAB9E; --text3:#5E6B60; --accent:#6FBF9C; --accent2:#8FD4B3; --accentBg:#1B2A22;
+    --crit:#E38A72; --critBg:#2A1B16; --warn:#D9B15C; --warnBg:#2A2412; --inpBg:#252C26; --inpBorder:#333B33;
+    --hard:#E0954A; --hardBg:#2E2013; --shadow:rgba(0,0,0,.35); --onAccent:#0E120F;
+  }
+}
+:root[data-theme="dark"] {
+  --bg2:#0E120F; --bg:#151A16; --card:#1D231E; --card2:#252C26; --line:#2B322C; --track:#2F372F;
+  --text:#E7ECE6; --text2:#9CAB9E; --text3:#5E6B60; --accent:#6FBF9C; --accent2:#8FD4B3; --accentBg:#1B2A22;
+  --crit:#E38A72; --critBg:#2A1B16; --warn:#D9B15C; --warnBg:#2A2412; --inpBg:#252C26; --inpBorder:#333B33;
+  --hard:#E0954A; --hardBg:#2E2013; --shadow:rgba(0,0,0,.35); --onAccent:#0E120F;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg2); color: var(--text); font-family: 'Inter','PingFang TC','Microsoft JhengHei',system-ui,sans-serif; }
+.doc { max-width: 980px; margin: 0 auto; padding: 40px 20px 80px; }
+.eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+h1 { font-size: 24px; font-weight: 800; margin: 0 0 10px; letter-spacing: -.01em; text-wrap: balance; }
+.lede { font-size: 14.5px; color: var(--text2); line-height: 1.7; max-width: 62ch; margin: 0; }
+.order { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.order span { font-size: 12px; font-weight: 700; color: var(--accent2); background: var(--accentBg); border-radius: 999px; padding: 5px 11px; }
+.order i { font-style: normal; color: var(--text3); align-self: center; font-size: 12px; }
+section.review { margin-top: 44px; }
+.review-head { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent2); margin-bottom: 4px; }
+h2 { font-size: 18px; font-weight: 700; margin: 0 0 6px; text-wrap: balance; }
+.sub { font-size: 13px; color: var(--text2); line-height: 1.6; margin: 0 0 18px; max-width: 70ch; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
+@media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.shape-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.shape-label b { font-size: 13px; }
+.shape-label span { font-size: 11.5px; color: var(--text3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.phone { background: var(--bg); border: 1px solid var(--line); border-radius: 20px; padding: 12px; }
+.notes { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.notes li { font-size: 12px; color: var(--text2); line-height: 1.55; padding-left: 14px; position: relative; }
+.notes li::before { content: '—'; position: absolute; left: 0; color: var(--text3); }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 1px 2px var(--shadow); overflow: hidden; }
+.sec { padding: 13px 14px; }
+.sec + .sec { border-top: 1px solid var(--line); }
+.plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.plan-title { font-size: 15px; font-weight: 700; }
+.plan-title.dim { color: var(--text3); text-decoration: line-through; text-decoration-thickness: 1px; }
+.status-txt { font-size: 11.5px; font-weight: 700; color: var(--text3); white-space: nowrap; }
+.status-txt.done { color: var(--accent2); }
+.status-txt.sub { color: var(--warn); }
+.plan-meta { font-size: 12px; color: var(--text2); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.plan-meta .zone { color: var(--accent2); font-weight: 600; }
+.plan-note { font-size: 12px; color: var(--text3); margin-top: 6px; line-height: 1.5; }
+.plan-links { display: flex; gap: 12px; margin-top: 7px; font-size: 11.5px; font-weight: 600; color: var(--accent2); }
+.lbl { font-size: 11px; font-weight: 700; color: var(--text2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.vis { font-size: 10px; font-weight: 700; border-radius: 5px; padding: 1px 6px; background: var(--accentBg); color: var(--accent2); }
+.vis.private { background: var(--critBg); color: var(--crit); }
+.num-row { display: flex; align-items: flex-end; gap: 8px; }
+.num { font-size: 10.5px; color: var(--text3); font-weight: 600; flex: 1; min-width: 0; }
+.num input { display: block; margin-top: 4px; width: 100%; border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text); border-radius: 9px; padding: 8px 9px; font: inherit; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.num input::placeholder { color: var(--text3); font-weight: 400; }
+.num.primary input { border-color: var(--accent); }
+.done-btn { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--text3); }
+.done-btn .circ { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--inpBorder); background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 17px; color: transparent; }
+.done-btn.on { color: var(--accent2); }
+.done-btn.on .circ { background: var(--accent); border-color: var(--accent); color: var(--onAccent); }
+.alt-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.alt-row .q { font-size: 11px; color: var(--text3); margin-right: 2px; }
+.chip { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--inpBorder); color: var(--text2); background: var(--card); }
+.chip.on { border-color: var(--warn); background: var(--warnBg); color: var(--warn); }
+.chip.rest.on { border-color: var(--text3); background: var(--card2); color: var(--text2); }
+.chip.sm { font-size: 11px; padding: 5px 9px; }
+.chip.sm.on { border-color: var(--accent2); background: var(--accentBg); color: var(--accent2); }
+.type-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.hint { font-size: 11px; color: var(--text3); line-height: 1.5; margin-top: 7px; }
+.choice { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 6px; align-items: stretch; }
+.choice .or { align-self: center; font-size: 11px; font-weight: 700; color: var(--text3); }
+.opt { border: 1.5px solid var(--inpBorder); border-radius: 11px; padding: 9px 10px; background: var(--card); }
+.opt.on { border-color: var(--accent); background: var(--accentBg); }
+.opt .t { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.opt .m { font-size: 10.5px; color: var(--text2); margin-top: 3px; }
+.radio { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--inpBorder); flex: none; }
+.opt.on .radio { border: 4px solid var(--accent); }
+.effort-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.effort-head .lbl { margin: 0; }
+.effort-val { margin-left: auto; font-size: 12px; color: var(--text2); }
+.effort-val b { color: var(--text); font-size: 14px; }
+.bands { display: flex; gap: 4px; height: 28px; }
+.band { flex: 1; border-radius: 8px; display: flex; align-items: center; justify-content: space-around; padding: 0 3px; }
+.band.b0 { background: var(--accentBg); } .band.b1 { background: var(--warnBg); } .band.b2 { background: var(--hardBg); } .band.b3 { background: var(--critBg); }
+.d { width: 9px; height: 9px; border-radius: 50%; opacity: .45; }
+.b0 .d { background: var(--accent); } .b1 .d { background: var(--warn); } .b2 .d { background: var(--hard); } .b3 .d { background: var(--crit); }
+.d.sel { opacity: 1; width: 13px; height: 13px; box-shadow: 0 0 0 2px var(--text); }
+.legend { display: flex; font-size: 9.5px; color: var(--text3); margin-top: 4px; }
+.legend span { flex: 1; text-align: center; }
+.note-box { width: 100%; min-height: 38px; border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text); border-radius: 9px; padding: 8px 10px; font-size: 12.5px; }
+.note-box.empty { color: var(--text3); }
+.private-sec { border-left: 3px solid var(--crit); }
+.flags { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.link { font-size: 11.5px; font-weight: 700; color: var(--accent2); margin-left: auto; }
+
+.week-list { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.wrow { display: flex; align-items: center; gap: 12px; padding: 11px 14px; }
+.wrow + .wrow { border-top: 1px solid var(--line); }
+.wbadge { width: 34px; text-align: center; font-size: 10.5px; font-weight: 700; color: var(--text3); flex: none; }
+.wbadge b { display: block; font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; }
+.wbadge.today b { color: var(--accent); }
+.wdot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--inpBorder); flex: none; display: flex; align-items: center; justify-content: center; font-size: 11px; color: transparent; }
+.wdot.done { background: var(--accent); border-color: var(--accent); color: var(--onAccent); }
+.wdot.norec { border-style: dashed; }
+.wtxt { min-width: 0; }
+.wtxt .t { font-size: 13.5px; font-weight: 700; }
+.wtxt .s { font-size: 11.5px; color: var(--text2); margin-top: 1px; }
+.wtxt .s.norec { color: var(--text3); }
+
+.vol-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+.vol-nums { font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.vol-nums b { color: var(--text); font-size: 17px; }
+.track { height: 7px; border-radius: 5px; background: var(--track); overflow: hidden; }
+.fill { height: 100%; background: var(--accent); border-radius: 5px; }
+.review-box { background: var(--warnBg); color: var(--warn); border-radius: 11px; padding: 10px 12px; font-size: 12px; line-height: 1.55; }
+.review-box b { display: block; margin-bottom: 2px; }
+.review-box .btn { display: inline-block; margin-top: 7px; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 8px; border: 1.5px solid var(--warn); }
+</style>
+
+<div class="doc">
+  <div class="eyebrow">MarathonTrain · 本週頁 · 討論稿第二版</div>
+  <h1>當天紀錄卡：一張卡，照「回來先記什麼」排</h1>
+  <p class="lede">課表項目變成卡片的標題，下面第一個能填的就是實際數字。沒照表才往下選「更換項目」或「自主休息」，
+    再來體感強度、附註、身體狀況。按鈕文案照你的：改做→更換項目、主動休息→自主休息，「錯過」拿掉。
+    下面四種日子涵蓋了課表 182 天裡會長得不一樣的情況。</p>
+  <div class="order"><span>課表標題</span><i>→</i><span>① 實際公里／分鐘＋完成</span><i>→</i><span>② 更換項目｜自主休息</span><i>→</i><span>③ 體感強度</span><i>→</i><span>④ 附註</span><i>→</i><span>⑤ 身體狀況</span></div>
+
+  <section class="review">
+    <div class="review-head">一、四種日子</div>
+    <h2>同一套順序，依當天課表長出不同的欄位</h2>
+    <p class="sub">課表 182 天裡，以公里計的跑步只有 19 天；以分鐘計的跑步 57 天；沒有跑步的訓練日（重訓、核心、跑姿）95 天；純休息 11 天。所以①的「實際數字」不能只放公里——沒有跑步的日子只有分鐘可以填。</p>
+    <div class="grid">
+
+      <div>
+        <div class="shape-label"><b>A · 照表跑完（長跑 Zone 2）</b><span>跑步日 76 天</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="sec">
+              <div class="plan-head"><span class="plan-title">長跑（Zone 2）</span><span class="status-txt done">照表 · 已完成</span></div>
+              <div class="plan-meta"><span>20–25 分</span><span class="zone">60–70%</span><span>RPE 4–5</span></div>
+              <div class="plan-note">這階段的「長跑」以時間而非距離計，全程維持 Zone 2。若骨盆有下墜感就縮短當天時間，不要硬撐。</div>
+            </div>
+            <div class="sec">
+              <div class="num-row">
+                <label class="num primary">實際公里<input value="2.6"></label>
+                <label class="num">實際分鐘<input value="24"></label>
+                <div class="done-btn on"><div class="circ">✓</div>完成</div>
+              </div>
+              <div class="alt-row" style="margin-top:10px"><span class="q">沒照表？</span><span class="chip">更換項目</span><span class="chip rest">自主休息</span></div>
+            </div>
+            <div class="sec">
+              <div class="effort-head"><span class="lbl">體感強度</span><span class="effort-val"><b>4</b> · 中等</span></div>
+              <div class="bands"><div class="band b0"><i class="d"></i><i class="d"></i><i class="d"></i></div><div class="band b1"><i class="d sel"></i><i class="d"></i><i class="d"></i></div><div class="band b2"><i class="d"></i><i class="d"></i></div><div class="band b3"><i class="d"></i><i class="d"></i></div></div>
+              <div class="legend"><span>輕鬆</span><span>中等</span><span>困難</span><span>全力</span></div>
+            </div>
+            <div class="sec">
+              <div class="lbl">附註 <span class="vis">Annlin、Phoebe 看得到</span></div>
+              <div class="note-box empty">例如：後半段有點喘，放慢了</div>
+            </div>
+            <div class="sec private-sec">
+              <div class="lbl">🔒 身體狀況 <span class="vis private">只有你看得到</span></div>
+              <div class="flags"><span class="chip sm">漏尿</span><span class="chip sm">疼痛</span><span class="chip sm">過度疲勞</span><span class="link">＋寫給自己</span></div>
+            </div>
+          </div>
+        </div>
+        <ul class="notes">
+          <li>填了公里或分鐘，右邊的「完成」自己亮起來——回來只要填一個數字</li>
+          <li>沒戴錶不知道公里，直接點「完成」也可以</li>
+          <li>分鐘留在公里旁邊：課表前八週全以分鐘計，週跑量要靠它換算</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="shape-label"><b>B · 沒有跑步的訓練日（重訓）</b><span>95 天</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="sec">
+              <div class="plan-head"><span class="plan-title">重量訓練 A（下肢＋核心）</span><span class="status-txt">待完成</span></div>
+              <div class="plan-meta"><span>30 分</span></div>
+              <div class="plan-note">Phase 1 全部用徒手或極輕負荷，不追求痠痛感。</div>
+              <div class="plan-links"><span>查看動作（6）</span></div>
+            </div>
+            <div class="sec">
+              <div class="num-row">
+                <label class="num primary">實際分鐘<input placeholder="30"></label>
+                <div class="done-btn"><div class="circ">✓</div>完成</div>
+              </div>
+              <div class="alt-row" style="margin-top:10px"><span class="q">沒照表？</span><span class="chip">更換項目</span><span class="chip rest">自主休息</span></div>
+            </div>
+            <div class="sec">
+              <div class="effort-head"><span class="lbl">體感強度</span><span class="effort-val">練完點一下</span></div>
+              <div class="bands"><div class="band b0"><i class="d"></i><i class="d"></i><i class="d"></i></div><div class="band b1"><i class="d"></i><i class="d"></i><i class="d"></i></div><div class="band b2"><i class="d"></i><i class="d"></i></div><div class="band b3"><i class="d"></i><i class="d"></i></div></div>
+              <div class="legend"><span>輕鬆</span><span>中等</span><span>困難</span><span>全力</span></div>
+            </div>
+            <div class="sec">
+              <div class="lbl">附註 <span class="vis">Annlin、Phoebe 看得到</span></div>
+              <div class="note-box empty">例如：深蹲改成徒手</div>
+            </div>
+            <div class="sec private-sec">
+              <div class="lbl">🔒 身體狀況 <span class="vis private">只有你看得到</span></div>
+              <div class="flags"><span class="chip sm">漏尿</span><span class="chip sm">疼痛</span><span class="chip sm">過度疲勞</span><span class="link">＋寫給自己</span></div>
+            </div>
+          </div>
+        </div>
+        <ul class="notes">
+          <li>沒有公里欄，①只剩分鐘＋完成</li>
+          <li>「跑姿訓練＋核心」這種兩項都要做的日子（14 天），標題區每一項各自一個勾</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="shape-label"><b>C · 課表二選一（輕鬆跑 或 完全休息）</b><span>二選一 32 天</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="sec">
+              <div class="lbl" style="margin-bottom:9px">今天二選一</div>
+              <div class="choice">
+                <div class="opt"><div class="t"><i class="radio"></i>輕鬆跑</div><div class="m">30 分 · 50–60%</div></div>
+                <span class="or">或</span>
+                <div class="opt on"><div class="t"><i class="radio"></i>完全休息</div><div class="m">今天就休息</div></div>
+              </div>
+              <div class="hint">休息不是失敗，也不需要改天補。</div>
+            </div>
+            <div class="sec">
+              <div class="lbl">附註 <span class="vis">Annlin、Phoebe 看得到</span></div>
+              <div class="note-box empty">例如：寶寶半夜醒三次</div>
+            </div>
+            <div class="sec private-sec">
+              <div class="lbl">🔒 身體狀況 <span class="vis private">只有你看得到</span></div>
+              <div class="flags"><span class="chip sm">漏尿</span><span class="chip sm">疼痛</span><span class="chip sm">過度疲勞</span><span class="link">＋寫給自己</span></div>
+            </div>
+          </div>
+        </div>
+        <ul class="notes">
+          <li>先選，兩個選項一樣大，不預設「要跑」</li>
+          <li>選了完全休息：沒有數字、沒有體感強度（現在這裡會多出一個公里框，順便修掉）</li>
+          <li>課表本身就有休息選項，所以不另外放「自主休息」——休息只留一條路</li>
+          <li>選了輕鬆跑，下面才長出①的公里／分鐘</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="shape-label"><b>D · 沒照表：更換項目</b><span>任何訓練日</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="sec">
+              <div class="plan-head"><span class="plan-title dim">Zone 2 跑</span><span class="status-txt sub">更換項目 · 騎車</span></div>
+              <div class="plan-meta"><span>40–50 分</span><span class="zone">60–70%</span></div>
+            </div>
+            <div class="sec">
+              <div class="alt-row"><span class="q">沒照表？</span><span class="chip on">更換項目</span><span class="chip rest">自主休息</span></div>
+              <div class="type-row"><span class="chip sm">跑步</span><span class="chip sm">重訓</span><span class="chip sm">核心</span><span class="chip sm on">騎車</span><span class="chip sm">游泳</span><span class="chip sm">走路</span><span class="chip sm">其他</span></div>
+              <div class="num-row" style="margin-top:10px">
+                <label class="num primary">實際分鐘<input value="40"></label>
+              </div>
+            </div>
+            <div class="sec">
+              <div class="effort-head"><span class="lbl">體感強度</span><span class="effort-val"><b>6</b> · 中等</span></div>
+              <div class="bands"><div class="band b0"><i class="d"></i><i class="d"></i><i class="d"></i></div><div class="band b1"><i class="d"></i><i class="d"></i><i class="d sel"></i></div><div class="band b2"><i class="d"></i><i class="d"></i></div><div class="band b3"><i class="d"></i><i class="d"></i></div></div>
+              <div class="legend"><span>輕鬆</span><span>中等</span><span>困難</span><span>全力</span></div>
+            </div>
+            <div class="sec">
+              <div class="lbl">附註 <span class="vis">Annlin、Phoebe 看得到</span></div>
+              <div class="note-box">下雨，改騎飛輪</div>
+            </div>
+            <div class="sec private-sec">
+              <div class="lbl">🔒 身體狀況 <span class="vis private">只有你看得到</span></div>
+              <div class="flags"><span class="chip sm">漏尿</span><span class="chip sm">疼痛</span><span class="chip sm">過度疲勞</span><span class="link">＋寫給自己</span></div>
+            </div>
+          </div>
+        </div>
+        <ul class="notes">
+          <li>點了「更換項目」，②往上移到數字前面：先說換成什麼，再填多少</li>
+          <li>換成騎車就不出現公里（騎車的公里不算跑量），換成跑步才有</li>
+          <li>「自主休息」同理：數字跟體感強度都收起來，只剩附註跟身體狀況</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="review">
+    <div class="review-head">二、拿掉「錯過」之後</div>
+    <h2>過去沒記的日子寫「未記錄」，不寫「待完成」</h2>
+    <p class="sub">「錯過」跟「什麼都沒按」在完成率和週跑量裡算法本來就一模一樣——拿掉它數字不會變。唯一要處理的是字：過去的日子掛著「待完成」看起來像補做清單，改成灰色的「未記錄」。今天和未來才叫「待完成」。</p>
+    <div class="grid">
+      <div class="week-list">
+        <div class="wrow"><div class="wbadge">一<b>7</b></div><div class="wdot done">✓</div><div class="wtxt"><div class="t">產後核心／骨盆底啟動</div><div class="s">已完成 · 體感 3</div></div></div>
+        <div class="wrow"><div class="wbadge">二<b>8</b></div><div class="wdot norec"></div><div class="wtxt"><div class="t">Zone 2 跑</div><div class="s norec">未記錄</div></div></div>
+        <div class="wrow"><div class="wbadge">三<b>9</b></div><div class="wdot done">✓</div><div class="wtxt"><div class="t">重量訓練 A</div><div class="s">更換項目·騎車 · 體感 6</div></div></div>
+        <div class="wrow"><div class="wbadge">四<b>10</b></div><div class="wdot"></div><div class="wtxt"><div class="t">產後骨盆底／腹直肌</div><div class="s">自主休息</div></div></div>
+        <div class="wrow"><div class="wbadge today">五<b>11</b></div><div class="wdot"></div><div class="wtxt"><div class="t">Zone 2 跑</div><div class="s">待完成 · 今天</div></div></div>
+      </div>
+      <ul class="notes" style="margin-top:0">
+        <li>沒做、也不是刻意休息 → 什麼都不按，就是以前的「錯過」</li>
+        <li>刻意休息 → 按「自主休息」，那天從完成率跟週跑量目標裡拿掉（跟現在一樣）</li>
+        <li>以前已經按過「錯過」的舊紀錄，讀的時候當作「未記錄」，不用改資料</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="review">
+    <div class="review-head">三、本週頂端</div>
+    <h2>本週訓練目標：跑量進度＋本週回顧，每天都看得到</h2>
+    <p class="sub">上一版已經談過：回顧從週日那一列搬上來。沒有異常、沒有降量時回顧那段不顯示。</p>
+    <div class="grid">
+      <div class="phone">
+        <div class="card">
+          <div class="sec">
+            <div class="lbl">本週訓練目標</div>
+            <div class="vol-head"><span style="font-size:12.5px;font-weight:700;color:var(--text2)">跑量</span><span class="vol-nums"><b>18.4</b> / 22–28 km</span></div>
+            <div class="track"><div class="fill" style="width:66%"></div></div>
+          </div>
+          <div class="sec">
+            <div class="review-box">
+              <b>本週回顧</b>
+              這週有 1 天記錄異常；1 天體感比課表要求吃力——下週照表，不要加。
+              <div><span class="btn">標記本週已降量</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ul class="notes" style="margin-top:0">
+        <li>週一到週六也看得到這週有沒有異常</li>
+        <li>「跑量」變成標題下的子項</li>
+      </ul>
+    </div>
+  </section>
+</div>

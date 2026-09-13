@@ -29,7 +29,7 @@ const ICON = {
   grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="19" r="1.8"/><circle cx="15" cy="19" r="1.8"/></svg>',
 };
 
-// 「改做」做了哪一類（Store 的 SUBSTITUTE_TYPES）→ 顯示文字
+// 「更換項目」換成哪一類（Store 的 SUBSTITUTE_TYPES）→ 顯示文字
 const SUBSTITUTE_LABELS = { run: '跑步', strength: '重訓', core: '核心', bike: '騎車', swim: '游泳', walk: '走路', other: '其他' };
 // 體感強度：Apple Fitness「Rate Your Effort」的四段（1-10）
 const EFFORT_BANDS = [[1, 3, '輕鬆'], [4, 6, '中等'], [7, 8, '困難'], [9, 10, '全力']];
@@ -78,18 +78,23 @@ const TYPE_LABELS = {
   tempo: '節奏跑', 'form-drill': '跑姿訓練', strength: '重量訓練', rest: '休息', race: '比賽',
   'walk-run': '走跑交替（舊類型，請改選）', // v3 舊覆寫文件裡可能還有；只供顯示，不在 VALID_TYPES 下拉
 };
-// Store.dayStatus() 的七種回傳值 → 畫面文字
+// Store.dayStatus() 的回傳值 → 畫面文字。unfinished 不是 dayStatus 的回傳值：過去的日子
+// 還是 'pending' 時畫面寫「未完成」，今天和未來才寫「待完成」（決策紀錄第 23 條）——
+// 用 dayStatusLabel()，不要直接查這張表。
 const DAY_STATUS_LABELS = {
-  expired: '已過期', substituted: '改做', missed: '錯過', rested: '主動休息',
-  done: '已完成', partial: '部分完成', pending: '待完成',
+  expired: '已過期', substituted: '更換項目', rested: '自主休息',
+  done: '已完成', partial: '部分完成', pending: '待完成', unfinished: '未完成',
 };
-// 三顆可按的狀態 chip。「照表」（status=null）不是 chip，是 renderActualBox 右上角的
-// 唯讀文字——它是「沒有覆寫」而不是一個選項，見決策紀錄第 13b 條。
-const DAY_STATUS_CHIPS = [['substituted', '改做'], ['missed', '錯過'], ['rested', '主動休息']];
+function dayStatusLabel(status, dateKey) {
+  if (status === 'pending' && dateKey < PlanData.dayKey(PlanData.today())) return DAY_STATUS_LABELS.unfinished;
+  return DAY_STATUS_LABELS[status] || DAY_STATUS_LABELS.pending;
+}
+// 可按的狀態 chip（「沒照表？」那一排）。「照表」（status=null）不是 chip，是紀錄卡標題右邊的
+// 唯讀文字——它是「沒有覆寫」而不是一個選項，見決策紀錄第 13b 條。「錯過」第 23 條拿掉。
+const DAY_STATUS_CHIPS = [['substituted', '更換項目'], ['rested', '自主休息']];
 const DAY_STATUS_HINTS = {
-  substituted: '改做只是記錄，不算補做，也不會把原本的量搬到別天。',
-  missed: '錯過就是錯過，不需要補做。',
-  rested: '主動休息不計入完成率——休息不是失敗。',
+  substituted: '更換項目只是記錄，不算補做，也不會把原本的量搬到別天。',
+  rested: '自主休息不計入完成率——休息不是失敗。',
 };
 
 // ── 頂層外殼 ─────────────────────────────────────────────────────────────────
@@ -202,8 +207,10 @@ function renderPage(state) {
   return renderWeekPage(state);
 }
 
-// ── 一天展開後的內容（本週頁手風琴的列身；決策紀錄第 17 條）──────────────────
-// 順序照使用者要的：訓練說明（項目）→ 實際操作（快速按鈕、體感強度、數字、備註）→ 身體狀況。
+// ── 一天展開後的內容（本週頁手風琴的列身；決策紀錄第 17、23 條）──────────────
+// 一般模式：一張「當天紀錄卡」，課表項目是卡片標題，底下照運動回來先記什麼排
+// （見 renderDayRecordCard）。教練模式：項目卡另外畫（有編輯工具列，塞不進合併的卡片），
+// 紀錄卡畫在下面、不重畫標題。本週回顧不在這裡——第 23 條搬到頂端的本週訓練目標卡。
 function renderDayBody(weekNumber, dayIndex) {
   const w = Store.effectiveWeek(weekNumber);
   // dayIndex 是日曆格子；教練模式下 effectiveDayOrder 一律回傳出廠順序，所以這裡
@@ -231,23 +238,22 @@ function renderDayBody(weekNumber, dayIndex) {
     }
   }
 
-  if (dayIndex === 6 && !isExpired) {
-    html += renderWeeklyReviewCard(weekNumber);
+  if (!coach) {
+    if (d.dayNotes) html += `<div class="banner info">${ICON.info}<div>${h(d.dayNotes)}</div></div>`;
+    html += renderDayRecordCard(weekNumber, dayIndex, d, entry, true);
+    html += `</div>`;
+    return html;
   }
 
-  if (coach) {
-    html += `
-      <div class="day-coach-row">
-        <label class="toggle-switch">
-          <span class="switch"><input type="checkbox" ${d.selectOne ? 'checked' : ''} onchange="A.toggleDaySelectOne(${weekNumber},${dayIndex})"><span class="slider"></span></span>
-          這天是「二擇一」
-        </label>
-      </div>
-      <textarea class="edit-form daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
-    `;
-  } else if (d.dayNotes) {
-    html += `<div class="banner info">${ICON.info}<div>${h(d.dayNotes)}</div></div>`;
-  }
+  html += `
+    <div class="day-coach-row">
+      <label class="toggle-switch">
+        <span class="switch"><input type="checkbox" ${d.selectOne ? 'checked' : ''} onchange="A.toggleDaySelectOne(${weekNumber},${dayIndex})"><span class="slider"></span></span>
+        這天是「二擇一」
+      </label>
+    </div>
+    <textarea class="edit-form daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
+  `;
 
   const editing = App.state.editingItem;
   const isEditingThisDay = editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex;
@@ -259,47 +265,26 @@ function renderDayBody(weekNumber, dayIndex) {
     html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired)).join('');
   }
 
-  if (coach && isEditingThisDay && editing.itemId === 'new') {
+  if (isEditingThisDay && editing.itemId === 'new') {
     html += renderItemEditForm(weekNumber, dayIndex, null);
-  } else if (coach) {
+  } else {
     html += `<div class="coach-add-row"><button class="btn coach-add-row" onclick="A.startAddItem(${weekNumber},${dayIndex})">+ 新增項目</button></div>`;
   }
 
-  if (!isExpired) {
-    html += renderActualBox(weekNumber, dayIndex, d, entry);
-    html += renderFlagsBox(dateKey);
-  }
+  if (!isExpired) html += renderDayRecordCard(weekNumber, dayIndex, d, entry, false);
 
   html += `</div>`;
   return html;
 }
 
-function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired) {
-  const coach = Store.coachMode;
-  const editing = App.state.editingItem;
-  const isEditingThis = coach && editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex && editing.itemId === item.id;
-  if (isEditingThis) return renderItemEditForm(weekNumber, dayIndex, item);
-
-  const done = isSelectOne
-    ? (entry && entry.selectedItemId === item.id && entry.done && entry.done[item.id])
-    : (entry && entry.done && entry.done[item.id]);
-  const chosen = isSelectOne && entry && entry.selectedItemId === item.id;
-  const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
-  // 樂觀寫入被 Firestore 拒絕時不回滾這個打勾（見決策紀錄第 0 條：不該因為權限問題
-  // 懲罰使用者剛完成的動作），但要讓使用者看得出「這筆沒有真的存到雲端」，
-  // 不能讓它看起來跟正常同步過的紀錄一樣。
-  const unsynced = Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
-
+// 項目的課表說明（時長／心率／RPE、影片、動作清單）——教練模式的項目卡跟當天紀錄卡的
+// 標題區共用同一份，改一處兩邊一起變。連結跟 <details> 都擋掉冒泡：外層可能是可點的選項。
+function itemPlanParts(item) {
   const meta = [];
   const metaStr = PlanData.fmtItemMeta(item);
   if (metaStr) meta.push(metaStr);
   if (item.heartRateZone) meta.push(`<span class="zone">${h(item.heartRateZone)}${item.intensityDerived ? '（內插）' : ''}</span>`);
   if (item.rpe) meta.push(`RPE ${item.rpe.min}-${item.rpe.max}`);
-
-  const clickAttr = isExpired ? '' :
-    (isSelectOne
-      ? `onclick="A.selectChoice(${weekNumber},${dayIndex},'${jsq(item.id)}')"`
-      : `onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')"`);
 
   const links = [];
   if (item.videoRef) {
@@ -328,6 +313,183 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
         </details>`;
     }
   }
+  const body = `
+    ${meta.length ? `<div class="item-meta">${meta.join('')}</div>` : ''}
+    ${item.notes ? `<div class="item-notes">${h(item.notes)}</div>` : ''}
+    ${links.length ? `<div class="item-links">${links.join('')}</div>` : ''}
+    ${workoutBlock}`;
+  return { meta, links, workoutBlock, body };
+}
+
+// 當天紀錄卡（決策紀錄第 23 條）。課表項目是標題，底下照「運動回來先記什麼」排：
+//   ① 實際公里／分鐘＋完成 → ② 沒照表？更換項目｜自主休息 → ③ 體感強度 → ④ 附註 → ⑤ 身體狀況
+// 一張卡、區塊之間用分隔線。沒照表時 ② 移到數字前面：先說換成什麼，再填多少。
+// 二擇一的日子先選（第 7 條：兩個選項地位相等，不預設要做），選了非休息的選項才長出數字欄；
+// 課表本身有休息選項的二擇一日不另外放「自主休息」——休息只留一條路。
+// withPlan=false：教練模式，項目卡畫在上面，這裡不畫標題、也不放「完成」（勾在項目卡上）。
+function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
+  const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
+  const isExpired = PlanData.isExpired(weekNumber, dayIndex);
+  const isFuture = dateKey > PlanData.dayKey(PlanData.today());
+  const st = entryStatus(entry);
+  const subType = entry && SUBSTITUTE_LABELS[entry.substituteType] ? entry.substituteType : null;
+  const derived = Store.dayStatus(weekNumber, dayIndex);
+  const isAllRest = d.items.every((it) => it.type === 'rest');
+  const hasRestOption = d.selectOne && d.items.some((it) => it.type === 'rest');
+  const chosen = d.selectOne && entry && entry.selectedItemId ? d.items.find((it) => it.id === entry.selectedItemId) || null : null;
+  const chosenIsRest = !!(chosen && chosen.type === 'rest');
+  // 數字跟體感強度對應「這天實際要做的項目」：二擇一只看選中的那個——還沒選、或選了休息，
+  // 就不長數字欄（以前用整天的項目判斷，選了完全休息還會跑出公里框）。
+  const active = d.selectOne ? (chosen ? [chosen] : []) : d.items;
+  const activeTrains = active.some((it) => it.type !== 'rest');
+  const hasRun = active.some((it) => isRunType(it.type) || it.type === 'race');
+  const hasDuration = active.some((it) => it.duration);
+  // 「完成」按鈕只給「非二擇一、只有一個不是休息的項目」的日子——跟 Store.setActualStats
+  // 自動打勾的條件同一套；兩項的日子勾在各自那一行，二擇一「選」本身就算完成。
+  const single = !d.selectOne && d.items.length === 1 && d.items[0].type !== 'rest' ? d.items[0] : null;
+  const dim = st === 'substituted' || st === 'rested';
+  const unsynced = Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
+
+  // 標題右邊的唯讀狀態（第 13b 條：「照表」是文字，不是一顆可以按的 chip）
+  const statusText = isAllRest ? '' :
+    st === 'substituted' ? `更換項目${subType ? '·' + SUBSTITUTE_LABELS[subType] : ''}` :
+    st === 'rested' ? DAY_STATUS_LABELS.rested :
+    (derived === 'done' || derived === 'partial') ? `照表 · ${DAY_STATUS_LABELS[derived]}` :
+    dayStatusLabel(derived, dateKey);
+  const statusHtml = `<span class="rec-status ${st || derived}">${h(statusText)}${unsynced ? ' <span class="rec-unsynced">尚未同步</span>' : ''}</span>`;
+
+  const secs = [];
+
+  // ── 標題：課表項目 ──
+  if (withPlan) {
+    if (d.selectOne) {
+      const opts = d.items.map((it) => {
+        const on = !!(chosen && chosen.id === it.id);
+        const click = isExpired ? '' : `onclick="A.selectChoice(${weekNumber},${dayIndex},'${jsq(it.id)}')"`;
+        return `
+          <div class="rec-opt ${on ? 'on' : ''} ${dim ? 'dim' : ''}" ${click} role="button" aria-pressed="${on}">
+            <div class="rec-opt-t"><span class="rec-radio"></span><span class="rec-title ${it.derived ? 'derived' : ''}">${h(it.title)}</span></div>
+            ${itemPlanParts(it).body}
+          </div>`;
+      }).join('<span class="rec-or">或</span>');
+      secs.push(`
+        <div class="rec-plan-head"><span class="rec-lbl">今天二選一</span>${statusHtml}</div>
+        <div class="rec-choice">${opts}</div>
+        ${chosenIsRest ? '<div class="status-hint">休息不是失敗，也不需要改天補。</div>' : ''}`);
+    } else {
+      const tickable = d.items.length > 1 && !isExpired;
+      secs.push(d.items.map((it, i) => {
+        const done = !!(entry && entry.done && entry.done[it.id]) && st === null;
+        const tick = tickable
+          ? `<button class="rec-tick ${done ? 'on' : ''}" onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(it.id)}')" aria-pressed="${done}" aria-label="完成：${h(it.title)}">${ICON.check}</button>`
+          : '';
+        return `
+          <div class="rec-line">
+            ${tick}
+            <div class="rec-line-body">
+              <div class="rec-plan-head">
+                <span class="rec-title ${dim ? 'dim' : ''} ${it.derived ? 'derived' : ''}">${h(it.title)}${it.type === 'race' ? ' 🏁' : ''}</span>
+                ${i === 0 ? statusHtml : ''}
+              </div>
+              ${itemPlanParts(it).body}
+            </div>
+          </div>`;
+      }).join(''));
+    }
+  }
+
+  if (isExpired) return secs.length ? `<div class="card rec-card">${secs.map((s) => `<div class="rec-sec">${s}</div>`).join('')}</div>` : '';
+
+  // ── ① 實際數字＋完成 ──
+  const showNums = !isFuture && st !== 'rested' && (st === 'substituted' || activeTrains);
+  // 換成騎車／游泳的公里沒有意義（週跑量只算跑步）；還沒選類型的舊紀錄照舊可以記公里
+  const showKm = showNums && (st === 'substituted' ? (!subType || subType === 'run') : hasRun);
+  const showMin = showNums && (st === 'substituted' ? true : hasDuration);
+  // !isFuture：決策紀錄第 13b 條——未來的日子只能預先排休息，不能預先打勾完成。
+  const showDone = withPlan && !isFuture && st === null && !!single;
+  const kmVal = entry && entry.actualDistanceKm != null ? entry.actualDistanceKm : '';
+  const durVal = entry && entry.actualDurationMinutes != null ? entry.actualDurationMinutes : '';
+  const isDone = derived === 'done';
+  const nums = (showKm || showMin || showDone) ? `
+    <div class="rec-nums">
+      ${showKm ? `<label class="rec-num">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>` : ''}
+      ${showMin ? `<label class="rec-num">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
+      ${showDone ? `<button class="rec-done ${isDone ? 'on' : ''} ${showKm || showMin ? '' : 'solo'}" onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(single.id)}')" aria-pressed="${isDone}"><span class="rec-done-circ">${ICON.check}</span>${showKm || showMin ? '完成' : '照表完成'}</button>` : ''}
+    </div>` : '';
+
+  // ── ② 沒照表？更換項目｜自主休息 ──
+  // 純休息日不放（第 13b 條：在休息日給「更換項目」＝App 主動遞出「用訓練取代休息」）。
+  // 課表有休息選項的二擇一日不放「自主休息」——除非這天已經是自主休息（舊紀錄），不然取消不了。
+  const chips = isAllRest ? [] : DAY_STATUS_CHIPS.filter(([k]) => !(k === 'rested' && hasRestOption && st !== 'rested'));
+  const alt = chips.length ? `
+    <div class="rec-alt">
+      <span class="rec-q">沒照表？</span>
+      ${chips.map(([k, label]) => {
+        const disabled = isFuture && k !== 'rested' && st !== k;
+        return `<button class="status-chip ${k} ${st === k ? 'active' : ''}" ${disabled ? 'disabled title="未來的日子只能預先排休息"' : ''} onclick="A.setDayStatus(${weekNumber},${dayIndex},'${k}')">${label}</button>`;
+      }).join('')}
+    </div>
+    ${st === 'substituted' ? `<div class="status-row sub-row">
+      ${SUBSTITUTE_TYPES.map((k) => `<button class="status-chip sub ${subType === k ? 'active' : ''}" onclick="A.setSubstituteType(${weekNumber},${dayIndex},'${k}')">${SUBSTITUTE_LABELS[k]}</button>`).join('')}
+    </div>` : ''}
+    ${st ? `<div class="status-hint">${h(st === 'substituted' && !subType ? '換成哪一類？點一個。' : DAY_STATUS_HINTS[st])}</div>` : ''}` : '';
+
+  const action = st === null ? nums + alt : alt + nums;
+  if (action.trim()) secs.push(action);
+
+  // ── ③ 體感強度 ──（二擇一：選了非休息的選項、或更換項目時才有東西可以評）
+  const showEffort = !isFuture && !isAllRest && st !== 'rested' && (d.selectOne ? (st === 'substituted' || (chosen && !chosenIsRest)) : true);
+  if (showEffort) secs.push(renderEffortControl(weekNumber, dayIndex, d, entry));
+
+  // ── ④ 附註（白名單三人看得到）──
+  // 「誰看得到」寫在標題旁（第 13a 條）：跟 ⑤ 在同一張卡裡，只剩標題能分流，寫錯框 Security Rules 擋不了。
+  secs.push(`
+    <div class="rec-lbl">附註 <span class="vis-tag">${h(othersLabel())}</span></div>
+    <textarea class="note-input" placeholder="例如：後半段有點喘，放慢了" onchange="A.setActualNote('${dateKey}', this.value)">${h(entry && entry.actualNote || '')}</textarea>`);
+
+  // ── ⑤ 身體狀況（只有本人）──三顆旗標常駐；私密文字框有旗標、有內容、或點了才展開。
+  const priv = Store.privateFor(dateKey) || { flags: {}, note: '' };
+  const hasFlag = !!(priv.flags && Object.keys(priv.flags).some((k) => priv.flags[k]));
+  const noteOpen = hasFlag || !!(priv.note && String(priv.note).trim()) || App.state.privateNoteOpen === dateKey;
+  const privateSec = `
+    <div class="rec-plan-head">
+      <span class="rec-lbl">🔒 身體狀況 <span class="vis-tag private">只有你看得到</span></span>
+      ${noteOpen ? '' : `<button class="link-btn" onclick="A.openPrivateNote('${dateKey}')">＋寫給自己</button>`}
+    </div>
+    <div class="flag-row">
+      ${Object.keys(FLAG_LABELS).map((k) => `<button class="flag-chip ${priv.flags && priv.flags[k] ? 'active' : ''}" onclick="A.toggleFlag('${dateKey}','${k}')">${FLAG_LABELS[k]}</button>`).join('')}
+    </div>
+    ${noteOpen ? `<textarea class="note-input" placeholder="例如：小腿有點緊、下墜感（選填）" onchange="A.setNote('${dateKey}', this.value)">${h(priv.note)}</textarea>` : ''}`;
+
+  return `
+    <div class="card rec-card ${withPlan ? '' : 'coach'}">
+      ${secs.map((s) => `<div class="rec-sec">${s}</div>`).join('')}
+      <div class="rec-sec rec-private">${privateSec}</div>
+    </div>`;
+}
+
+function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired) {
+  const coach = Store.coachMode;
+  const editing = App.state.editingItem;
+  const isEditingThis = coach && editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex && editing.itemId === item.id;
+  if (isEditingThis) return renderItemEditForm(weekNumber, dayIndex, item);
+
+  const done = isSelectOne
+    ? (entry && entry.selectedItemId === item.id && entry.done && entry.done[item.id])
+    : (entry && entry.done && entry.done[item.id]);
+  const chosen = isSelectOne && entry && entry.selectedItemId === item.id;
+  const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
+  // 樂觀寫入被 Firestore 拒絕時不回滾這個打勾（見決策紀錄第 0 條：不該因為權限問題
+  // 懲罰使用者剛完成的動作），但要讓使用者看得出「這筆沒有真的存到雲端」，
+  // 不能讓它看起來跟正常同步過的紀錄一樣。
+  const unsynced = Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
+
+  const parts = itemPlanParts(item);
+
+  const clickAttr = isExpired ? '' :
+    (isSelectOne
+      ? `onclick="A.selectChoice(${weekNumber},${dayIndex},'${jsq(item.id)}')"`
+      : `onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')"`);
 
   const coachToolbar = coach ? `
     <div class="coach-toolbar" onclick="event.stopPropagation()">
@@ -344,10 +506,7 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
         <div class="item-check">${ICON.check}</div>
         <div class="item-body">
           <div class="item-title">${h(item.title)}${item.type === 'race' ? ' 🏁' : ''}${unsynced ? ' <span style="font-size:10px;font-weight:600;color:var(--warn);background:var(--warnBg);border-radius:5px;padding:1px 5px;vertical-align:2px">尚未同步</span>' : ''}</div>
-          ${meta.length ? `<div class="item-meta">${meta.join('')}</div>` : ''}
-          ${item.notes ? `<div class="item-notes">${h(item.notes)}</div>` : ''}
-          ${links.length ? `<div class="item-links">${links.join('')}</div>` : ''}
-          ${workoutBlock}
+          ${parts.body}
           ${isSelectOne && chosen ? `<div class="choice-note">✓ 這次選了這個</div>` : ''}
           ${coachToolbar}
         </div>
@@ -427,66 +586,10 @@ function renderItemEditForm(weekNumber, dayIndex, item) {
   `;
 }
 
-// 當天的「實際操作」方塊——Notion 舊課表那欄「實際操作（完成度）」的對應物。
-// 一天一個（不是一項目一個）：entries 的 actualDurationMinutes / actualDistanceKm 本來就是
-// 一天一筆，之前畫在每張項目卡片上，一天有兩個有時長的項目時，兩個輸入框綁的是同一個值。
-// 狀態四顆 chip：照表（status=null，由打勾推導）／改做／錯過／主動休息。
-// 實際公里只在當天有跑步類項目時出現（Phase 1 全部以時間計，但實際跑了幾公里還是要記——
-// 週跑量的「實際」就是從這裡加總的）。
-// 「誰看得到」做進標題，不只放在 placeholder：這欄跟下面的私密欄長得很像，
-// 她以前在 Notion 是一格混寫身體感受的，寫錯框 Security Rules 擋不了。
+// 附註欄標題旁的「誰看得到」（決策紀錄第 13a 條：分流靠標題，不靠 placeholder）。
 function othersLabel() {
   const others = PlanData.users.filter((u) => u.userId !== Store.activeUserId).map((u) => u.displayName);
   return others.length ? `${others.join('、')} 看得到` : '只有你';
-}
-
-function renderActualBox(weekNumber, dayIndex, d, entry) {
-  const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
-  const st = entry && DAY_STATUS_OVERRIDES.includes(entry.status) ? entry.status : null;
-  const subType = entry && SUBSTITUTE_LABELS[entry.substituteType] ? entry.substituteType : null;
-  const derived = Store.dayStatus(weekNumber, dayIndex);
-  const isAllRest = d.items.every((it) => it.type === 'rest');
-  const chosenIsRest = d.selectOne && entry && entry.selectedItemId &&
-    d.items.some((it) => it.id === entry.selectedItemId && it.type === 'rest');
-  const isFuture = dateKey > PlanData.dayKey(PlanData.today());
-  const hasRun = d.items.some((it) => isRunType(it.type) || it.type === 'race');
-  const hasDuration = d.items.some((it) => it.duration);
-  const showMinutes = st === 'substituted' || (!st && hasDuration);
-  // 改做的公里只在「改做的是跑步」（或還沒選類型的舊紀錄）才有意義——改騎車填公里不算跑量
-  const showKm = (st === 'substituted' && (!subType || subType === 'run')) || (!st && hasRun);
-  const showEffort = !isAllRest && !chosenIsRest && (st === null || st === 'substituted');
-  const durVal = entry && entry.actualDurationMinutes != null ? entry.actualDurationMinutes : '';
-  const kmVal = entry && entry.actualDistanceKm != null ? entry.actualDistanceKm : '';
-  // 純休息日不放狀態 chip——在休息日提供「改做」等於 App 主動遞出「用訓練取代休息」的按鈕。
-  // 二擇一已選「完全休息」的日子不放「主動休息」——兩種休息只留一條路。
-  const chips = isAllRest ? [] : DAY_STATUS_CHIPS.filter(([k]) => !(k === 'rested' && chosenIsRest));
-  const hint = st === 'substituted' && !subType ? '改做了哪一類？點一個。'
-    : st ? DAY_STATUS_HINTS[st]
-    : (isAllRest ? '休息日。有做針灸、伸展之類的可以記在下面。'
-      : '完成用上面的打勾記錄；改做／錯過／主動休息才點下面的狀態。');
-  return `
-    <div class="card actual-box">
-      <div class="actual-box-head">
-        <span class="actual-box-title">實際操作 <span class="vis-tag">${h(othersLabel())}</span></span>
-        ${!isAllRest ? `<span class="derived-status ${derived}">${st ? '' : '照表 · '}${h(DAY_STATUS_LABELS[derived] || '')}${st === 'substituted' && subType ? '·' + SUBSTITUTE_LABELS[subType] : ''}</span>` : ''}
-      </div>
-      ${chips.length ? `<div class="status-row">
-        ${chips.map(([k, label]) => {
-          const disabled = isFuture && k !== 'rested';
-          return `<button class="status-chip ${k} ${st === k ? 'active' : ''}" ${disabled ? 'disabled title="未來的日子只能預先排休息"' : ''} onclick="A.setDayStatus(${weekNumber},${dayIndex},'${k}')">${label}</button>`;
-        }).join('')}
-      </div>` : ''}
-      ${st === 'substituted' ? `<div class="status-row sub-row">
-        ${SUBSTITUTE_TYPES.map((k) => `<button class="status-chip sub ${subType === k ? 'active' : ''}" onclick="A.setSubstituteType(${weekNumber},${dayIndex},'${k}')">${SUBSTITUTE_LABELS[k]}</button>`).join('')}
-      </div>` : ''}
-      <div class="status-hint">${h(hint)}</div>
-      ${showEffort ? renderEffortControl(weekNumber, dayIndex, d, entry) : ''}
-      ${(showMinutes || showKm) ? `<div class="actual-row">
-        ${showMinutes ? `<label class="actual-field">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
-        ${showKm ? `<label class="actual-field">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>` : ''}
-      </div>` : ''}
-      <textarea class="note-input" placeholder="例如：照表完成／改成快走 25 分／改騎飛輪 40 分" onchange="A.setActualNote('${dateKey}', this.value)">${h(entry && entry.actualNote || '')}</textarea>
-    </div>`;
 }
 
 // 體感強度（決策紀錄第 17 條）：Apple Fitness「Rate Your Effort」的四階梯，十個點，
@@ -514,7 +617,7 @@ function renderEffortControl(weekNumber, dayIndex, d, entry) {
   return `
     <div class="effort">
       <div class="effort-head">
-        <span class="actual-box-title" style="margin:0">體感強度</span>
+        <span class="rec-lbl" style="margin:0">體感強度</span>
         <span class="effort-val">${val != null ? `<b>${val}</b> · ${effortLabel(val)}` : '<span class="muted">練完點一下</span>'}</span>
         <button class="help-btn ${helpOpen ? 'on' : ''}" onclick="A.toggleHelp('effort')" aria-label="說明">${ICON.help}</button>
       </div>
@@ -525,9 +628,10 @@ function renderEffortControl(weekNumber, dayIndex, d, entry) {
     </div>`;
 }
 
-// 週日的回顧：異常旗標天數、體感比課表吃力的天數（第 17 條的 effort vs 項目 rpe，
+// 本週回顧：異常旗標天數、體感比課表吃力的天數（第 17 條的 effort vs 項目 rpe，
 // 二擇一取選中的那個）、本週已降量的標記。吃力天數只是提醒「下週不要加」，
-// 不是叫她補——第 0 條。
+// 不是叫她補——第 0 條。決策紀錄第 23 條：從週日那一列搬到頂端「本週訓練目標」卡，
+// 每天都看得到；沒有異常、沒有吃力、沒有標記降量時整段不顯示。
 function renderWeeklyReviewCard(weekNumber) {
   let flaggedDays = 0, overDays = 0;
   const w = Store.effectiveWeek(weekNumber);
@@ -545,7 +649,10 @@ function renderWeeklyReviewCard(weekNumber) {
     }
   }
   const adj = Store.weekAdjustmentFor(weekNumber);
-  if (flaggedDays === 0 && overDays === 0 && !adj) return '';
+  // 看 reduced 不看 adj 存不存在：拖曳換過順序（第 18 條）也會產生 weekAdjustments 文件，
+  // 那不代表這週有事要回顧——搬到頂端之後，這個判斷錯了會每天掛一句「這週狀況正常」。
+  const reduced = !!(adj && adj.reduced);
+  if (flaggedDays === 0 && overDays === 0 && !reduced) return '';
   const summary = flaggedDays > 0
     ? `這週有 ${flaggedDays} 天記錄異常。${h(PlanData.plan.safety.weeklySelfCheck)}`
     : (overDays > 0 ? '' : '這週狀況正常。');
@@ -556,33 +663,10 @@ function renderWeeklyReviewCard(weekNumber) {
       <div>
         <b>本週回顧</b>
         ${summary}${overLine}
-        ${adj && adj.reduced
+        ${reduced
           ? `<div style="margin-top:6px;font-weight:600">✓ 已標記本週降量${adj.note ? '：' + h(adj.note) : ''}</div>`
           : `<button class="btn secondary" style="margin-top:8px;width:auto;padding:7px 12px;font-size:12.5px" onclick="A.markWeekReduced(${weekNumber})">標記本週已降量</button>`}
       </div>
-    </div>
-  `;
-}
-
-// 三顆旗標常駐一排（一點就記）；私密備註的文字框預設收起，有旗標、有內容、或點了「＋備註」
-// 才展開——省手風琴的高度，但「只有你看得到」的標籤跟上面共用欄的「誰看得到」一樣常駐，
-// 分流靠標題，不靠 placeholder。
-function renderFlagsBox(dateKey) {
-  const priv = Store.privateFor(dateKey) || { flags: {}, note: '' };
-  const hasFlag = !!(priv.flags && Object.keys(priv.flags).some((k) => priv.flags[k]));
-  const open = hasFlag || !!(priv.note && String(priv.note).trim()) || App.state.privateNoteOpen === dateKey;
-  return `
-    <div class="card flagsbox private-box">
-      <div class="actual-box-head">
-        <span class="actual-box-title" style="margin:0">🔒 身體狀況 <span class="vis-tag private">只有你看得到</span></span>
-        ${open ? '' : `<button class="link-btn" onclick="A.openPrivateNote('${dateKey}')">＋備註</button>`}
-      </div>
-      <div class="flag-row">
-        ${Object.keys(FLAG_LABELS).map((k) => `
-          <button class="flag-chip ${priv.flags && priv.flags[k] ? 'active' : ''}" onclick="A.toggleFlag('${dateKey}','${k}')">${FLAG_LABELS[k]}</button>
-        `).join('')}
-      </div>
-      ${open ? `<textarea class="note-input" placeholder="例如：小腿有點緊、下墜感（選填）" onchange="A.setNote('${dateKey}', this.value)">${h(priv.note)}</textarea>` : ''}
     </div>
   `;
 }
@@ -596,6 +680,8 @@ function renderWeekPage(state) {
   const hasOverride = !!Store.planOverrides[wn];
   const loc = PlanData.locateToday();
   const todayKey = loc.status === 'in-plan' ? loc.key : null;
+  // 計畫開始前／結束後 todayKey 是 null，但「過去的日子寫未完成」要用真的今天比
+  const todayKeyNow = PlanData.dayKey(PlanData.today());
 
   const table = Store.weekViewMode === 'table';
   const vol = Store.weekVolume(wn, Store.activeUserId);
@@ -621,10 +707,10 @@ function renderWeekPage(state) {
       <div class="weekday-acc ${isOpen ? 'open' : ''}" id="day-${wn}-${i}">
         <div class="weekday-row" onclick="A.openDay(${wn},${i})" style="cursor:pointer">
           <div class="weekday-badge ${isToday ? 'today' : ''}">${PlanData.weekdayLabel(i)}<span class="num">${dateLabel.getDate()}</span></div>
-          <div class="weekday-status ${status}">${statusIcon}</div>
+          <div class="weekday-status ${status} ${status === 'pending' && dateKey < todayKeyNow ? 'unfinished' : ''}">${statusIcon}</div>
           <div class="weekday-summary">
             <div class="t">${h(titles)}${contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : ''}</div>
-            <div class="sub">${h(dayStatusText(status, entry))}${isToday ? ' · 今天' : ''}</div>
+            <div class="sub">${h(dayStatusText(status, entry, dateKey))}${isToday ? ' · 今天' : ''}</div>
           </div>
           <span class="weekday-chevron">${ICON.chevron}</span>
           ${canDrag ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="按住拖曳換順序" title="按住拖曳換順序">${ICON.grip}</span>` : ''}
@@ -651,7 +737,7 @@ function renderWeekPage(state) {
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
       ${planBanner}
-      ${renderWeekVolumeCard(vol)}
+      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', title: '跑量', footer: renderWeeklyReviewCard(wn) })}
       <div class="view-toggle">
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
@@ -681,11 +767,12 @@ function renderDayOrderHint(wn, order, canDrag) {
 
 function fmtKmRange(t) { return t.min === t.max ? `${t.min}` : `${t.min}–${t.max}`; }
 
-// 週視圖列的第二行文字：狀態，改做時帶類型（「改做·重訓」），有體感就帶上。
-function dayStatusText(status, entry) {
-  let s = DAY_STATUS_LABELS[status] || '待完成';
+// 週視圖列的第二行文字：狀態，更換項目時帶類型（「更換項目·重訓」），有體感就帶上。
+// 過去的日子沒記錄寫「未完成」，今天和未來寫「待完成」（dayStatusLabel）。
+function dayStatusText(status, entry, dateKey) {
+  let s = dayStatusLabel(status, dateKey);
   if (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType]) s += '·' + SUBSTITUTE_LABELS[entry.substituteType];
-  if (entry && Number.isInteger(entry.effort) && status !== 'missed' && status !== 'rested' && status !== 'expired') s += ` · 體感 ${entry.effort}`;
+  if (entry && Number.isInteger(entry.effort) && status !== 'rested' && status !== 'expired') s += ` · 體感 ${entry.effort}`;
   return s;
 }
 
@@ -695,6 +782,10 @@ function dayStatusText(status, entry) {
 // 已標記降量的週不畫條、不比對，只顯示實際（第 0 條：降量週縮小分母）。
 function renderWeekVolumeCard(vol, opts) {
   opts = opts || {};
+  // 本週頁頂端是「本週訓練目標」（決策紀錄第 23 條）：跑量變成其中一項，底下接本週回顧。
+  // 總覽頁用同一張卡但不帶 heading／footer。
+  const heading = opts.heading ? `<div class="vol-heading">${h(opts.heading)}</div>` : '';
+  const footer = opts.footer || '';
   const t = vol.target, actual = vol.actual;
   const anchor = t.min > 0 ? t.min : t.max;
   const reached = actual != null && anchor > 0 && actual >= anchor;
@@ -717,6 +808,7 @@ function renderWeekVolumeCard(vol, opts) {
   if (vol.reduced) {
     return `
       <div class="card vol-card">
+        ${heading}
         <div class="vol-head">
           <span class="vol-title">${h(opts.title || '本週跑量')}</span>
           <span class="vol-nums"><b>${actualStr}</b> km</span>
@@ -725,10 +817,12 @@ function renderWeekVolumeCard(vol, opts) {
         <div class="vol-sub">本週已標記降量——只記錄實際，不比對目標（原定 ${fmtKmRange(t)} km）。</div>
         ${helpText}
         ${raceLine}
+        ${footer}
       </div>`;
   }
   return `
     <div class="card vol-card">
+      ${heading}
       <div class="vol-head">
         <span class="vol-title">${h(opts.title || '本週跑量')}</span>
         <span class="vol-nums"><b>${actualStr}</b> / ${fmtKmRange(t)} km${reached && !over ? ' ✓' : ''}</span>
@@ -738,6 +832,7 @@ function renderWeekVolumeCard(vol, opts) {
       ${over ? `<div class="vol-sub over">已超過本週課表上限（${t.max} km）——下週不要再加。</div>` : ''}
       ${helpText}
       ${raceLine}
+      ${footer}
     </div>
   `;
 }
@@ -756,11 +851,12 @@ function renderWeekTable(wn, w, order, todayKey) {
         return `<div class="wt-item"><span class="wt-title">${h(it.title)}</span>${meta ? `<span class="wt-meta">${h(meta)}</span>` : ''}</div>`;
       }).join(d.selectOne ? '<div class="wt-or">或</div>' : '');
     const bits = [];
-    if (status !== 'pending') bits.push(`<span class="wt-status ${status}">${h(DAY_STATUS_LABELS[status] + (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType] ? '·' + SUBSTITUTE_LABELS[entry.substituteType] : ''))}</span>`);
+    const label = dayStatusLabel(status, dateKey);
+    if (status !== 'pending' || label === DAY_STATUS_LABELS.unfinished) bits.push(`<span class="wt-status ${status === 'pending' ? 'unfinished' : status}">${h(label + (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType] ? '·' + SUBSTITUTE_LABELS[entry.substituteType] : ''))}</span>`);
     const nums = [];
     if (entry && entry.actualDurationMinutes != null) nums.push(`${entry.actualDurationMinutes} 分`);
     if (entry && entry.actualDistanceKm != null) nums.push(`${entry.actualDistanceKm} km`);
-    if (entry && Number.isInteger(entry.effort) && status !== 'missed' && status !== 'rested') nums.push(`體感 ${entry.effort} ${effortLabel(entry.effort)}`);
+    if (entry && Number.isInteger(entry.effort) && status !== 'rested') nums.push(`體感 ${entry.effort} ${effortLabel(entry.effort)}`);
     if (nums.length) bits.push(`<span class="wt-nums">${h(nums.join(' · '))}</span>`);
     if (entry && entry.actualNote) bits.push(`<div class="wt-note">${h(entry.actualNote)}</div>`);
     return `
@@ -783,7 +879,7 @@ function renderWeekCoachPanel(wn, w, hasOverride, vol) {
   const coachSet = vol.target.source === 'coach';
   // planOnly：純課表加總，不看任何人的 entries。planOverrides 是三人共用的一份文件，
   // 「課表加總」這個字眼講的是課表本身，不能取決於「誰的手機正在看這頁」——如果用
-  // Store.activeUserId 的個人紀錄過濾（例如教練自己那天標了主動休息），上限跟著縮小，
+  // Store.activeUserId 的個人紀錄過濾（例如教練自己那天標了自主休息），上限跟著縮小，
   // 同樣的目標對別人來說卻是合法的，而且面板文字會講出一個不是課表真實加總的數字。
   const auto = Store.weekTargetAuto(wn, Store.activeUserId, { planOnly: true });
   const stale = hasOverride && (w.basePlanVersion || 3) < PlanData.plan.planVersion;

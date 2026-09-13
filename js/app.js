@@ -119,12 +119,16 @@ const App = {
     render();
   },
 
+  // 數字框是當天紀錄卡最上面、最常被填的欄位（決策紀錄第 23 條），填完緊接著就會點
+  // 「完成」或體感強度——onchange 當下整頁重繪會把那一下點擊吞掉（blur → change → 重繪 →
+  // click 落空）。所以先安靜存檔、稍後再重繪：點擊本身會觸發重繪，這個延遲只負責「沒有
+  // 接著點任何東西」時把自動亮起的「完成」畫出來。
   setActualStats(weekNumber, dayIndex, field, value) {
     const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
     const num = value === '' ? null : Number(value);
     if (num != null && (!Number.isFinite(num) || num < 0)) return;
-    Store.setActualStats(dateKey, field === 'duration' ? { durationMinutes: num } : { distanceKm: num });
-    render();
+    Store.setActualStats(dateKey, field === 'duration' ? { durationMinutes: num } : { distanceKm: num }, true);
+    setTimeout(render, 350);
   },
 
   setDayStatus(weekNumber, dayIndex, status) {
@@ -433,8 +437,8 @@ const App = {
     if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b > 100) { alert('週跑量要在 0-100 公里之間'); return; }
     // 決策紀錄第 0 條：手動目標只能把數字往下調。比課表加總高的目標＝用一個數字催人
     // 多跑，卻沒有任何一天的課表項目支撐它——要加量請改項目，那才看得見、也才會被審。
-    // planOnly=true：純課表加總，不看操作者自己的 entries——否則教練當週若標了主動休息
-    // 或改做，這條擋線會用「他自己剩下要跑的量」當上限，同樣的目標在別人的裝置上卻合法，
+    // planOnly=true：純課表加總，不看操作者自己的 entries——否則教練當週若標了自主休息
+    // 或更換項目，這條擋線會用「他自己剩下要跑的量」當上限，同樣的目標在別人的裝置上卻合法，
     // 而且錯誤訊息會講出一個不是課表真實加總的數字（審查抓到：W3 標休息後上限從 9.4 縮到
     // 6.7，換成沒有紀錄的 Annlin 身分同一個數字卻直接放行）。
     const auto = Store.weekTargetAuto(weekNumber, Store.activeUserId, { planOnly: true });
