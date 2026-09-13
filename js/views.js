@@ -37,6 +37,38 @@ function effortLabel(n) { const b = EFFORT_BANDS.find(([a, z]) => n >= a && n <=
 
 const FLAG_LABELS = { leakage: '漏尿', pain: '疼痛', overTired: '過度疲勞' };
 
+// 階段性目標（決策紀錄第 22 條）六個欄位的顯示設定——跟 store.js 的 PHASE_TARGET_FIELDS
+// 是同一份清單，這裡管單位／輸入格式／小數位數。kind:'pace' 用 mm:ss 輸入＋顯示；
+// 'km' 沿用跑量既有的 fmtKmRange；'num' 是純數字，step 決定輸入框的精度。
+const PHASE_TARGET_META = [
+  { key: 'zone2Pace', label: 'Zone 2 配速目標', unit: '/km', kind: 'pace' },
+  { key: 'volumeKm', label: '跑量目標', unit: 'km', kind: 'km', step: 0.5 },
+  { key: 'cadence', label: 'Cadence 步頻', unit: 'spm', kind: 'num', step: 1 },
+  { key: 'verticalOscillation', label: 'Vertical Oscillation 垂直振幅', unit: 'cm', kind: 'num', step: 0.1 },
+  { key: 'groundContactTime', label: 'Ground Contact Time 觸地時間', unit: 'ms', kind: 'num', step: 1 },
+  { key: 'strideLength', label: 'Stride Length 步幅', unit: 'm', kind: 'num', step: 0.01 },
+];
+// "6:30" -> 6.5（分鐘小數，跟課表估算配速 timeBasedRunPaceMinPerKm 同一種單位）；
+// 也接受純數字（使用者直接打小數）。不合法（空字串、打錯格式）回傳 null。
+function parsePaceStr(str) {
+  const s = String(str == null ? '' : str).trim();
+  if (!s) return null;
+  const m = s.match(/^(\d+):([0-5]?\d)$/);
+  if (m) return Number(m[1]) + Number(m[2]) / 60;
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+function fmtPace(decimalMin) {
+  if (!Number.isFinite(decimalMin)) return '';
+  const total = Math.round(decimalMin * 60);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+function fmtTargetRange(r, meta) {
+  if (!r) return '';
+  if (meta.kind === 'pace') return r.min === r.max ? fmtPace(r.min) : `${fmtPace(r.min)}–${fmtPace(r.max)}`;
+  return r.min === r.max ? `${r.min}` : `${r.min}–${r.max}`;
+}
+
 // 教練模式編輯表單的 type 下拉選單。⚠️ 跟 tools/verify_plan.py 的 VALID_TYPES 必須
 // 保持一致——那支腳本管出廠課表，這裡管教練模式的即時編輯，是兩個不同的執行環境
 // （Python / 瀏覽器 JS），沒辦法共用同一份常數，只能靠這條註解互相提醒同步改。
@@ -824,6 +856,7 @@ function renderOverviewPage(state) {
   `;
 
   const trend = renderLongRunTrend(viewingUserId);
+  const phaseTargetsBlock = renderPhaseTargetsCard(phase, viewingUserId, isSelf, viewingUser, state);
   const goalsBlock = renderGoalsCard(viewingUserId, isSelf, viewingUser);
   const volumeBlock = renderVolumeOverview(wn, viewingUserId);
 
@@ -861,6 +894,7 @@ function renderOverviewPage(state) {
           ${stats}
           ${phaseStrip}
         </div>
+        ${phaseTargetsBlock}
         ${goalsBlock}
         ${volumeBlock}
       </div>
@@ -917,6 +951,119 @@ function renderGoalsCard(userId, isSelf, user) {
         <div style="font-size:11.5px;color:var(--text3);margin-top:10px;line-height:1.5">${isSelf ? '寫給自己（跟一起練的人）看的。' : `以教練模式編輯，${h(user ? user.displayName : userId)} 看得到。`}目標不會改變任何一天的課表內容。</div>
       </div>
     </div>`;
+}
+
+// 這個階段第一個「Zone 2 跑」項目的心率／RPE——findZone2Reference 只找 type==='run'
+// 且標題含「Zone 2」的項目（跟 long-run/tempo 的心率區間不一樣，不能混用），找到就停，
+// 純粹當背景參考文字，不是計算依據。用 Store.effectiveWeek 而不是出廠 plan.json，
+// 教練若把這階段的 Zone 2 項目改過（例如改了心率區間），這裡要跟著變。
+function findZone2Reference(phase) {
+  for (let wn = phase.weekRange[0]; wn <= phase.weekRange[1]; wn++) {
+    const w = Store.effectiveWeek(wn);
+    for (const d of w.days) {
+      for (const it of d.items) {
+        if (it.type === 'run' && /Zone\s*2/i.test(it.title || '') && it.heartRateZone) return it;
+      }
+    }
+  }
+  return null;
+}
+
+// 階段性目標（決策紀錄第 22 條）：Zone 2 配速、跑量、5K 技術指標（Cadence/VO/GCT/步幅）
+// 依訓練階段各自設定。跟訓練目標卡同一套編輯權限（isSelf || 教練模式）。只有跑量目標
+// 有「累積實際 vs 目標」的比對（沿用 weekVolume 的算法加總），其餘五項純參考不追蹤實際——
+// 這是這一版刻意的範圍（配速／技術指標要不要比對實際留到之後再討論）。
+// 六個欄位一次存（一顆按鈕，讀整份表單），不是六次個別寫入——跟教練模式的項目編輯表單
+// 同一種「整份讀、整份存」模式。
+function renderPhaseTargetsCard(currentPhase, viewingUserId, isSelf, viewingUser, state) {
+  const phases = PlanData.plan.phases;
+  const shownPhaseId = (state.overviewPhaseId && phases.some((p) => p.phaseId === state.overviewPhaseId))
+    ? state.overviewPhaseId : currentPhase.phaseId;
+  const phase = phases.find((p) => p.phaseId === shownPhaseId) || currentPhase;
+  const editable = isSelf || Store.coachMode;
+  const targets = Store.phaseTargetsFor(viewingUserId)[phase.phaseId] || {};
+
+  const phaseSelect = `
+    <select onchange="A.setOverviewPhase(this.value)">
+      ${phases.map((p) => `<option value="${p.phaseId}" ${p.phaseId === shownPhaseId ? 'selected' : ''}>${h(p.name)}${p.phaseId === currentPhase.phaseId ? '（目前）' : ''}</option>`).join('')}
+    </select>`;
+
+  // 跑量目標：唯一有「累積實際 vs 目標」的一項，額外算課表這階段的自動參考量（純提示）。
+  const volMeta = PHASE_TARGET_META[1]; // volumeKm
+  const volTarget = targets.volumeKm;
+  const volAuto = Store.phaseVolumeAutoRange(phase.phaseId, viewingUserId);
+  const volActual = Store.phaseVolumeActual(phase.phaseId, viewingUserId);
+  const volAnchor = volTarget ? (volTarget.min > 0 ? volTarget.min : volTarget.max) : 0;
+  const volPct = volTarget && volAnchor > 0 && volActual != null ? Math.min(100, Math.round((volActual / volAnchor) * 100)) : 0;
+  const volOverAuto = !!(volTarget && volAuto && volTarget.max > volAuto.max);
+
+  const volRow = editable ? `
+    <div class="ptgt-row">
+      <span class="ptgt-label">${h(volMeta.label)}<span class="muted"> ${h(volMeta.unit)}</span></span>
+      <div class="ptgt-inputs">
+        <input name="volumeKm_min" type="number" step="${volMeta.step}" min="0" value="${volTarget ? volTarget.min : ''}" placeholder="${volAuto ? volAuto.min : ''}">
+        <span class="muted">–</span>
+        <input name="volumeKm_max" type="number" step="${volMeta.step}" min="0" value="${volTarget ? volTarget.max : ''}" placeholder="${volAuto ? volAuto.max : ''}">
+      </div>
+    </div>
+    ${volAuto ? `<div class="ptgt-hint${volOverAuto ? ' warn' : ''}">課表這階段大約 ${fmtKmRange(volAuto)} km${volOverAuto ? '——你的目標比這高' : ''}。</div>` : ''}
+  ` : (volTarget ? `<div class="ptgt-row"><span class="ptgt-label">${h(volMeta.label)}</span><span class="ptgt-val">${fmtKmRange(volTarget)} ${h(volMeta.unit)}</span></div>` : '');
+
+  const volProgress = volTarget ? `
+    <div class="ptgt-progress">
+      <span class="ptgt-progress-nums">本階段累積 <b>${volActual == null ? '—' : volActual}</b> / ${fmtKmRange(volTarget)} km</span>
+      <div class="progress-track"><div class="progress-fill ${volPct >= 100 ? 'reached' : ''}" style="width:${volPct}%"></div></div>
+    </div>` : '';
+
+  // 這階段的 Zone 2 心率／RPE 區間：配速目標旁邊的背景參考（決策紀錄第 22 條——配速
+  // 沒有像跑量那樣的自動天花板可以卡，只能提供這個當安全邊界的提醒，不擋存檔）。
+  const zone2Ref = findZone2Reference(phase);
+  const zone2Hint = zone2Ref
+    ? `這階段 Zone 2 對應心率 ${h(zone2Ref.heartRateZone)}${zone2Ref.rpe ? `、RPE ${zone2Ref.rpe.min}-${zone2Ref.rpe.max}` : ''}。`
+    : '';
+
+  // 其餘五項：Zone 2 配速＋四個 5K 技術指標，純參考／純目標，不比對實際。
+  const otherRows = PHASE_TARGET_META.filter((m) => m.key !== 'volumeKm').map((m) => {
+    const r = targets[m.key];
+    const hint = m.key === 'zone2Pace' && zone2Hint ? `<div class="ptgt-hint">${zone2Hint}</div>` : '';
+    if (!editable) {
+      return r ? `<div class="ptgt-row"><span class="ptgt-label">${h(m.label)}</span><span class="ptgt-val">${fmtTargetRange(r, m)} ${h(m.unit)}</span></div>${hint}` : '';
+    }
+    const minVal = m.kind === 'pace' ? (r ? fmtPace(r.min) : '') : (r ? r.min : '');
+    const maxVal = m.kind === 'pace' ? (r ? fmtPace(r.max) : '') : (r ? r.max : '');
+    const inputAttrs = m.kind === 'pace' ? `type="text" placeholder="6:30"` : `type="number" step="${m.step}" min="0"`;
+    return `
+      <div class="ptgt-row">
+        <span class="ptgt-label">${h(m.label)}<span class="muted"> ${h(m.unit)}</span></span>
+        <div class="ptgt-inputs">
+          <input name="${m.key}_min" ${inputAttrs} value="${h(minVal)}">
+          <span class="muted">–</span>
+          <input name="${m.key}_max" ${inputAttrs} value="${h(maxVal)}">
+        </div>
+      </div>${hint}`;
+  }).join('');
+
+  const editHint = editable ? `<div class="ptgt-note">教練依訓練階段自己判斷，這幾項數字不會被自動限制或比對（跑量的累積比對除外）。</div>` : '';
+  const saveBtn = editable ? `<div class="actions" style="margin-top:10px"><button class="btn secondary" style="width:auto;padding:7px 14px;font-size:13px" onclick="A.savePhaseTargets('${jsq(phase.phaseId)}','${jsq(viewingUserId)}')">儲存本階段目標</button></div>` : '';
+  const empty = !editable && !volTarget && PHASE_TARGET_META.every((m) => m.key === 'volumeKm' || !targets[m.key]);
+
+  return `
+    <div class="section">
+      <div class="section-title">階段目標${!isSelf ? `（${h(viewingUser ? viewingUser.displayName : viewingUserId)}）` : ''}</div>
+      <div class="card ptgt-card">
+        <div class="ptgt-head">${phaseSelect}</div>
+        ${empty ? `<div class="muted" style="font-size:13px">還沒設定目標</div>` : `
+          <form id="ptgt-form" onsubmit="return false">
+            ${volRow}
+            ${volProgress}
+            ${otherRows}
+          </form>
+          ${editHint}
+        `}
+        ${saveBtn}
+      </div>
+    </div>
+  `;
 }
 
 // 週跑量總覽：本週的數字 + 26 週的「目標區間 vs 實際」圖。

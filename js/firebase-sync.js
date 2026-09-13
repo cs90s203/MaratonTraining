@@ -211,14 +211,15 @@ const Sync = {
         this._notify();
       }, (err) => this._handleSnapErr(err, 'weekAdjustments'));
 
-    // profile 集合目前只有一份文件 goals（訓練目標）；用 collection 訂閱而不是單一 doc，
-    // 跟其他三個一致，之後 profile 多一份文件也不用改這裡。
+    // profile 集合用 collection 訂閱而不是單一 doc，跟其他三個一致——目前有兩份文件
+    // （goals 訓練目標、phaseTargets 階段性目標，決策紀錄第 22 條），docChanges 裡逐一分派。
     unsubProfile = fbDb.collection(`users/${userId}/profile`)
       .onSnapshot({ includeMetadataChanges: true }, (snap) => {
         this.pendingByCollection.profile = snap.metadata.hasPendingWrites;
         snap.docChanges().forEach((c) => {
-          if (c.type === 'removed' || c.doc.id !== 'goals') return;
-          Store.mergeRemoteGoals(userId, c.doc.data());
+          if (c.type === 'removed') return;
+          if (c.doc.id === 'goals') Store.mergeRemoteGoals(userId, c.doc.data());
+          else if (c.doc.id === 'phaseTargets') Store.mergeRemotePhaseTargets(userId, c.doc.data());
         });
         this._notify();
       }, (err) => this._handleSnapErr(err, 'profile'));
@@ -301,16 +302,17 @@ const Sync = {
       }, () => {}); // 讀不到（不在白名單）就悄悄放棄，總覽頁顯示「尚無資料」
   },
 
-  // 別人的訓練目標（總覽頁「查看別人的進度」唯讀用，教練模式下也用這份資料編輯），
-  // 跟上面同一套管理方式。
+  // 別人的訓練目標／階段性目標（總覽頁「查看別人的進度」唯讀用，教練模式下也用這份
+  // 資料編輯），跟上面同一套管理方式、同一個 docChanges 分派邏輯。
   subscribeOtherProfile(otherUserId, onData) {
     if (!this.isSignedIn() || !fbDb) return;
     if (unsubOtherProfile[otherUserId]) return;
     unsubOtherProfile[otherUserId] = fbDb.collection(`users/${otherUserId}/profile`)
       .onSnapshot((snap) => {
         snap.docChanges().forEach((c) => {
-          if (c.type === 'removed' || c.doc.id !== 'goals') return;
-          Store.mergeRemoteGoals(otherUserId, c.doc.data());
+          if (c.type === 'removed') return;
+          if (c.doc.id === 'goals') Store.mergeRemoteGoals(otherUserId, c.doc.data());
+          else if (c.doc.id === 'phaseTargets') Store.mergeRemotePhaseTargets(otherUserId, c.doc.data());
         });
         onData && onData();
       }, () => {});
@@ -429,7 +431,10 @@ const Sync = {
     if (userId === Store.activeUserId) {
       await this._backfillCollection(userId, 'private', Store.privateData);
       await this._backfillCollection(userId, 'weekAdjustments', Store.weekAdjustments[userId] || {});
-      if (Store.goals[userId]) await this._backfillCollection(userId, 'profile', { goals: Store.goals[userId] });
+      const profileDocs = {};
+      if (Store.goals[userId]) profileDocs.goals = Store.goals[userId];
+      if (Store.phaseTargets[userId]) profileDocs.phaseTargets = Store.phaseTargets[userId];
+      if (Object.keys(profileDocs).length) await this._backfillCollection(userId, 'profile', profileDocs);
     }
   },
 

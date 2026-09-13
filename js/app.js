@@ -6,6 +6,7 @@ const App = {
     page: 'week',          // 決策紀錄第 17 條：沒有「今日」頁，本週頁預設展開今天那一列
     weekViewNumber: 1,
     viewingUserId: null,   // null = 預設看自己；總覽頁「查看別人」用，跟 Store.activeUserId（寫入身分）分開
+    overviewPhaseId: null, // 決策紀錄第 22 條：總覽頁「階段目標」卡目前選看哪個階段；null = 目前所在階段
     expandedDay: null,     // {weekNumber,dayIndex}：本週頁手風琴目前展開的那一列；null = 全收
     editingItem: null,     // 教練模式：{weekNumber,dayIndex,itemId}，itemId==='new' 表示正在新增項目
     helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
@@ -71,6 +72,35 @@ const App = {
 
   viewProgress(userId) {
     this.state.viewingUserId = userId;
+    this.state.overviewPhaseId = null; // 換人看，階段選擇跟著退回「目前所在階段」
+    render();
+  },
+
+  // ── 階段性目標（總覽頁；決策紀錄第 22 條）──────────────────────────────────
+  setOverviewPhase(phaseId) {
+    this.state.overviewPhaseId = phaseId;
+    render();
+  },
+
+  // 六個欄位一次讀整份表單、一次存——跟教練模式的項目編輯表單同一種「整份讀、整份存」
+  // 模式（見 _readItemForm 的註解）。配速用 parsePaceStr 接受 "6:30" 或純小數；
+  // 其餘用純數字，min/max 打反了自動排正。空字串（兩邊都空）＝清掉這一項。
+  savePhaseTargets(phaseId, targetUserId) {
+    const root = document.getElementById('ptgt-form');
+    if (!root) return;
+    const val = (name) => { const el = root.querySelector(`[name="${name}"]`); return el ? el.value.trim() : ''; };
+    const range = (parse, key) => {
+      const a = parse(val(`${key}_min`)), b = parse(val(`${key}_max`));
+      if (a == null && b == null) return null;
+      const lo = a == null ? b : a, hi = b == null ? a : b;
+      return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
+    };
+    const numOrNull = (s) => { const n = Number(s); return s !== '' && Number.isFinite(n) ? n : null; };
+    const fields = {};
+    PHASE_TARGET_META.forEach((m) => {
+      fields[m.key] = range(m.kind === 'pace' ? parsePaceStr : numOrNull, m.key);
+    });
+    Store.setPhaseTargetsForPhase(phaseId, fields, targetUserId);
     render();
   },
 

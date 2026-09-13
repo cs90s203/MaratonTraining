@@ -6,6 +6,9 @@
 //   mt_weekadj::{userId}   -> Firestore users/{userId}/weekAdjustments/{weekNumber}（白名單內可讀，只有本人可寫；跟 entries 同層）
 //   mt_goals::{userId}     -> Firestore users/{userId}/profile/goals（白名單內可讀，只有本人可寫）
 //                             訓練目標：比賽目標一句 + 自訂目標清單。每個人自己的，不是共用課表。
+//   mt_phasetargets::{userId} -> Firestore users/{userId}/profile/phaseTargets（同上，白名單內可讀，
+//                             只有本人可寫）。決策紀錄第 22 條：依訓練階段設定 Zone 2 配速／跑量／
+//                             5K 技術指標目標，教練模式下任何白名單成員都能幫別人設（第 15 條）。
 //   planOverrides          -> Firestore planOverrides/{weekNumber}（白名單內都可讀寫——
 //                             教練模式改的課表內容，跟上面「個人紀錄」是不同的共用資源）
 //   mt_active_user         -> 本機限定，不同步。「我是誰」跟 Google 登入身分是分開的兩件事。
@@ -86,6 +89,11 @@ function isValidDayOrder(order) {
 
 function nowIso() { return new Date().toISOString(); }
 function round1(x) { return Math.round(x * 10) / 10; }
+function round2(x) { return Math.round(x * 100) / 100; }
+
+// 階段性目標（決策紀錄第 22 條）可設定的六個欄位。跟 views.js 的 PHASE_TARGET_META
+// 是同一份清單的兩個切面——這裡只管「合不合法」，那邊管「怎麼顯示、單位、輸入格式」。
+const PHASE_TARGET_FIELDS = ['zone2Pace', 'volumeKm', 'cadence', 'verticalOscillation', 'groundContactTime', 'strideLength'];
 
 // 遠端文件寫回本機快取時的合併規則（見檔頭「跨裝置合併」）：逐欄位比 fieldAt，
 // 沒有 fieldAt 的舊文件退回用整份 updatedAt 當每個欄位的時間。
@@ -139,6 +147,7 @@ const Store = {
   privateData: {},      // { [dateKey]: privateDoc }  — 只有 activeUserId 自己的
   weekAdjustments: {},  // { [userId]: { [weekNumber]: adjDoc } } — 自己的會存 localStorage；別人的（查看進度用）只在記憶體
   goals: {},            // { [userId]: goalsDoc }     — 自己的會存 localStorage；別人的只在記憶體（總覽頁唯讀）
+  phaseTargets: {},     // { [userId]: { [phaseId]: {zone2Pace,volumeKm,cadence,verticalOscillation,groundContactTime,strideLength} } } — 同上
   planOverrides: {},    // { [weekNumber]: weekDoc }  — 白名單共用，教練模式改過的週
   listeners: [],
 
@@ -170,6 +179,8 @@ const Store = {
     this.weekAdjustments[userId] = mergedAdj;
     const g = loadJSON(`mt_goals::${userId}`, null);
     if (g) this.goals[userId] = mergeDocs(g, this.goals[userId]);
+    const pt = loadJSON(`mt_phasetargets::${userId}`, null);
+    if (pt) this.phaseTargets[userId] = mergeDocs(pt, this.phaseTargets[userId]);
   },
 
   onChange(fn) { this.listeners.push(fn); },
@@ -182,6 +193,7 @@ const Store = {
     saveJSON(`mt_private::${this.activeUserId}`, this.privateData);
     saveJSON(`mt_weekadj::${this.activeUserId}`, this.weekAdjustments[this.activeUserId] || {});
     if (this.goals[this.activeUserId]) saveJSON(`mt_goals::${this.activeUserId}`, this.goals[this.activeUserId]);
+    if (this.phaseTargets[this.activeUserId]) saveJSON(`mt_phasetargets::${this.activeUserId}`, this.phaseTargets[this.activeUserId]);
     if (!silent) this._notify();
   },
 
@@ -503,6 +515,91 @@ const Store = {
     this.goals[userId] = mergeDocs(this.goals[userId], doc);
     if (userId === this.activeUserId) saveJSON(`mt_goals::${userId}`, this.goals[userId]);
     this._notify();
+  },
+
+  // ── 階段性目標（users/{userId}/profile/phaseTargets）───────────────────────
+  // 決策紀錄第 22 條：教練依訓練階段（恢復奠基期／基礎期／賽前期／減量期／賽週）設定
+  // Zone 2 配速、跑量、5K 技術指標（Cadence／Vertical Oscillation／Ground Contact Time／
+  // Stride Length）的目標範圍。形狀：{ [phaseId]: {欄位: {min,max}|null, ...}, updatedAt, deleted }
+  // ——頂層欄位是 phaseId，逐階段合併（applyPatch），跟 goals 用同一套哲學：每個人自己的，
+  // 教練模式下任何白名單成員都能幫別人設（第 15 條）。
+  //
+  // 刻意跟週跑量目標不同：週跑量目標是系統自動算出來、教練只能往下調的天花板（第 0 條
+  // 的機械防線，因為那是每週都在調的高頻動作，容易手滑）；這裡的六個數字是教練低頻率、
+  // 深思熟慮的專業判斷，不設自動上限、不擋存檔——App 只在旁邊顯示背景參考（課表這階段
+  // 自動算出的量、這階段 Zone 2 的心率／RPE 區間），讓教練「看得到」邊界，不是「被擋住」。
+  phaseTargetsFor(userId) {
+    const p = this.phaseTargets[userId];
+    if (!p || p.deleted) return {};
+    const out = {};
+    PlanData.plan.phases.forEach((ph) => { if (p[ph.phaseId]) out[ph.phaseId] = p[ph.phaseId]; });
+    return out;
+  },
+
+  // fields：{欄位: {min,max}|null, ...}（六個欄位不必全給，沒給的維持原值）——由
+  // app.js 的 savePhaseTargets 一次讀整份表單、算好每個欄位再呼叫這裡，寫回時整個
+  // phaseId 當一個欄位（一次 applyPatch／一次雲端寫入），不是六次個別欄位寫入。
+  setPhaseTargetsForPhase(phaseId, fields, targetUserId) {
+    if (!PlanData.plan.phases.some((p) => p.phaseId === phaseId)) return null;
+    const uid = targetUserId || this.activeUserId;
+    const cur = (this.phaseTargets[uid] && this.phaseTargets[uid][phaseId]) || {};
+    const next = { ...cur };
+    PHASE_TARGET_FIELDS.forEach((k) => {
+      if (!(k in fields)) return;
+      const r = fields[k];
+      // 防呆：min/max 打反也存得進去（app.js 的表單已經排過序了，這裡是第二道防線——
+      // 跟 _isValidWeekShape 同一個精神，不假設呼叫端一定做對）。
+      next[k] = (r && Number.isFinite(r.min) && Number.isFinite(r.max))
+        ? { min: round2(Math.min(r.min, r.max)), max: round2(Math.max(r.min, r.max)) }
+        : null;
+    });
+    return this._writePhaseTargetsFor(targetUserId, { [phaseId]: next }, true);
+  },
+
+  _writePhaseTargetsFor(targetUserId, patch, silent) {
+    const uid = targetUserId || this.activeUserId;
+    const prev = this.phaseTargets[uid] || {};
+    const { next, push } = applyPatch(prev, patch);
+    this.phaseTargets[uid] = next;
+    if (uid === this.activeUserId) this.persist(silent);
+    else if (!silent) this._notify();
+    if (this._cloudPush) this._cloudPush('profile', 'phaseTargets', push, uid);
+    return next;
+  },
+
+  mergeRemotePhaseTargets(userId, doc) {
+    this.phaseTargets[userId] = mergeDocs(this.phaseTargets[userId], doc);
+    if (userId === this.activeUserId) saveJSON(`mt_phasetargets::${userId}`, this.phaseTargets[userId]);
+    this._notify();
+  },
+
+  // 這個階段課表本身自動算出來大約多少公里——純參考文字用，把該階段每一週的自動目標
+  // （跟 setWeeklyVolume 的天花板同一個算法，planOnly：不看任何人的 entries／對調順序，
+  // 課表本身的加總不該因為誰在看畫面而變）加總。跟教練填的目標**不比對、不強制**，
+  // 只是讓教練填數字時看得到背景（決策紀錄第 22 條）。
+  phaseVolumeAutoRange(phaseId, userId) {
+    const ph = PlanData.plan.phases.find((p) => p.phaseId === phaseId);
+    if (!ph) return null;
+    let min = 0, max = 0;
+    for (let w = ph.weekRange[0]; w <= ph.weekRange[1]; w++) {
+      const t = this.weekTargetAuto(w, userId, { planOnly: true });
+      min += t.min; max += t.max;
+    }
+    return { min: round1(min), max: round1(max) };
+  },
+
+  // 這個階段至今累積的實際跑量——沿用「週跑量」的實際值算法（第 17 條：改做非跑步類
+  // 不算、休息／過期排除…）逐週加總，不是另一套新規則。回傳 null 表示這個階段完全
+  // 沒有任何一週有記錄（畫面上顯示「—」，不是 0——第 0 條：沒資料不等於做了 0）。
+  phaseVolumeActual(phaseId, userId) {
+    const ph = PlanData.plan.phases.find((p) => p.phaseId === phaseId);
+    if (!ph) return null;
+    let sum = 0, hasAny = false;
+    for (let w = ph.weekRange[0]; w <= ph.weekRange[1]; w++) {
+      const v = this.weekVolume(w, userId);
+      if (v.actual != null) { sum += v.actual; hasAny = true; }
+    }
+    return hasAny ? round1(sum) : null;
   },
 
   // ── 教練模式：課表內容的共用覆寫層 ──────────────────────────────────────

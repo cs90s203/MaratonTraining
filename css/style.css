@@ -520,4 +520,23 @@ textarea.note-input {
 .goal-add { display: flex; gap: 8px; margin-top: 10px; }
 .goal-race { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
 
+/* ── 階段性目標（決策紀錄第 22 條）────────────────────────── */
+.ptgt-head { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.ptgt-head select { border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 12.5px; }
+.ptgt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.ptgt-row:last-of-type { border-bottom: none; }
+.ptgt-label { font-size: 13px; color: var(--text2); }
+.ptgt-val { font-size: 13px; font-weight: 700; color: var(--text); }
+.ptgt-inputs { display: flex; align-items: center; gap: 6px; }
+.ptgt-inputs input {
+  width: 60px; text-align: center; border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text);
+  border-radius: 8px; padding: 6px 4px; font: inherit; font-size: 13px;
+}
+.ptgt-hint { font-size: 11.5px; color: var(--text3); margin: -2px 0 6px; }
+.ptgt-hint.warn { color: var(--warn); }
+.ptgt-progress { margin: 10px 0 2px; }
+.ptgt-progress-nums { font-size: 13px; color: var(--text2); }
+.ptgt-progress-nums b { color: var(--text); font-size: 15px; }
+.ptgt-note { font-size: 11px; color: var(--text3); margin-top: 10px; line-height: 1.5; }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
