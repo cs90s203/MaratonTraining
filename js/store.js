@@ -76,12 +76,12 @@ const DAY_STATUS_OVERRIDES = ['substituted', 'rested'];
 function entryStatus(e) { return e && DAY_STATUS_OVERRIDES.includes(e.status) ? e.status : null; }
 // 「更換項目」換成哪一類（entries.substituteType）。views.js 的 SUBSTITUTE_LABELS 是它的顯示文字。
 const SUBSTITUTE_TYPES = ['run', 'strength', 'core', 'bike', 'swim', 'walk', 'other'];
-// 週跑量目標只加總這三種 type。⚠️ 跟 tools/verify_plan.py 的 RUN_TYPES 必須一致
+// 週跑量目標只加總這幾種 type。⚠️ 跟 tools/verify_plan.py 的 RUN_TYPES 必須一致
 //（Python／瀏覽器 JS 兩個執行環境，沒辦法共用常數，只能靠註解互相提醒）。
 // race 刻意不在裡面：比賽是整份計畫的終點，不是賽週的跑量目標（算進去賽週目標會變 47K+）。
 // walk-run 是 v3 的舊類型（決策紀錄第 12 條拿掉了），教練改過的舊覆寫文件裡可能還有，
 // 算跑量時視同 run，不要無聲算成 0。
-const RUN_TYPES = ['run', 'long-run', 'tempo'];
+const RUN_TYPES = ['run', 'long-run', 'tempo', 'interval']; // interval＝間歇跑（決策紀錄第 40 條）
 const LEGACY_RUN_TYPES = ['walk-run'];
 function isRunType(t) { return RUN_TYPES.includes(t) || LEGACY_RUN_TYPES.includes(t); }
 
@@ -858,8 +858,9 @@ const Store = {
   videoById(id) { return this.videoFor(id); },
   workoutById(id) { return this.workoutFor(id); },
   // 下拉選單：內建（顯示今天的版本，改過名字的看得到新名字）＋自訂
-  allVideos() { return PlanData.videos.map((v) => this.videoFor(v.id)).concat(this.libraryList('video')); },
-  allWorkouts() { return PlanData.workouts.map((w) => this.workoutFor(w.id)).concat(this.libraryList('workout')); },
+  // 已刪除的內建不列（第 39 條）；已經選了它的項目，編輯表單的 refOptions 會保留成「（已從庫中刪除）」
+  allVideos() { return PlanData.videos.filter((v) => !this.builtinRemoved('video', v.id)).map((v) => this.videoFor(v.id)).concat(this.libraryList('video')); },
+  allWorkouts() { return PlanData.workouts.filter((w) => !this.builtinRemoved('workout', w.id)).map((w) => this.workoutFor(w.id)).concat(this.libraryList('workout')); },
   // 內建內容現在有沒有修改版（設定頁「內建·已修改」、要不要顯示「還原內建」）
   builtinModified(kind, id) {
     const ov = this.library[id];
@@ -1044,23 +1045,51 @@ const Store = {
     } else {
       from = prev.from; // 同一天再改：取代今天這個版本
     }
-    const next = { kind: okind, content, from, history, updatedAt: nowIso(), updatedBy: this.activeUserId };
+    const next = { kind: okind, content, from, history, removed: !!(prev && prev.removed), updatedAt: nowIso(), updatedBy: this.activeUserId };
+    this._pushOverrideDoc(id, next, baseUpdatedAt, onResult);
+    return { ok: true, doc: next };
+  },
+
+  // 本機先放上去，再交給 firebase-sync.js 用 transaction 存；失敗退回雲端確認過的最後一份
+  // （不是存檔那一刻本機的樣子——那份可能也沒進雲端，或已經比雲端舊）。
+  _pushOverrideDoc(id, next, baseUpdatedAt, onResult) {
     this.library[id] = next;
     this._notify();
-    if (this._cloudPushLibraryOverride) {
-      this._overrideInFlight[id] = true;
-      const base0 = baseUpdatedAt !== undefined ? baseUpdatedAt : this.libraryServerUpdatedAt(id);
-      this._cloudPushLibraryOverride(id, next, base0, (ok, message) => {
-        delete this._overrideInFlight[id];
-        if (!ok) {
-          // 退回雲端確認過的最後一份（不是存檔那一刻本機的樣子——那份可能也沒進雲端，或已經比雲端舊）
-          const server = this._libraryServer[id];
-          if (server) this.library[id] = server; else delete this.library[id];
-          this._notify();
-        }
-        if (onResult) onResult(ok, message);
-      });
-    }
+    if (!this._cloudPushLibraryOverride) return;
+    this._overrideInFlight[id] = true;
+    const base0 = baseUpdatedAt !== undefined ? baseUpdatedAt : this.libraryServerUpdatedAt(id);
+    this._cloudPushLibraryOverride(id, next, base0, (ok, message) => {
+      delete this._overrideInFlight[id];
+      if (!ok) {
+        const server = this._libraryServer[id];
+        if (server) this.library[id] = server; else delete this.library[id];
+        this._notify();
+      }
+      if (onResult) onResult(ok, message);
+    });
+  },
+
+  // 刪除／恢復內建的動作清單或影片（決策紀錄第 39 條：內建的也要能刪，沒有例外）。
+  // 跟自訂的刪除同一個意思（第 26 條）：從常用項目庫跟下拉選單拿掉，已經排進課表的日子照樣顯示——
+  // 不然 25 天的「重量訓練 A」會安靜地少掉「查看動作」。記在修改版文件的 removed 欄位，
+  // 不動 content／history（刪除不是改內容，恢復之後改過的內容還在）。
+  builtinRemoved(kind, id) {
+    const ov = this.library[id];
+    return !!(ov && ov.kind === (kind === 'workout' ? 'workoutOverride' : 'videoOverride') && this._libraryDocOk(ov, id) && ov.removed);
+  },
+  setBuiltinRemoved(kind, id, removed, baseUpdatedAt, onResult) {
+    const base = kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id];
+    if (!base) return { ok: false, reason: '找不到這份內建內容。' };
+    if (this._overrideInFlight[id]) return { ok: false, reason: '上一次的修改還在儲存，等幾秒再試一次。' };
+    const okind = kind === 'workout' ? 'workoutOverride' : 'videoOverride';
+    const raw = this.library[id];
+    const prev = raw && raw.kind === okind && this._libraryDocOk(raw, id) ? raw : null;
+    if (!!(prev && prev.removed) === !!removed) return { ok: true, unchanged: true };
+    // 還沒有修改版：建一份「內容一律用內建（content:null、沒有 history）」的，只帶 removed
+    const next = prev
+      ? { ...prev, removed: !!removed, updatedAt: nowIso(), updatedBy: this.activeUserId }
+      : { kind: okind, content: null, from: this.todayKey(), history: [], removed: !!removed, updatedAt: nowIso(), updatedBy: this.activeUserId };
+    this._pushOverrideDoc(id, next, baseUpdatedAt, onResult);
     return { ok: true, doc: next };
   },
 

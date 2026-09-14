@@ -363,6 +363,32 @@ const App = {
     render();
   },
 
+  // 刪除／恢復內建的動作清單或影片（決策紀錄第 39 條）
+  deleteBuiltin(kind, id) {
+    const base = kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id];
+    if (!base) return;
+    if (!Sync.isSignedIn()) { alert('要先登入才能刪除內建內容（三個人共用）。'); return; }
+    const cur = kind === 'workout' ? Store.workoutFor(id) : Store.videoFor(id);
+    const name = kind === 'workout' ? cur.name : cur.title;
+    const u = Store.libraryUsage(kind, id);
+    const where = kind === 'workout' ? '動作參照' : '影片參照';
+    if (!confirm(`刪除「${name}」？\n會從常用項目庫跟下拉選單拿掉。${u.total ? `已經排進課表的 ${u.total} 天照樣顯示——要從那些天拿掉，請到那天的項目把${where}改成（無）。` : ''}\n之後可以在「已刪除的內建」恢復。`)) return;
+    const r = Store.setBuiltinRemoved(kind, id, true, Store.libraryServerUpdatedAt(id), (ok, msg) => {
+      if (!ok) { render(); alert(`${msg}\n「${name}」沒有刪除。`); }
+    });
+    if (!r.ok) { alert(r.reason); return; }
+    if (this.state.libraryEdit && this.state.libraryEdit.id === id) this.state.libraryEdit = null;
+    render();
+  },
+  undeleteBuiltin(kind, id) {
+    if (!Sync.isSignedIn()) { alert('要先登入才能恢復內建內容（三個人共用）。'); return; }
+    const r = Store.setBuiltinRemoved(kind, id, false, Store.libraryServerUpdatedAt(id), (ok, msg) => {
+      if (!ok) { render(); alert(msg); }
+    });
+    if (!r.ok) { alert(r.reason); return; }
+    render();
+  },
+
   startLibraryEditFromCard(weekNumber, dayIndex, itemId, workoutId) {
     this.startLibraryEdit('workout', workoutId, { weekNumber, dayIndex, itemId });
   },

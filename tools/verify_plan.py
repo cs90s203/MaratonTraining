@@ -21,12 +21,12 @@ from datetime import date, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEEKDAY = "一二三四五六日"
-VALID_TYPES = {"recovery", "run", "long-run", "tempo",
-               "form-drill", "strength", "rest", "race"}
-# 週跑量目標只算這三種（js/store.js weekVolume 用同一組；兩邊是不同執行環境，靠註解同步）。
+VALID_TYPES = {"recovery", "run", "long-run", "tempo", "interval",
+               "form-drill", "strength", "rest", "race"}  # interval＝間歇跑（決策紀錄第 40 條，出廠課表目前沒有）
+# 週跑量目標只算這幾種（js/store.js weekVolume 用同一組；兩邊是不同執行環境，靠註解同步）。
 # race 刻意不在裡面：比賽是整份計畫的終點，不是「賽週的跑量目標」——算進去會讓賽週目標
 # 變成 47K+，進度條整週停在 10%，26 週的圖也被那一根拉到看不出其他週的差異。
-RUN_TYPES = {"run", "long-run", "tempo"}
+RUN_TYPES = {"run", "long-run", "tempo", "interval"}
 
 # 安全性文字的獨立基準。**故意不從 build_plan.py import**——那樣等於拿產生器檢查自己。
 # 這四段是 docs/計畫原文/訓練計畫.md 第 6、180、176、28 行的逐字內容；改一個標點就會失敗。

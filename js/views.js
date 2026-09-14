@@ -75,10 +75,10 @@ function fmtTargetRange(r, meta) {
 // 教練模式編輯表單的 type 下拉選單。⚠️ 跟 tools/verify_plan.py 的 VALID_TYPES 必須
 // 保持一致——那支腳本管出廠課表，這裡管教練模式的即時編輯，是兩個不同的執行環境
 // （Python / 瀏覽器 JS），沒辦法共用同一份常數，只能靠這條註解互相提醒同步改。
-const VALID_TYPES = ['recovery', 'run', 'long-run', 'tempo', 'form-drill', 'strength', 'rest', 'race'];
+const VALID_TYPES = ['recovery', 'run', 'long-run', 'tempo', 'interval', 'form-drill', 'strength', 'rest', 'race'];
 const TYPE_LABELS = {
   recovery: '恢復', run: '跑步', 'long-run': '長跑',
-  tempo: '節奏跑', 'form-drill': '跑姿訓練', strength: '重量訓練', rest: '休息', race: '比賽',
+  tempo: '節奏跑', interval: '間歇跑', 'form-drill': '跑姿訓練', strength: '重量訓練', rest: '休息', race: '比賽',
   'walk-run': '走跑交替（舊類型，請改選）', // v3 舊覆寫文件裡可能還有；只供顯示，不在 VALID_TYPES 下拉
 };
 // Store.dayStatus() 的回傳值 → 畫面文字。unfinished 不是 dayStatus 的回傳值：過去的日子
@@ -1428,13 +1428,23 @@ function renderLibraryPanel(state) {
       </div>
       <div class="lib-actions">
         <button class="link-btn" onclick="A.startLibraryEdit('${kind}','${jsq(id)}')">編輯</button>
-        ${modified ? `<button class="link-btn lib-del" onclick="A.restoreBuiltin('${kind}','${jsq(id)}')">還原內建</button>` : ''}
+        ${modified ? `<button class="link-btn" onclick="A.restoreBuiltin('${kind}','${jsq(id)}')">還原內建</button>` : ''}
+        <button class="link-btn lib-del" onclick="A.deleteBuiltin('${kind}','${jsq(id)}')">刪除</button>
       </div>
     </div>`;
   };
+  // 已刪除的內建（第 39 條）：一行一個，按「恢復」放回常用項目庫
+  const removedBuiltins = (kind) => {
+    const list = (kind === 'workout' ? PlanData.workouts : PlanData.videos).filter((b) => Store.builtinRemoved(kind, b.id));
+    if (!list.length) return '';
+    return `<div class="lib-removed"><div class="lib-note">已刪除的內建（已經排進課表的日子照樣顯示）：</div>${list.map((b) => {
+      const cur = kind === 'workout' ? Store.workoutFor(b.id) : Store.videoFor(b.id);
+      return `<div class="lib-removed-row"><span>${h(kind === 'workout' ? cur.name : cur.title)}</span><button class="link-btn" onclick="A.undeleteBuiltin('${kind}','${jsq(b.id)}')">恢復</button></div>`;
+    }).join('')}</div>`;
+  };
   const workoutMeta = (w) => `${w.exercises.length} 個動作：${h(w.exercises.map((ex) => ex.name).join('、'))}`;
 
-  const builtinWorkoutRows = PlanData.workouts.map((b) => isEditing('workout', b.id) && !edit.origin
+  const builtinWorkoutRows = PlanData.workouts.filter((b) => !Store.builtinRemoved('workout', b.id)).map((b) => isEditing('workout', b.id) && !edit.origin
     ? renderWorkoutEditor(edit)
     : (() => { const w = Store.workoutFor(b.id); return builtinRow('workout', b.id, h(w.name), `${workoutMeta(w)}<br>${usageText('workout', b.id)}`); })()).join('');
   const workouts = Store.libraryList('workout');
@@ -1443,7 +1453,7 @@ function renderLibraryPanel(state) {
     : row(w, h(w.name), `${workoutMeta(w)}<br>${usageText('workout', w.id)}`)).join('');
 
   const videoMeta = (v) => v.linkType === 'video' ? '貼上的影片網址' : (v.linkType === 'none' ? '只顯示文字，沒有連結' : `搜尋「${h(v.searchQuery)}」`);
-  const builtinVideoRows = PlanData.videos.map((b) => isEditing('video', b.id)
+  const builtinVideoRows = PlanData.videos.filter((b) => !Store.builtinRemoved('video', b.id)).map((b) => isEditing('video', b.id)
     ? renderVideoEditor(edit)
     : (() => { const v = Store.videoFor(b.id); return builtinRow('video', b.id, `${ICON.playCircle}${h(v.title)}`, `${videoMeta(v)}<br>${usageText('video', b.id)}`); })()).join('');
   const videos = Store.libraryList('video');
@@ -1463,16 +1473,18 @@ function renderLibraryPanel(state) {
         </div>
         <div class="lib-group">
           <div class="lib-head">動作清單</div>
-          <div class="lib-note">內建的也可以改。改的內容從今天起生效，今天以前的日子維持原樣；「還原內建」也一樣只從今天起。</div>
+          <div class="lib-note">內建的也可以改或刪除。改的內容從今天起生效，今天以前的日子維持原樣；「還原內建」也一樣只從今天起。刪除是從這裡跟下拉選單拿掉，已經排進課表的日子照樣顯示。</div>
           ${builtinWorkoutRows}
           ${workoutRows}
+          ${removedBuiltins('workout')}
           ${isEditing('workout', 'new') ? renderWorkoutEditor(edit) : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('workout','new')">＋ 新增動作清單</button>`}
         </div>
         <div class="lib-group">
           <div class="lib-head">影片</div>
-          <div class="lib-note">內建的也可以改，一樣從今天起生效。可以存搜尋關鍵字，或直接貼上 YouTube 網址。</div>
+          <div class="lib-note">內建的也可以改或刪除，改的內容一樣從今天起生效。可以存搜尋關鍵字，或直接貼上 YouTube 網址。</div>
           ${builtinVideoRows}
           ${videoRows}
+          ${removedBuiltins('video')}
           ${isEditing('video', 'new') ? renderVideoEditor(edit) : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('video','new')">＋ 新增影片</button>`}
         </div>
       </div>
