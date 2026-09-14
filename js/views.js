@@ -257,7 +257,7 @@ function renderDayBody(weekNumber, dayIndex) {
         這天是「二擇一」
       </label>
     </div>
-    <textarea class="edit-form daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
+    <textarea class="note-input daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
   `;
 
   // 決策紀錄第 45 條：課表上的項目只能「從項目庫換」「改時間」，今天以前的日子不能改

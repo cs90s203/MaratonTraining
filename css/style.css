@@ -416,7 +416,9 @@ textarea.note-input {
 .day-coach-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; font-size: 12.5px; color: var(--warn); font-weight: 600; }
 .day-coach-row .toggle-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .day-coach-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--warn); }
-.daynotes-edit { width: 100%; margin: 8px 0; font-size: 12.5px; }
+/* 這天的備註：跟當天紀錄的「附註」同一個輸入框樣式（textarea.note-input）。以前這個框自己掛 .edit-form，
+   可是輸入框樣式寫的是 .edit-form 「裡面」的 textarea，對不到自己，畫成瀏覽器預設的白框 */
+.daynotes-edit { margin: 8px 0; min-height: 44px; }
 
 .coach-toggle-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
