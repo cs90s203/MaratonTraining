@@ -497,7 +497,7 @@ button.rec-radio { cursor: pointer; }
 .rec-q { font-size: 11.5px; color: var(--text3); }
 .rec-private { }
 
-.vol-heading { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+.vol-heading { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 /* ── 本週頁手風琴（決策紀錄第 17 條）───────────────────────────── */
 .week-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
@@ -536,8 +536,9 @@ button.rec-radio { cursor: pointer; }
   cursor: pointer; padding: 0; vertical-align: middle; font-size: 14px; line-height: 1;
 }
 .icon-btn svg { width: 16px; height: 16px; }
-.icon-btn.alert { color: var(--warn); border-color: var(--warn); margin-left: 6px; width: 24px; height: 24px; }
-.icon-btn.alert svg { width: 14px; height: 14px; }
+/* 圖示本身已經畫了一個圈（ICON.alert 的 <circle>），按鈕不再疊自己的邊框，免得看起來是兩層同心圓 */
+.icon-btn.alert { color: var(--warn); border: none; background: transparent; width: 24px; height: 24px; }
+.icon-btn.alert svg { width: 20px; height: 20px; }
 .help-btn {
   border: none; background: transparent; color: var(--text3); width: 24px; height: 24px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none;

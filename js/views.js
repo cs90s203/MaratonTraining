@@ -984,14 +984,14 @@ function renderWeekPage(state) {
       <div class="week-head">
         <button class="navbtn" style="opacity:${canPrev ? 1 : .3}" ${canPrev ? `onclick="A.setWeekView(${wn - 1})"` : 'disabled'}>‹ 上週</button>
         <div style="text-align:center">
-          <div style="font-weight:800;font-size:17px">第 ${wn} 週 <button class="icon-btn alert" onclick="A.openModal('safety')" aria-label="安全提醒" title="開始前 / 安全提醒">${ICON.alert}</button></div>
+          <div style="font-weight:800;font-size:17px">第 ${wn} 週</div>
           <div style="font-size:12px;color:var(--text2)">${h(phase.name)}</div>
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
       ${signedOutBanner}
       ${planBanner}
-      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', title: '跑量', footer: renderWeeklyReviewCard(wn) })}
+      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', title: '跑量', footer: renderWeeklyReviewCard(wn), showSafetyAlert: true })}
       <div class="view-toggle">
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
@@ -1045,7 +1045,10 @@ function renderWeekVolumeCard(vol, opts) {
   opts = opts || {};
   // 本週頁頂端是「本週訓練目標」（決策紀錄第 23 條）：跑量變成其中一項，底下接本週回顧。
   // 總覽頁用同一張卡但不帶 heading／footer。
-  const heading = opts.heading ? `<div class="vol-heading">${h(opts.heading)}</div>` : '';
+  const heading = opts.heading ? `<div class="vol-heading">
+    <span>${h(opts.heading)}</span>
+    ${opts.showSafetyAlert ? `<button class="icon-btn alert" onclick="A.openModal('safety')" aria-label="安全提醒" title="開始前 / 安全提醒">${ICON.alert}</button>` : ''}
+  </div>` : '';
   const footer = opts.footer || '';
   const t = vol.target, actual = vol.actual;
   const anchor = t.min > 0 ? t.min : t.max;
