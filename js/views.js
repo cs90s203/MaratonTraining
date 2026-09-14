@@ -947,7 +947,7 @@ function renderWeekPage(state) {
       </div>
       ${signedOutBanner}
       ${planBanner}
-      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', title: '跑量', footer: renderWeeklyReviewCard(wn), showSafetyAlert: true })}
+      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', who: (PlanData.userById[Store.activeUserId] || {}).displayName || Store.activeUserId, title: '跑量', footer: renderWeeklyReviewCard(wn), showSafetyAlert: true })}
       <div class="view-toggle">
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
@@ -999,8 +999,9 @@ function renderWeekVolumeCard(vol, opts) {
   opts = opts || {};
   // 本週頁頂端是「本週訓練目標」（決策紀錄第 23 條）：跑量變成其中一項，底下接本週回顧。
   // 總覽頁用同一張卡但不帶 heading／footer。
+  // opts.who：現在是誰的紀錄（使用者要的：標題前面放名字，才知道目前是誰）
   const heading = opts.heading ? `<div class="vol-heading">
-    <span>${h(opts.heading)}</span>
+    <span class="vol-heading-text">${opts.who ? `<span class="vol-who">${h(opts.who)}</span>` : ''}${h(opts.heading)}</span>
     ${opts.showSafetyAlert ? `<button class="icon-btn alert" onclick="A.openModal('safety')" aria-label="安全提醒" title="開始前 / 安全提醒">${ICON.alert}</button>` : ''}
   </div>` : '';
   const footer = opts.footer || '';

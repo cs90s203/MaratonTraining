@@ -528,6 +528,8 @@ button.rec-radio { cursor: pointer; }
 .rec-private { }
 
 .vol-heading { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vol-heading-text { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.vol-who { font-size: 12px; font-weight: 700; color: var(--accent2); background: var(--accentBg); border-radius: 6px; padding: 2px 8px; overflow-wrap: anywhere; }
 
 /* ── 本週頁手風琴（決策紀錄第 17 條）───────────────────────────── */
 .week-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
