@@ -212,12 +212,32 @@ const App = {
       handle: '.drag-handle', draggable: '.weekday-acc', animation: 150,
       delay: 150, delayOnTouchOnly: true,        // 手指要按住一下才開始拖，不然跟捲動打架
       forceFallback: true, fallbackTolerance: 4, // 桌機／手機同一套行為，不靠瀏覽器原生 DnD
+      // 教練模式（第 50 條）：兩天對調，不是插入——拖曳中列不移動（onMove 回 false），落點那一列亮起來；
+      // 放開時以手指／滑鼠底下那一列為準（SortableJS 的 Swap 外掛不在 cdnjs 這個 build 裡，自己做）。
+      onMove: (evt) => {
+        if (list.dataset.coach !== '1') return true;
+        list.querySelectorAll('.swap-target').forEach((x) => x.classList.remove('swap-target'));
+        if (evt.related && !evt.related.classList.contains('locked') && evt.related !== evt.dragged) evt.related.classList.add('swap-target');
+        return false;
+      },
       onEnd: (evt) => {
-        const from = evt.oldDraggableIndex, to = evt.newDraggableIndex;
-        if (from === to) return;
         const coach = list.dataset.coach === '1';
         // 等 Sortable 自己收尾完再重繪——render() 整個換掉 #root，不能在它還握著節點時做。
-        setTimeout(() => (coach ? this.moveSharedWeekDay(wn, from, to) : this.moveWeekDay(wn, from, to)), 0);
+        if (coach) {
+          list.querySelectorAll('.swap-target').forEach((x) => x.classList.remove('swap-target'));
+          const oe = evt.originalEvent;
+          const pt = oe && (oe.changedTouches ? oe.changedTouches[0] : oe);
+          const under = pt && Number.isFinite(pt.clientX) ? document.elementFromPoint(pt.clientX, pt.clientY) : null;
+          const row = under && under.closest('.weekday-acc');
+          const rows = [...list.querySelectorAll('.weekday-acc')];
+          const from = rows.indexOf(evt.item), to = row && list.contains(row) ? rows.indexOf(row) : -1;
+          if (from < 0 || to < 0 || from === to) return;
+          setTimeout(() => this.swapSharedWeekDays(wn, from, to), 0);
+          return;
+        }
+        const from = evt.oldDraggableIndex, to = evt.newDraggableIndex;
+        if (from === to) return;
+        setTimeout(() => this.moveWeekDay(wn, from, to), 0);
       },
     });
   },
@@ -236,27 +256,25 @@ const App = {
   },
   resetDayOrder(weekNumber) { Store.resetDayOrder(weekNumber); render(); },
 
-  // 教練模式拖曳（決策紀錄第 43 條）：搬的是共用課表，把第 from 天的內容插到第 to 天，中間的往前／往後補。
-  // 項目 id 不變，日期跟著格子走。只限還沒開始的週（畫面上沒有把手，這裡再擋一次；理由見 views.js renderWeekPage）。
-  moveSharedWeekDay(weekNumber, from, to) {
-    from = Number(from); to = Number(to);
-    if (!(from >= 0 && from <= 6 && to >= 0 && to <= 6) || from === to) return;
-    if (PlanData.keyForWeekDay(weekNumber, 0) <= PlanData.dayKey(PlanData.today())) {
-      alert('這週已經開始，共用課表不能搬動天數。'); render(); return;
-    }
+  // 教練模式拖曳（決策紀錄第 50 條）：兩天的共用課表對調（所有人一起變）。項目 id 跟著內容走，日期是格子的。
+  // 今天以前的日子不能動（畫面上沒有把手、也不能當落點，這裡再擋一次）。牽涉到今天時先確認：今天已經練過的人，
+  // 勾會留在今天、換走的課會在另一天顯示成沒做——那堂課不要再做一次（第 0 條）。
+  swapSharedWeekDays(weekNumber, a, b) {
+    a = Number(a); b = Number(b);
+    if (!(a >= 0 && a <= 6 && b >= 0 && b <= 6) || a === b) return;
+    const today = PlanData.dayKey(PlanData.today());
+    const ka = PlanData.keyForWeekDay(weekNumber, a), kb = PlanData.keyForWeekDay(weekNumber, b);
+    if (ka < today || kb < today) { alert('今天以前的日子不能換。'); render(); return; }
     const week = this._cloneEffectiveWeek(weekNumber);
     const days = week.days.slice();
-    const [moved] = days.splice(from, 1);
-    days.splice(to, 0, moved);
+    const la = PlanData.weekdayLabel(a), lb = PlanData.weekdayLabel(b);
+    if ((ka === today || kb === today) && !confirm(`把週${la}跟週${lb}的課表對調？\n今天已經練過的人，打的勾會留在今天，換走的那堂課會在另一天顯示成還沒做——不要再做一次。`)) { render(); return; }
+    [days[a], days[b]] = [days[b], days[a]];
     week.days = days.map((d, i) => ({ ...d, dayIndex: i }));
-    week.layoutAt = new Date().toISOString(); // 天數搬過了：別台還停在舊排列的畫面不能再照位置存（store.js saveWeekOverride）
+    week.layoutAt = new Date().toISOString(); // 天數換過了：別台還停在舊排列的畫面不能再照位置存（store.js saveWeekOverride）
     const e = this.state.expandedDay;
-    if (e && e.weekNumber === weekNumber) {
-      let d = e.dayIndex;
-      if (d === from) d = to;
-      else if (from < d && d <= to) d -= 1;
-      else if (to <= d && d < from) d += 1;
-      this.state.expandedDay = { weekNumber, dayIndex: d };
+    if (e && e.weekNumber === weekNumber && (e.dayIndex === a || e.dayIndex === b)) {
+      this.state.expandedDay = { weekNumber, dayIndex: e.dayIndex === a ? b : a }; // 展開的那一天跟著內容走
     }
     this.state.itemPicker = null;
     this.state.amountEdit = null;
@@ -287,6 +305,14 @@ const App = {
 
   switchIdentity(userId) {
     if (userId === Store.activeUserId) return;
+    // 決策紀錄第 51 條：登入之後「我是誰」就是登入的帳號（第 41 條自動判斷出來的）。切成別人只會讓每一筆寫入被
+    // Firebase 拒絕（規則只准本人寫自己的紀錄），切回來之前還會卡在「寫入被拒」。要看別人，用總覽的「查看別人的進度」。
+    const me = Sync.isSignedIn() ? Sync.detectedUserId : null;
+    if (me && userId !== me) {
+      const u = PlanData.userById[me];
+      alert(`登入的帳號是「${u ? u.displayName : me}」，只能記自己的紀錄。要看別人的進度，到「總覽 → 查看別人的進度」。`);
+      return;
+    }
     Store.setActiveUser(userId);
     this.state.viewingUserId = null;
     render();
@@ -978,25 +1004,13 @@ const App = {
     render();
   },
 
-  // 週跑量目標的教練覆寫（決策紀錄第 13 條）。預設沒有這個欄位——目標由
-  // Store.weekVolume 從課表跑步項目即時加總；教練設了才存 {min,max}。兩個都留空
-  // 等於「改回自動加總」，跟 clearWeeklyVolume 同義。
+  // 本週的目標跑量（決策紀錄第 49 條，取代第 13 條的「只能往下調」）：教練自己訂的數字，
+  // 不限制在課表加總以下、不改課表、不影響進度條。兩個都留空＝清掉目標，跟 clearWeeklyVolume 同義。
   setWeeklyVolume(weekNumber, minVal, maxVal) {
     if (minVal === '' && maxVal === '') { this.clearWeeklyVolume(weekNumber); return; }
     const a = minVal === '' ? Number(maxVal) : Number(minVal);
     const b = maxVal === '' ? Number(minVal) : Number(maxVal);
-    if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b > 100) { alert('週跑量要在 0-100 公里之間'); return; }
-    // 決策紀錄第 0 條：手動目標只能把數字往下調。比課表加總高的目標＝用一個數字催人
-    // 多跑，卻沒有任何一天的課表項目支撐它——要加量請改項目，那才看得見、也才會被審。
-    // planOnly=true：純課表加總，不看操作者自己的 entries——否則教練當週若標了自主休息
-    // 或更換項目，這條擋線會用「他自己剩下要跑的量」當上限，同樣的目標在別人的裝置上卻合法，
-    // 而且錯誤訊息會講出一個不是課表真實加總的數字（審查抓到：W3 標休息後上限從 9.4 縮到
-    // 6.7，換成沒有紀錄的 Annlin 身分同一個數字卻直接放行）。
-    const auto = Store.weekTargetAuto(weekNumber, Store.activeUserId, { planOnly: true });
-    if (Math.max(a, b) > auto.max + 0.05) {
-      alert(`目標上限不能高於課表加總（${auto.max} K）。要加量請直接改課表項目，不要只改數字。`);
-      return;
-    }
+    if (!Number.isFinite(a) || !Number.isFinite(b) || Math.min(a, b) < 0 || Math.max(a, b) > 200) { alert('目標跑量要在 0-200 公里之間'); return; }
     const week = this._cloneEffectiveWeek(weekNumber);
     week.weeklyVolumeKm = { min: Math.min(a, b), max: Math.max(a, b) };
     delete week.weeklyVolumeNullReason; // 舊版欄位（第 8 條時代），不再有意義

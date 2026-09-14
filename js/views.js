@@ -881,12 +881,10 @@ function renderWeekPage(state) {
 
   // 拖曳換順序（第 18 條）：教練模式下 effectiveDayOrder 一律回傳出廠順序，拖了也不會生效，
   // 所以不畫把手；SortableJS 沒載到（離線、CDN 被擋）也不畫，免得把手看起來像壞了。
-  // 決策紀錄第 43 條：教練模式也能拖——拖的是共用課表本身（所有人一起變），但只限還沒開始的週：
-  // 打勾紀錄是「日期＋項目 id」、個人對調是「格子→共用第幾天」，已經開始的週搬共用的天，
-  // 已經打的勾會對不到、做過的課會換到後面的日子又出現一次（第 0 條）。
+  // 決策紀錄第 50 條（取代第 43 條的「只限還沒開始的週」）：教練模式拖到另一天上放開＝兩天的共用課表直接對調
+  // （所有人一起變），這週也可以；今天以前的日子鎖住（沒有把手、也不能當落點）。
   // 一般模式拖的照舊是自己的本週順序（第 14、18 條）。
-  const coachWeekStarted = coach && PlanData.keyForWeekDay(wn, 0) <= todayKeyNow;
-  const canDrag = !table && typeof Sortable !== 'undefined' && !coachWeekStarted;
+  const canDrag = !table && typeof Sortable !== 'undefined';
 
   // 手風琴（決策紀錄第 17 條）：一次只展開一列，展開的列身就是原本「今日」頁的內容。
   const rows = order.map((contentIndex, i) => {
@@ -900,7 +898,7 @@ function renderWeekPage(state) {
     const titles = d.items.map((it) => it.title).join(d.selectOne ? ' 或 ' : '、');
     const statusIcon = status === 'done' ? ICON.check : '';
     return `
-      <div class="weekday-acc ${isOpen ? 'open' : ''}" id="day-${wn}-${i}">
+      <div class="weekday-acc ${isOpen ? 'open' : ''} ${coach && dateKey < todayKeyNow ? 'locked' : ''}" id="day-${wn}-${i}">
         <div class="weekday-row" onclick="A.openDay(${wn},${i})" style="cursor:pointer">
           <div class="weekday-badge ${isToday ? 'today' : ''}">${PlanData.weekdayLabel(i)}<span class="num">${dateLabel.getDate()}</span></div>
           <div class="weekday-status ${status} ${status === 'pending' && dateKey < todayKeyNow ? 'unfinished' : ''}">${statusIcon}</div>
@@ -909,7 +907,7 @@ function renderWeekPage(state) {
             <div class="sub">${h(dayStatusText(status, entry, dateKey))}${isToday ? ' · 今天' : ''}</div>
           </div>
           <span class="weekday-chevron">${ICON.chevron}</span>
-          ${canDrag ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="按住拖曳換順序" title="${coach ? '按住拖曳：改所有人的共用課表' : '按住拖曳換順序'}">${ICON.grip}</span>` : ''}
+          ${canDrag && !(coach && dateKey < todayKeyNow) ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="${coach ? '按住拖到另一天，兩天對調' : '按住拖曳換順序'}">${ICON.grip}</span>` : ''}
         </div>
         ${isOpen ? `<div class="weekday-body">${renderDayBody(wn, i)}</div>` : ''}
       </div>
@@ -950,7 +948,7 @@ function renderWeekPage(state) {
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
       </div>
       ${table ? renderWeekTable(wn, w, order, todayKey) : `<div class="card" ${canDrag ? `data-daylist="${wn}" data-coach="${coach ? 1 : 0}"` : ''}>${rows}</div>`}
-      ${!coach ? renderDayOrderHint(wn, order, canDrag) : renderCoachDragHint(canDrag, coachWeekStarted, table)}
+      ${!coach ? renderDayOrderHint(wn, order, canDrag) : renderCoachDragHint(canDrag)}
       ${coach ? renderWeekCoachPanel(wn, w, hasOverride, vol) : ''}
     </div>
   `;
@@ -959,11 +957,9 @@ function renderWeekPage(state) {
 // 決策紀錄第 14、18 條：環境因素讓這週某天跟另一天對調，課表項目不變，只是重新標籤。
 // 對調本身靠拖曳列上的把手；這裡只剩一行提示，跟對調過之後的「已對調＋還原」。
 // 教練模式開著時整行不顯示（那個模式下 effectiveDayOrder 一律回傳出廠順序）。
-function renderCoachDragHint(canDrag, weekStarted, table) {
-  if (table || typeof Sortable === 'undefined') return '';
-  if (canDrag) return `<div class="day-order-hint"><span>教練模式：按住 ⋮⋮ 拖曳會搬動<b>所有人的共用課表</b>。</span></div>`;
-  if (weekStarted) return `<div class="day-order-hint"><span>這週已經開始，共用課表不能拖曳換天（已經打的勾會對不上）。要換自己這週的順序，關掉教練模式再拖。</span></div>`;
-  return '';
+function renderCoachDragHint(canDrag) {
+  if (!canDrag) return '';
+  return `<div class="day-order-hint"><span>教練模式：按住 ⋮⋮ 拖到另一天上放開，兩天的課表直接對調（<b>所有人的共用課表</b>）。今天以前的日子不能動。</span></div>`;
 }
 
 function renderDayOrderHint(wn, order, canDrag) {
@@ -1013,15 +1009,14 @@ function renderWeekVolumeCard(vol, opts) {
   const over = actual != null && t.max > 0 && !t.timeBased && actual > t.max;
   const pct = anchor > 0 && actual != null ? Math.min(100, Math.round((actual / anchor) * 100)) : 0;
   const pace = PlanData.plan.timeBasedRunPaceMinPerKm;
-  const how = t.source === 'coach'
-    ? '目標由教練模式設定。'
-    : `目標＝本週課表跑步項目的加總${t.timeBased ? `（以時間計的項目用 ${pace} 分速換算，約略值、偏低）` : ''}。`;
+  const how = `預計＝本週課表跑步項目的加總${t.timeBased ? `（以時間計的項目用 ${pace} 分速換算，約略值、偏低）` : ''}。${vol.goal ? '目標跑量是教練另外設的數字，不影響進度條。' : ''}`;
+  const goalLine = vol.goal ? `<div class="vol-sub">目標跑量 ${fmtKmRange(vol.goal)} km</div>` : '';
   const actualStr = actual == null ? '—' : `${actual}${vol.estimated ? '<span class="approx">約</span>' : ''}`;
   const raceLine = vol.race ? `<div class="vol-sub">週日比賽 ${vol.race.planned} km 另計${vol.race.actual != null ? `（已記錄 ${vol.race.actual} km）` : ''}。</div>` : '';
   // 說明文字收進「？」（使用者要的）：卡片平常只留數字跟進度條。
   const helpOpen = !!App.state.helpOpen.vol;
   const helpBtn = `<button class="help-btn ${helpOpen ? 'on' : ''}" onclick="A.toggleHelp('vol')" aria-label="說明">${ICON.help}</button>`;
-  const helpText = helpOpen ? `<div class="vol-sub">${h(how)}實際＝各天「實際公里」的加總${vol.estimated ? '（沒填公里、只填分鐘的日子用同一個分速換算）' : ''}。目標下限＝進度條滿格；超過上限會提醒，不會畫「多出來」。</div>` : '';
+  const helpText = helpOpen ? `<div class="vol-sub">${h(how)}實際＝各天「實際公里」的加總${vol.estimated ? '（沒填公里、只填分鐘的日子用同一個分速換算）' : ''}。預計下限＝進度條滿格；超過預計上限會提醒，不會畫「多出來」。</div>` : '';
   if (vol.reduced) {
     return `
       <div class="card vol-card">
@@ -1032,6 +1027,7 @@ function renderWeekVolumeCard(vol, opts) {
           ${helpBtn}
         </div>
         <div class="vol-sub">本週已標記降量——只記錄實際，不比對目標（原定 ${fmtKmRange(t)} km）。</div>
+        ${goalLine}
         ${helpText}
         ${raceLine}
         ${footer}
@@ -1047,6 +1043,7 @@ function renderWeekVolumeCard(vol, opts) {
       </div>
       <div class="progress-track"><div class="progress-fill ${reached ? 'reached' : ''}" style="width:${pct}%"></div></div>
       ${over ? `<div class="vol-sub over">已超過本週課表上限（${t.max} km）——下週不要再加。</div>` : ''}
+      ${goalLine}
       ${helpText}
       ${raceLine}
       ${footer}
@@ -1092,12 +1089,12 @@ function renderWeekTable(wn, w, order, todayKey) {
     </div>`;
 }
 
+// 本週課表設定（教練模式）。決策紀錄第 49 條：「目標跑量」是教練自己訂的數字（不連動、不限制、不影響進度條）；
+// 「預計跑量」＝課表加總，唯讀。以前只有一組「週跑量目標」而且只能往下調，被課表加總卡死。
 function renderWeekCoachPanel(wn, w, hasOverride, vol) {
-  const coachSet = vol.target.source === 'coach';
+  const goal = vol.goal;
   // planOnly：純課表加總，不看任何人的 entries。planOverrides 是三人共用的一份文件，
-  // 「課表加總」這個字眼講的是課表本身，不能取決於「誰的手機正在看這頁」——如果用
-  // Store.activeUserId 的個人紀錄過濾（例如教練自己那天標了自主休息），上限跟著縮小，
-  // 同樣的目標對別人來說卻是合法的，而且面板文字會講出一個不是課表真實加總的數字。
+  // 「課表加總」這個字眼講的是課表本身，不能取決於「誰的手機正在看這頁」。
   const auto = Store.weekTargetAuto(wn, Store.activeUserId, { planOnly: true });
   const stale = hasOverride && (w.basePlanVersion || 3) < PlanData.plan.planVersion;
   return `
@@ -1115,16 +1112,17 @@ function renderWeekCoachPanel(wn, w, hasOverride, vol) {
             </select>
           </div>
         </div>
-        <div class="row">
-          <div class="field"><label class="field-lbl">週跑量目標下限（K）</label><input id="wv-min-${wn}" type="number" min="0" step="0.5" value="${coachSet ? vol.target.min : ''}" placeholder="${auto.min}"></div>
-          <div class="field"><label class="field-lbl">週跑量目標上限（K）</label><input id="wv-max-${wn}" type="number" min="0" step="0.5" value="${coachSet ? vol.target.max : ''}" placeholder="${auto.max}"></div>
+        <div class="field wide">
+          <label class="field-lbl">目標跑量（K）</label>
+          <div class="range-pair"><input id="wv-min-${wn}" type="number" min="0" step="0.5" value="${goal ? goal.min : ''}"><span>–</span><input id="wv-max-${wn}" type="number" min="0" step="0.5" value="${goal ? goal.max : ''}"></div>
         </div>
+        <div class="wk-plan-line"><span>預計跑量</span><b>${fmtKmRange(auto)} K</b></div>
         <div class="actions">
           <button class="btn" style="background:var(--warn);width:auto;padding:8px 14px;font-size:13px"
-            onclick="A.setWeeklyVolume(${wn}, document.getElementById('wv-min-${wn}').value, document.getElementById('wv-max-${wn}').value)">設定週跑量目標</button>
-          ${coachSet ? `<button class="btn secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="A.clearWeeklyVolume(${wn})">改回自動加總</button>` : ''}
+            onclick="A.setWeeklyVolume(${wn}, document.getElementById('wv-min-${wn}').value, document.getElementById('wv-max-${wn}').value)">設定目標跑量</button>
+          ${goal ? `<button class="btn secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="A.clearWeeklyVolume(${wn})">清除目標</button>` : ''}
         </div>
-        <div style="font-size:11.5px;color:var(--text3)">${coachSet ? `目前是教練手動設定的目標（課表加總是 ${auto.min}–${auto.max} K）。` : `目前依課表跑步項目自動加總（${auto.min}–${auto.max} K）；改了項目目標會跟著變。`}手動目標只能往下調，上限不能高於課表加總——要加量請改課表項目。</div>
+        <div style="font-size:11.5px;color:var(--text3)">目標跑量是教練自己訂的數字，不會限制或改變課表，也不影響進度條。預計跑量是這週課表跑步項目的加總，改課表項目會跟著變。</div>
       </div>
       ${hasOverride ? `
         <div class="actions" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--warn)">
@@ -1726,14 +1724,16 @@ function renderSettingsPage(state) {
       <div class="section-title">我是誰</div>
       <div class="userlist">
         ${users.map((u) => `
-          <div class="user-opt ${u.userId === Store.activeUserId ? 'active' : ''}" onclick="A.switchIdentity('${jsq(u.userId)}')">
+          <div class="user-opt ${u.userId === Store.activeUserId ? 'active' : ''} ${Sync.isSignedIn() && Sync.detectedUserId && u.userId !== Sync.detectedUserId ? 'locked' : ''}" onclick="A.switchIdentity('${jsq(u.userId)}')">
             <div class="avatar">${h(u.displayName).slice(0, 1)}</div>
             <div class="name">${h(u.displayName)}${Sync.detectedUserId === u.userId ? ' <span class="lib-tag">登入的帳號</span>' : ''}</div>
             ${u.userId === Store.activeUserId ? `<span class="check">${ICON.check}</span>` : ''}
           </div>
         `).join('')}
       </div>
-      <div class="share-box" style="margin-top:10px">登入 Google 帳號後會自動選成那個帳號的人（決策紀錄第 41 條）。切換身分決定你打勾寫進哪個人的紀錄，跟總覽頁「查看別人進度」是分開的功能。</div>
+      <div class="share-box" style="margin-top:10px">${Sync.isSignedIn() && Sync.detectedUserId
+        ? '登入之後固定是登入的帳號，不能切成別人（切了也寫不進去）。要看別人的進度，到「總覽 → 查看別人的進度」。'
+        : '登入 Google 帳號後會自動選成那個帳號的人。沒登入時，這裡決定打勾記在誰的名下；要看別人的進度用總覽頁「查看別人的進度」。'}</div>
     </div>
 
     <div class="section">

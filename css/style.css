@@ -275,6 +275,7 @@ textarea.note-input {
   border: 1.5px solid var(--inpBorder); background: var(--card); cursor: pointer;
 }
 .user-opt.active { border-color: var(--accent2); background: var(--accentBg); }
+.user-opt.locked { opacity: .45; cursor: default; } /* 登入後不能切成別人（決策紀錄第 51 條） */
 .user-opt .avatar {
   width: 36px; height: 36px; border-radius: 50%; background: var(--track); color: var(--text2);
   display: flex; align-items: center; justify-content: center; font-weight: 700; flex: none;
@@ -389,6 +390,8 @@ textarea.note-input {
 .saved-flash { font-size: 12px; font-weight: 700; color: var(--accent2); align-self: center; }
 .coach-locked-note { font-size: 12px; color: var(--text3); margin-top: 10px; }
 .range-pair { display: flex; align-items: center; gap: 4px; }
+.wk-plan-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; color: var(--text2); }
+.wk-plan-line b { color: var(--text); }
 .range-pair input { min-width: 0; flex: 1; }
 /* 項目表單的多部影片（決策紀錄第 28 條）：一部一列下拉＋✕，底下「＋ 再加一部影片」 */
 .vref-list { display: flex; flex-direction: column; gap: 6px; }
@@ -559,6 +562,8 @@ button.rec-radio { cursor: pointer; }
 .sortable-ghost { opacity: .35; }
 .sortable-drag { background: var(--card2); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); opacity: .95; }
 .sortable-ghost .weekday-body, .sortable-drag .weekday-body { display: none; }
+/* 教練模式拖曳：放開就跟這一列對調（決策紀錄第 50 條） */
+.weekday-acc.swap-target { outline: 2px dashed var(--warn); outline-offset: -2px; border-radius: 10px; background: var(--warnBg); }
 .day-order-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--text3); margin: 8px 6px 0; line-height: 1.5; }
 .weekday-body { padding: 4px 0 10px; }
 .weekday-body .day-body { padding: 0; }

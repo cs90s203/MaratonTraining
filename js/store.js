@@ -1250,9 +1250,9 @@ const Store = {
   //   - 比賽日整天不算（目標與實際都不算）：比賽是終點不是那週的跑量，另外回傳 race
   //   - 二擇一的日子：下限取各選項的最小值（休息選項＝0，所以含休息的日子下限自然不含它）、
   //     上限取最大值——這是誠實的區間，不是把「可以休息」偷偷算成「要跑」
-  // 教練模式可以覆寫（week.weeklyVolumeKm = {min,max}，存在 planOverrides 那份文件裡），
-  // 但上限不能高於自動加總（app.js setWeeklyVolume 擋）——數字只能把目標調低，
-  // 要加量請改課表項目，那才會被看見。
+  // 決策紀錄第 49 條：教練另外可以設「目標跑量」（week.weeklyVolumeKm = {min,max}，存在 planOverrides 那份文件裡），
+  // 是一個自由的數字，不限制在課表加總以下、也不取代這裡的加總——weekVolume 另外回傳 goal。
+  // 進度條、「超過課表上限」一律照課表加總（第 0 條的機械防線留在課表這邊）。
   // 實際＝該週各天的公里加總；某天沒填公里但有填分鐘、且當天課表有跑步項目，就用同一個
   // 分速換算（跟目標對稱，否則 Phase 1 以時間計的八週實際永遠是 —），並標 estimated。
   // 「本週已降量」（weekAdjustments）只有自己的才讀得到；reduced=true 時畫面不比對目標。
@@ -1301,13 +1301,11 @@ const Store = {
     const order = this.effectiveDayOrder(weekNumber, uid);
     const auto = this.weekTargetAuto(weekNumber, uid);
     const ov = w.weeklyVolumeKm;
-    // 教練目標是「上限」不是固定數字：讀取時再夾一次在（這個人的）自動加總以下——
-    // 寫入時的守衛（app.js setWeeklyVolume）擋不到已存在的資料，也擋不到教練設完目標後
-    // 又改課表項目、或使用者標了主動休息的情況。kind:'reference' 是 v3 的舊參考值，一律不算。
+    // target＝預計（課表加總，依這個人的休息／更換縮分母）；goal＝教練設的目標跑量，原數字、不夾（第 49 條）。
+    // kind:'reference' 是 v3 的舊參考值，一律不算。
     const coachSet = !!(ov && ov.kind !== 'reference' && Number.isFinite(ov.min) && Number.isFinite(ov.max));
-    const target = coachSet
-      ? { min: round1(Math.min(ov.min, ov.max, auto.min)), max: round1(Math.min(Math.max(ov.min, ov.max), auto.max)), source: 'coach', timeBased: auto.timeBased }
-      : { ...auto, source: 'auto' };
+    const target = { ...auto, source: 'auto' };
+    const goal = coachSet ? { min: round1(Math.min(ov.min, ov.max)), max: round1(Math.max(ov.min, ov.max)) } : null;
     let actual = null, estimated = false, race = null;
     for (let i = 0; i < 7; i++) {
       const d = w.days[order[i]];
@@ -1338,6 +1336,7 @@ const Store = {
     const adj = uid === this.activeUserId ? this.weekAdjustmentFor(weekNumber, uid) : null;
     return {
       target,
+      goal,
       actual: actual == null ? null : round1(actual),
       estimated,
       race,

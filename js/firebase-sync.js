@@ -224,7 +224,11 @@ const Sync = {
   // 「身分不符」、那個身分被拒絕的寫入（failedWrites 裡沒有第三段 userId 的 entries／private／weekAdjustments），
   // 不然膠囊會一直掛著上一個人的錯誤訊息，這個人的同一天也被標成「尚未同步」（第 41 條審查）。
   // 「身分不符」在任何重新訂閱時都先清掉：身分還是錯的話，private 訂閱會馬上再設回來。
+  // 決策紀錄第 51 條：身分每換一次加一。寫入的結果（成功／被拒）是伺服器晚一點才回來的——
+  // 切成別人又切回來，上一個身分被拒的那筆才回來，會把現在這個身分蓋成「寫入被拒」、訊息寫的還是別人的名字。
+  _identitySeq: 0,
   resubscribe(identityChanged) {
+    if (identityChanged) this._identitySeq++;
     if (!this.isSignedIn()) return;
     if (identityChanged) {
       [...this.failedWrites].forEach((k) => {
@@ -587,15 +591,19 @@ const Sync = {
     // 防禦，避免以後又有地方不小心送出 undefined。
     const clean = {};
     Object.keys(data).forEach((k) => { if (data[k] !== undefined) clean[k] = data[k]; });
+    // 寫自己的紀錄（沒有 targetUserId）：結果回來時身分已經換過，就跟現在這個身分無關，不動狀態（第 51 條）
+    const seq = this._identitySeq;
+    const stale = () => !targetUserId && seq !== this._identitySeq;
     try {
       fbDb.collection(`users/${userId}/${kind}`).doc(docId).set(clean, { merge: true })
         .then(() => {
+          if (stale()) return;
           if (!this.failedWrites.delete(key)) return;
           // 之前被拒的那筆現在寫成功了：全部都補上就解除「寫入被拒」，否則只重繪
           if (this.state === 'write-denied' && this.failedWrites.size === 0) this._set('done', '已同步');
           else this._notify();
         })
-        .catch((err) => this._onWriteError(kind, docId, userId, key, err));
+        .catch((err) => { if (!stale()) this._onWriteError(kind, docId, userId, key, err); });
     } catch (err) {
       this._onWriteError(kind, docId, userId, key, err);
     }
