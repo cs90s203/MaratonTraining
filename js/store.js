@@ -1034,6 +1034,27 @@ const Store = {
   },
   canSaveItemAsTemplate(item) { return !!this._cleanLibraryFields('item', { name: '', item }); },
 
+  // 決策紀錄第 52 條：課表上「用到這個常用項目」的項目——templateId 連著它；還沒連的（出廠課表的、v0.23 以前換進來的）
+  // 名稱跟類型一樣也算。連著別的常用項目的不算。
+  usesTemplate(it, templateId, tplItem) {
+    if (!it || !tplItem) return false;
+    if (it.templateId) return it.templateId === templateId;
+    return it.title === tplItem.title && it.type === tplItem.type;
+  },
+  // 今天以後（含今天）用到它的課表項目：[{weekNumber, dayIndex, itemId}]
+  templateUsage(templateId, tplItem) {
+    const today = this.todayKey();
+    const out = [];
+    for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) {
+      if (PlanData.keyForWeekDay(wn, 6) < today) continue;
+      this.effectiveWeek(wn).days.forEach((d, di) => {
+        if (PlanData.keyForWeekDay(wn, di) < today) return;
+        d.items.forEach((it) => { if (this.usesTemplate(it, templateId, tplItem)) out.push({ weekNumber: wn, dayIndex: di, itemId: it.id }); });
+      });
+    }
+    return out;
+  },
+
   // id 為 null＝新增。回傳存好的文件（含 id），形狀不合回傳 null。
   saveLibraryDoc(id, kind, fields) {
     const clean = this._cleanLibraryFields(kind, fields);

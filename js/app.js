@@ -11,6 +11,7 @@ const App = {
     itemPicker: null,      // 決策紀錄第 45 條：教練模式打開的項目庫清單 {weekNumber,dayIndex,itemId|'add'}
     savedFlash: null,      // 剛按「存成常用」的課表項目 id：那張卡寫「已存進項目庫」
     amountEdit: null,      // 決策紀錄第 46 條：點兩下正在改時間的課表項目 {weekNumber,dayIndex,itemId}
+    libFlash: '',          // 決策紀錄第 52 條：改常用項目之後「已套用到 N 天」的一次性訊息
     helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
     modal: null,           // 'safety' | null
     privateNoteOpen: null, // 身體狀況的備註框被手動展開的那一天（dateKey）
@@ -37,6 +38,7 @@ const App = {
   goTo(page) {
     if (page === 'today') page = 'week'; // 舊的入口一律導到本週頁
     this.state.page = page;
+    this.state.libFlash = '';
     if (page === 'week') this._focusToday();
     this.state.itemPicker = null;
     this.state.amountEdit = null;
@@ -400,7 +402,54 @@ const App = {
 
   // 從常用項目庫帶進課表的內容：深拷貝，拿掉「推導值」標記（教練挑的就是確認過的，第 19 條）
   _itemFromTemplate(tpl, id) {
-    return { ...JSON.parse(JSON.stringify(tpl.item)), id, derived: false, intensityDerived: false };
+    // templateId：記住從哪個常用項目來的，之後改常用項目才對得到（第 52 條）
+    return { ...JSON.parse(JSON.stringify(tpl.item)), id, templateId: tpl.id, derived: false, intensityDerived: false };
+  },
+
+  // 決策紀錄第 52 條：改了常用項目，今天以後（含今天）用到它的課表項目跟著改，今天以前的日子不動。
+  // 只套「這次改了的欄位」——同名的出廠項目各週的備註、時間本來就不一樣，整份蓋過去會洗掉。
+  // 影片：這次拿掉的從項目拿掉；常用項目有、項目還沒有的加上（之前存過、當時沒套上的修改，再按一次儲存就會補上）。
+  // 時間／距離：項目的數字還是舊的常用項目那個數字才跟著改（某天單獨改過的時間不動）。
+  // 套過的項目記下 templateId，之後改名也對得到。回傳改到幾天。
+  _applyTemplateToPlan(templateId, oldItem, newItem) {
+    const norm = (it) => { const c = it && Store._cleanLibraryFields('item', { name: '', item: it }); return c ? c.item : null; };
+    const o = norm(oldItem), n = norm(newItem);
+    if (!o || !n) return 0;
+    const J = (x) => JSON.stringify(x == null ? null : x);
+    const copy = (x) => (x == null ? null : JSON.parse(JSON.stringify(x)));
+    const changed = ['type', 'title', 'heartRateZone', 'rpe', 'intensityNote', 'notes', 'workoutRef', 'segments'].filter((k) => J(o[k]) !== J(n[k]));
+    const amountChanged = ['duration', 'distanceKm'].filter((k) => J(o[k]) !== J(n[k]));
+    const oldRefs = PlanData.itemVideoRefs(o), newRefs = PlanData.itemVideoRefs(n);
+    const removed = oldRefs.filter((r) => !newRefs.includes(r));
+    const today = PlanData.dayKey(PlanData.today());
+    let days = 0;
+    for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) {
+      if (PlanData.keyForWeekDay(wn, 6) < today) continue;
+      if (!Store.effectiveWeek(wn).days.some((d, di) => PlanData.keyForWeekDay(wn, di) >= today && d.items.some((it) => Store.usesTemplate(it, templateId, o)))) continue;
+      const week = this._cloneEffectiveWeek(wn);
+      let weekChanged = false;
+      week.days.forEach((d, di) => {
+        if (PlanData.keyForWeekDay(wn, di) < today) return;
+        let dayChanged = false;
+        d.items.forEach((it) => {
+          if (!Store.usesTemplate(it, templateId, o)) return;
+          const before = J(it);
+          changed.forEach((k) => { it[k] = copy(n[k]); });
+          amountChanged.forEach((k) => { if (J(it[k]) === J(o[k])) it[k] = copy(n[k]); });
+          const refs = PlanData.itemVideoRefs(it).filter((r) => !removed.includes(r));
+          newRefs.forEach((r) => { if (!refs.includes(r)) refs.push(r); });
+          const capped = refs.slice(0, PlanData.MAX_ITEM_VIDEOS);
+          it.videoRefs = capped;
+          it.videoRef = capped[0] || null;
+          it.templateId = templateId;
+          if (changed.length) it.derived = false;
+          if (J(it) !== before) dayChanged = true;
+        });
+        if (dayChanged) { days++; weekChanged = true; }
+      });
+      if (weekChanged) Store.saveWeekOverride(wn, week, true);
+    }
+    return days;
   },
 
   // 換成別的常用項目：id 不變（打勾紀錄照 id 對，換掉不會讓做過的課又變成沒做）
@@ -499,6 +548,7 @@ const App = {
   // origin：從本週頁某張卡的「查看動作」打開的，編輯器就畫在那張卡的位置。
   // copyOf（第 43 條「複製」）：打開一份還沒存的新內容，照 copyOf 那份預填；按存檔才建立，取消什麼都不留。
   startLibraryEdit(kind, id, origin, copyOf) {
+    this.state.libFlash = '';
     if (copyOf) id = 'new';
     const srcId = copyOf || id;
     const isBuiltin = !copyOf && id !== 'new' && (kind === 'workout' ? !!PlanData.workoutById[id] : (kind === 'video' ? !!PlanData.videoById[id] : false));
@@ -723,6 +773,9 @@ const App = {
     delete fields.derived; delete fields.intensityDerived;
     const saved = Store.saveLibraryDoc(isNew ? null : id, 'item', { name: fields.title, item: fields });
     if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    // 第 52 條：今天以後用到它的課表跟著改
+    const n = isNew ? 0 : this._applyTemplateToPlan(id, tpl.item, saved.item);
+    this.state.libFlash = n ? `已套用到今天以後的 ${n} 天課表（今天以前的日子不動）。` : '';
     this.state.libraryEdit = null;
     render();
   },

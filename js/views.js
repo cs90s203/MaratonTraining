@@ -691,9 +691,14 @@ function renderTemplateForm(tpl) {
             <div class="range-pair"><input name="${nameA}" type="number" ${attrs} value="${h(a)}"><span>–</span><input name="${nameB}" type="number" ${attrs} value="${h(b)}"></div>
           </div>`;
 
+  // 第 52 條：存檔會套用到今天以後用到它的課表，先講清楚範圍
+  const usage = tpl.id === 'new' ? null : Store.templateUsage(tpl.id, it).length;
+  const usageLine = usage == null ? ''
+    : `<div class="tpl-usage">${usage ? `存檔後，今天起用到這個項目的 <b>${usage}</b> 天會跟著改（只改這次改的地方；某天單獨改過的時間不動；今天以前的日子不動）。` : '課表裡今天以後還沒有用到這個項目。'}</div>`;
   return `
     <div class="item coach-editing" id="${formId}">
       <div class="edit-form">
+        ${usageLine}
         <div class="field wide"><label class="field-lbl">名稱</label><input name="title" type="text" maxlength="80" value="${h(tpl.name || it.title)}" placeholder="例如：Zone 2 跑"></div>
         <div class="field wide"><label class="field-lbl">類型</label>
           <select name="type">${types.map((t) => `<option value="${t}" ${it.type === t ? 'selected' : ''}>${TYPE_LABELS[t] || t}</option>`).join('')}</select>
@@ -1576,11 +1581,12 @@ function renderLibraryPanel(state) {
   return `
     <div class="section">
       <div class="section-title">常用項目庫 <span class="coach-tag">三人共用</span></div>
+      ${state.libFlash ? `<div class="banner info">${ICON.check}<div>${h(state.libFlash)}</div></div>` : ''}
       ${banners}
       <div class="card lib-card">
         <div class="lib-group">
           <div class="lib-head">常用項目</div>
-          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。項目的內容只在這裡設定；課表上點項目名稱就能換成這裡的項目，換過去是複製一份，之後改這裡不會改到已經排好的日子。</div>
+          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。項目的內容只在這裡設定；課表上點項目名稱就能換成這裡的項目。改這裡會套用到今天以後用到它的日子，今天以前的日子不動。</div>
           ${itemRows || (isEditing('item', 'new') ? '' : '<div class="lib-empty">還沒有常用項目。</div>')}
           ${newItemForm}
         </div>
