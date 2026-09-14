@@ -849,7 +849,12 @@ function renderWeekPage(state) {
 
   // 拖曳換順序（第 18 條）：教練模式下 effectiveDayOrder 一律回傳出廠順序，拖了也不會生效，
   // 所以不畫把手；SortableJS 沒載到（離線、CDN 被擋）也不畫，免得把手看起來像壞了。
-  const canDrag = !coach && !table && typeof Sortable !== 'undefined';
+  // 決策紀錄第 43 條：教練模式也能拖——拖的是共用課表本身（所有人一起變），但只限還沒開始的週：
+  // 打勾紀錄是「日期＋項目 id」、個人對調是「格子→共用第幾天」，已經開始的週搬共用的天，
+  // 已經打的勾會對不到、做過的課會換到後面的日子又出現一次（第 0 條）。
+  // 一般模式拖的照舊是自己的本週順序（第 14、18 條）。
+  const coachWeekStarted = coach && PlanData.keyForWeekDay(wn, 0) <= todayKeyNow;
+  const canDrag = !table && typeof Sortable !== 'undefined' && !coachWeekStarted;
 
   // 手風琴（決策紀錄第 17 條）：一次只展開一列，展開的列身就是原本「今日」頁的內容。
   const rows = order.map((contentIndex, i) => {
@@ -872,7 +877,7 @@ function renderWeekPage(state) {
             <div class="sub">${h(dayStatusText(status, entry, dateKey))}${isToday ? ' · 今天' : ''}</div>
           </div>
           <span class="weekday-chevron">${ICON.chevron}</span>
-          ${canDrag ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="按住拖曳換順序" title="按住拖曳換順序">${ICON.grip}</span>` : ''}
+          ${canDrag ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="按住拖曳換順序" title="${coach ? '按住拖曳：改所有人的共用課表' : '按住拖曳換順序'}">${ICON.grip}</span>` : ''}
         </div>
         ${isOpen ? `<div class="weekday-body">${renderDayBody(wn, i)}</div>` : ''}
       </div>
@@ -912,8 +917,8 @@ function renderWeekPage(state) {
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
       </div>
-      ${table ? renderWeekTable(wn, w, order, todayKey) : `<div class="card" ${canDrag ? `data-daylist="${wn}"` : ''}>${rows}</div>`}
-      ${!coach ? renderDayOrderHint(wn, order, canDrag) : ''}
+      ${table ? renderWeekTable(wn, w, order, todayKey) : `<div class="card" ${canDrag ? `data-daylist="${wn}" data-coach="${coach ? 1 : 0}"` : ''}>${rows}</div>`}
+      ${!coach ? renderDayOrderHint(wn, order, canDrag) : renderCoachDragHint(canDrag, coachWeekStarted, table)}
       ${coach ? renderWeekCoachPanel(wn, w, hasOverride, vol) : ''}
     </div>
   `;
@@ -922,6 +927,13 @@ function renderWeekPage(state) {
 // 決策紀錄第 14、18 條：環境因素讓這週某天跟另一天對調，課表項目不變，只是重新標籤。
 // 對調本身靠拖曳列上的把手；這裡只剩一行提示，跟對調過之後的「已對調＋還原」。
 // 教練模式開著時整行不顯示（那個模式下 effectiveDayOrder 一律回傳出廠順序）。
+function renderCoachDragHint(canDrag, weekStarted, table) {
+  if (table || typeof Sortable === 'undefined') return '';
+  if (canDrag) return `<div class="day-order-hint"><span>教練模式：按住 ⋮⋮ 拖曳會搬動<b>所有人的共用課表</b>。</span></div>`;
+  if (weekStarted) return `<div class="day-order-hint"><span>這週已經開始，共用課表不能拖曳換天（已經打的勾會對不上）。要換自己這週的順序，關掉教練模式再拖。</span></div>`;
+  return '';
+}
+
 function renderDayOrderHint(wn, order, canDrag) {
   const swapped = order.map((v, i) => v !== i ? `${PlanData.weekdayLabel(i)}顯示${PlanData.weekdayLabel(v)}的內容` : null).filter(Boolean);
   if (!swapped.length && !canDrag) return '';
@@ -1468,14 +1480,23 @@ function renderLibraryPanel(state) {
       <div class="lib-row-main"><div class="lib-name">${main}</div>${meta ? `<div class="lib-meta">${meta}</div>` : ''}</div>
       <div class="lib-actions">
         <button class="link-btn" onclick="A.startLibraryEdit('${doc.kind}','${jsq(doc.id)}')">編輯</button>
+        <button class="link-btn" onclick="A.duplicateLibraryDoc('${doc.kind}','${jsq(doc.id)}')">複製</button>
         <button class="link-btn lib-del" onclick="A.deleteLibraryDoc('${jsq(doc.id)}')">刪除</button>
       </div>
     </div>`;
 
   const items = Store.libraryList('item');
+  const itemMeta = (t) => {
+    const segs = PlanData.itemSegments(t.item);
+    return h([TYPE_LABELS[t.item.type] || t.item.type, PlanData.fmtItemMeta(t.item), segs.length ? `${segs.length} 段訓練段落` : ''].filter(Boolean).join(' · '));
+  };
   const itemRows = items.map((t) => isEditing('item', t.id)
     ? renderItemEditForm(0, 0, null, { libraryTemplate: t })
-    : row(t, h(t.name), h([TYPE_LABELS[t.item.type] || t.item.type, PlanData.fmtItemMeta(t.item)].filter(Boolean).join(' · ')))).join('');
+    : row(t, h(t.name), itemMeta(t))).join('');
+  // 第 43 條：直接在項目庫新增常用項目（原本只能從課表上某個項目「存成常用」）
+  const newItemForm = isEditing('item', 'new')
+    ? renderItemEditForm(0, 0, null, { libraryTemplate: edit.prefill ? { id: 'new', ...edit.prefill } : { id: 'new', name: '', item: { type: 'run', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', segments: null, videoRefs: [], videoRef: null, workoutRef: null, notes: '' } } })
+    : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('item','new')">＋ 新增常用項目</button>`;
 
   // 內建內容（第 33 條）：一列一份，標「內建」／「內建·已修改」，按鈕是「編輯」＋改過才有的「還原內建」
   const usageText = (kind, id) => {
@@ -1492,6 +1513,7 @@ function renderLibraryPanel(state) {
       </div>
       <div class="lib-actions">
         <button class="link-btn" onclick="A.startLibraryEdit('${kind}','${jsq(id)}')">編輯</button>
+        <button class="link-btn" onclick="A.duplicateLibraryDoc('${kind}','${jsq(id)}')">複製</button>
         ${modified ? `<button class="link-btn" onclick="A.restoreBuiltin('${kind}','${jsq(id)}')">還原內建</button>` : ''}
         <button class="link-btn lib-del" onclick="A.deleteBuiltin('${kind}','${jsq(id)}')">刪除</button>
       </div>
@@ -1532,8 +1554,9 @@ function renderLibraryPanel(state) {
       <div class="card lib-card">
         <div class="lib-group">
           <div class="lib-head">常用項目</div>
-          <div class="lib-note">在「本週」教練模式的任何一個項目下面按「存成常用」就會出現在這裡；新增項目時可以直接帶入。帶入是複製一份，之後改範本不會改到已經排好的日子。</div>
-          ${itemRows || '<div class="lib-empty">還沒有常用項目。</div>'}
+          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。新增課表項目時可以直接帶入；帶入是複製一份，之後改範本不會改到已經排好的日子。</div>
+          ${itemRows || (isEditing('item', 'new') ? '' : '<div class="lib-empty">還沒有常用項目。</div>')}
+          ${newItemForm}
         </div>
         <div class="lib-group">
           <div class="lib-head">動作清單</div>

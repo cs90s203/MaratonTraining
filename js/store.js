@@ -735,9 +735,24 @@ const Store = {
   // 若立刻整頁重繪，剛好落在「blur → change → 重繪」跟使用者緊接著點下一個按鈕的
   // mousedown 同一個事件序列裡，重繪會把那個按鈕換成新節點，點擊因此落空（需要點兩次）。
   // 不 notify 不代表不存檔：this.planOverrides 已經更新，下次任何原因觸發的重繪都會是新值。
+  // 第 43 條：教練拖曳會搬動共用課表的天數（寫 layoutAt），而其他編輯都是「第幾天」這種位置。
+  // 畫面每次畫完記下各週的 layoutAt；存檔時如果這週在畫面畫好之後被別人搬過天
+  // （表單開著時不重畫，畫面會停在舊的排列），就不存——不然會改到錯的那一天。
+  _seenLayoutAt: null,
+  markPlanSeen() {
+    const m = {};
+    for (const wn of Object.keys(this.planOverrides)) m[wn] = this.effectiveWeek(Number(wn)).layoutAt || null;
+    this._seenLayoutAt = m;
+  },
+
   saveWeekOverride(weekNumber, weekObj, silent) {
     if (!this._isValidWeekShape(weekObj)) {
       alert('這週的資料格式不完整（可能缺天數或項目），沒有存檔，請檢查後再試一次。');
+      return null;
+    }
+    if (this._seenLayoutAt && (this.effectiveWeek(weekNumber).layoutAt || null) !== (this._seenLayoutAt[weekNumber] || null)) {
+      alert(`第 ${weekNumber} 週的天數剛被別人搬動過，這次沒有存（避免改到錯的那一天）。畫面會更新，請再改一次。`);
+      this._notify();
       return null;
     }
     const baseUpdatedAt = weekObj.__baseUpdatedAt;
@@ -751,6 +766,7 @@ const Store = {
     // 被教練改過的週不會自動跟上，週視圖用這個欄位提示「這週的調整基於舊版」。
     const next = { ...clean, weekNumber, basePlanVersion: PlanData.plan.planVersion, updatedAt: nowIso(), updatedBy: this.activeUserId };
     this.planOverrides[weekNumber] = next;
+    if (this._seenLayoutAt) this._seenLayoutAt[weekNumber] = next.layoutAt || null; // 自己剛存的就是看到的
     if (!silent) this._notify();
     if (this._cloudPushPlanOverride) this._cloudPushPlanOverride(weekNumber, next, baseUpdatedAt);
     return next;
@@ -762,12 +778,14 @@ const Store = {
   resetWeekOverride(weekNumber) {
     const backup = this.planOverrides[weekNumber];
     delete this.planOverrides[weekNumber];
+    if (this._seenLayoutAt) this._seenLayoutAt[weekNumber] = null;
     this._notify();
     if (this._cloudDeletePlanOverride) this._cloudDeletePlanOverride(weekNumber, backup);
   },
 
   rollbackResetWeekOverride(weekNumber, backup) {
     if (backup) this.planOverrides[weekNumber] = backup;
+    if (backup && this._seenLayoutAt) this._seenLayoutAt[weekNumber] = backup.layoutAt || null;
     this._notify();
   },
 
@@ -893,7 +911,10 @@ const Store = {
     if (!(d && d.kind === kind && this._libraryDocOk(d, id))) return null;
     const v = this._versionOn(d.history, key);
     const content = v.found && v.content ? v.content : this._contentOf(kind, d);
-    return { ...content, id, builtin: false, modified: false, derived: false, deleted: !!d.deleted };
+    // 第 43 條：從內建複製出來的動作清單，安全提醒照樣跟著內建（JSON）走——複製不是繞過安全提醒的路
+    const origin = kind === 'workout' ? PlanData.workoutById[d.copiedFrom] : null;
+    return { ...content, id, builtin: false, modified: false, derived: false, deleted: !!d.deleted,
+      safetyNote: (origin && origin.safetyNote) || null };
   },
   workoutFor(id, dateKey) { return this._resolveLibrary('workout', id, dateKey); },
   videoFor(id, dateKey) { return this._resolveLibrary('video', id, dateKey); },
@@ -1000,6 +1021,8 @@ const Store = {
     // 後被刪掉的東西又跑回來。
     const patch = { ...clean, kind, updatedBy: this.activeUserId };
     if (!prev) patch.deleted = false;
+    // 第 43 條：複製內建動作清單時記住來源，只在新增時寫一次（之後編輯不送，蓋不掉）
+    if (!prev && kind === 'workout' && fields.copiedFrom && PlanData.workoutById[fields.copiedFrom]) patch.copiedFrom = fields.copiedFrom;
     // 第 33 條：自訂動作清單／影片改了內容，只從今天起生效。上一個版本如果是今天以前開始的，
     // 收進 history（用到昨天為止）；同一天再改就直接取代。常用項目（item）是複製式，不需要版本。
     if (kind === 'workout' || kind === 'video') {

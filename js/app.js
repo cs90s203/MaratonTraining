@@ -186,6 +186,13 @@ const App = {
   // SortableJS 沒載到（離線、CDN 被擋）時 views 不畫把手，這裡也不掛；「還原順序」照常。
   _sortable: null,
   afterRender() {
+    Store.markPlanSeen();
+    const le = this.state.libraryEdit;
+    if (le && le.scrollOnce) {
+      le.scrollOnce = false;
+      const el = document.getElementById('tpl-edit-new') || document.querySelector('.lib-card .coach-editing');
+      if (el) el.scrollIntoView({ block: 'start' });
+    }
     if (this._sortable) { try { this._sortable.destroy(); } catch (e) { /* 舊 DOM 已被換掉 */ } this._sortable = null; }
     const list = document.querySelector('[data-daylist]');
     if (!list || typeof Sortable === 'undefined') return;
@@ -197,8 +204,9 @@ const App = {
       onEnd: (evt) => {
         const from = evt.oldDraggableIndex, to = evt.newDraggableIndex;
         if (from === to) return;
+        const coach = list.dataset.coach === '1';
         // 等 Sortable 自己收尾完再重繪——render() 整個換掉 #root，不能在它還握著節點時做。
-        setTimeout(() => this.moveWeekDay(wn, from, to), 0);
+        setTimeout(() => (coach ? this.moveSharedWeekDay(wn, from, to) : this.moveWeekDay(wn, from, to)), 0);
       },
     });
   },
@@ -216,6 +224,34 @@ const App = {
     render();
   },
   resetDayOrder(weekNumber) { Store.resetDayOrder(weekNumber); render(); },
+
+  // 教練模式拖曳（決策紀錄第 43 條）：搬的是共用課表，把第 from 天的內容插到第 to 天，中間的往前／往後補。
+  // 項目 id 不變，日期跟著格子走。只限還沒開始的週（畫面上沒有把手，這裡再擋一次；理由見 views.js renderWeekPage）。
+  moveSharedWeekDay(weekNumber, from, to) {
+    from = Number(from); to = Number(to);
+    if (!(from >= 0 && from <= 6 && to >= 0 && to <= 6) || from === to) return;
+    if (PlanData.keyForWeekDay(weekNumber, 0) <= PlanData.dayKey(PlanData.today())) {
+      alert('這週已經開始，共用課表不能搬動天數。'); render(); return;
+    }
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const days = week.days.slice();
+    const [moved] = days.splice(from, 1);
+    days.splice(to, 0, moved);
+    week.days = days.map((d, i) => ({ ...d, dayIndex: i }));
+    week.layoutAt = new Date().toISOString(); // 天數搬過了：別台還停在舊排列的畫面不能再照位置存（store.js saveWeekOverride）
+    const e = this.state.expandedDay;
+    if (e && e.weekNumber === weekNumber) {
+      let d = e.dayIndex;
+      if (d === from) d = to;
+      else if (from < d && d <= to) d -= 1;
+      else if (to <= d && d < from) d += 1;
+      this.state.expandedDay = { weekNumber, dayIndex: d };
+    }
+    this.state.editingItem = null;
+    this.state.libraryEdit = null;
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
 
   // 同步膠囊「寫入被拒」：手機沒有 hover 看不到 title，點了直接把原因講出來。
   showSyncMessage() { alert(Sync.message || '寫入被拒。'); },
@@ -323,18 +359,22 @@ const App = {
   // 不能用 Store.libraryDoc——還沒改過的內建清單在庫裡根本沒有文件，按了會沒反應。
   // baseUpdatedAt：打開這一刻修改版的 updatedAt（沒有＝null），存檔時交給 transaction 比對。
   // origin：從本週頁某張卡的「查看動作」打開的，編輯器就畫在那張卡的位置。
-  startLibraryEdit(kind, id, origin) {
-    const isBuiltin = id !== 'new' && (kind === 'workout' ? !!PlanData.workoutById[id] : (kind === 'video' ? !!PlanData.videoById[id] : false));
+  // copyOf（第 43 條「複製」）：打開一份還沒存的新內容，照 copyOf 那份預填；按存檔才建立，取消什麼都不留。
+  startLibraryEdit(kind, id, origin, copyOf) {
+    if (copyOf) id = 'new';
+    const srcId = copyOf || id;
+    const isBuiltin = !copyOf && id !== 'new' && (kind === 'workout' ? !!PlanData.workoutById[id] : (kind === 'video' ? !!PlanData.videoById[id] : false));
+    const suffix = copyOf ? '（複本）' : '';
     let doc = null;
-    if (id !== 'new') {
-      doc = kind === 'workout' ? Store.workoutFor(id) : (kind === 'video' ? Store.videoFor(id) : Store.libraryDoc(id));
+    if (srcId !== 'new') {
+      doc = kind === 'workout' ? Store.workoutFor(srcId) : (kind === 'video' ? Store.videoFor(srcId) : Store.libraryDoc(srcId));
       if (!doc) { alert('找不到這份內容，可能還沒同步到這台裝置。'); return; }
     }
     let draft = null;
     if (kind === 'workout') {
       const exs = doc ? doc.exercises : [];
       draft = {
-        name: doc ? doc.name : '',
+        name: doc ? doc.name + suffix : '',
         loadGuidance: doc ? (doc.loadGuidance || '') : '',
         exercises: exs.length ? exs.map((ex) => {
           const r = ex.holdSeconds || ex.reps || {};
@@ -343,7 +383,7 @@ const App = {
       };
     } else if (kind === 'video') {
       draft = {
-        title: doc ? doc.title : '', creator: doc ? (doc.creator || '') : '',
+        title: doc ? doc.title + suffix : '', creator: doc ? (doc.creator || '') : '',
         linkType: doc && (doc.linkType === 'video' || doc.linkType === 'none') ? doc.linkType : 'search',
         searchQuery: doc ? (doc.searchQuery || '') : '', url: doc ? (doc.url || '') : '',
         notes: doc ? (doc.notes || '') : '',
@@ -356,8 +396,14 @@ const App = {
       builtin: isBuiltin,
       baseUpdatedAt: isBuiltin ? Store.libraryServerUpdatedAt(id) : null,
       origin: origin || null,
-      safetyNote: kind === 'workout' && base ? base.safetyNote || '' : '',
+      safetyNote: kind === 'workout' && doc ? doc.safetyNote || '' : '',
       builtinNotes: kind === 'video' && base ? base.notes || '' : '',
+      // 複製常用項目：表單照這份預填
+      prefill: kind === 'item' && copyOf ? { name: doc.name + suffix, item: JSON.parse(JSON.stringify(doc.item)) } : null,
+      // 從內建動作清單（或它的複本）複製：記住來源，安全提醒跟著內建走
+      copiedFrom: kind === 'workout' && copyOf ? (doc.builtin ? copyOf : ((Store.libraryDoc(copyOf) || {}).copiedFrom || null)) : null,
+      // 複本的編輯器排在群組最下面，常常在螢幕外：畫完捲過去一次（afterRender）
+      scrollOnce: !!copyOf,
     };
     this.state.editingItem = null;
     render();
@@ -490,7 +536,7 @@ const App = {
       if (e.id !== 'new' && Store.library[e.id] && Store.library[e.id].deleted) {
         alert('這份動作清單已經從常用項目庫刪掉了，不能再改。要改的話請新增一份。'); return;
       }
-      const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'workout', fields);
+      const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'workout', e.id === 'new' ? { ...fields, copiedFrom: e.copiedFrom } : fields);
       if (!saved) { alert('內容不完整，沒有存檔。'); return; }
     }
     this.state.libraryEdit = null;
@@ -519,8 +565,9 @@ const App = {
 
   // 編輯常用項目的內容：同一份項目表單（_readItemForm／_validateItemFields），只是存到庫裡
   saveTemplateEdit(id) {
-    const tpl = Store.libraryDoc(id);
-    if (!tpl) return;
+    const isNew = id === 'new'; // 第 43 條：直接在項目庫新增
+    const tpl = isNew ? null : Store.libraryDoc(id);
+    if (!isNew && !tpl) return;
     const formId = `tpl-edit-${id}`;
     const fields = this._readItemForm(formId);
     if (!fields) return;
@@ -530,11 +577,15 @@ const App = {
     const root = document.getElementById(formId);
     const nameEl = root && root.querySelector('[name="templateName"]');
     const name = nameEl ? nameEl.value.trim() : '';
-    const saved = Store.saveLibraryDoc(id, 'item', { name: name || fields.title, item: fields });
+    const saved = Store.saveLibraryDoc(isNew ? null : id, 'item', { name: name || fields.title, item: fields });
     if (!saved) { alert('內容不完整，沒有存檔。'); return; }
     this.state.libraryEdit = null;
     render();
   },
+
+  // 複製（第 43 條）：打開一份預填好的新內容（名稱加「（複本）」），按存檔才建立。
+  // 內建的動作清單／影片複製出來是自訂的（照今天看到的版本），原本那份不動。
+  duplicateLibraryDoc(kind, id) { this.startLibraryEdit(kind, 'new', null, id); },
 
   deleteLibraryDoc(id) {
     const doc = Store.libraryDoc(id);
