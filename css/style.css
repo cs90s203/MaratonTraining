@@ -524,16 +524,12 @@ button.rec-radio { cursor: pointer; }
 
 /* ── 本週頁手風琴（決策紀錄第 17 條）───────────────────────────── */
 .week-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-/* 第 X 週：點一下切換教練模式（決策紀錄第 46 條）。「教練」小標籤平常是淡的框，開著是實心 */
+/* 第 X 週：點一下切換教練模式——使用者自己的隱藏快捷鍵（決策紀錄第 46 條）。
+   看起來跟一般標題一樣：沒有標籤、沒有提示文字、滑鼠不變手指；開著時頂端本來就有教練模式的橫幅 */
 .week-title-btn {
-  display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--text);
-  font: inherit; font-weight: 800; font-size: 17px; padding: 2px 4px; cursor: pointer; border-radius: 8px;
+  border: 0; background: transparent; color: var(--text); font: inherit; font-weight: 800; font-size: 17px;
+  padding: 2px 4px; cursor: default; border-radius: 8px; -webkit-tap-highlight-color: transparent;
 }
-.week-title-btn .wt-coach {
-  font-size: 10.5px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 6px;
-  border: 1px solid var(--line); color: var(--text3);
-}
-.week-title-btn.on .wt-coach { border-color: var(--warn); background: var(--warnBg); color: var(--warn); }
 .week-title-btn:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
 .weekday-acc { border-bottom: 1px solid var(--line); scroll-margin-top: 140px; }
 .weekday-acc:last-child { border-bottom: none; }
