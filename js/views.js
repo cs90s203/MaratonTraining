@@ -76,10 +76,11 @@ function fmtTargetRange(r, meta) {
 // 教練模式編輯表單的 type 下拉選單。⚠️ 跟 tools/verify_plan.py 的 VALID_TYPES 必須
 // 保持一致——那支腳本管出廠課表，這裡管教練模式的即時編輯，是兩個不同的執行環境
 // （Python / 瀏覽器 JS），沒辦法共用同一份常數，只能靠這條註解互相提醒同步改。
-const VALID_TYPES = ['recovery', 'run', 'long-run', 'tempo', 'interval', 'form-drill', 'strength', 'rest', 'race'];
+// muscle＝肌力訓練（決策紀錄第 47 條：徒手／彈力帶這類，跟有負重的「重量訓練」分開）。tools/verify_plan.py 會讀這一行比對。
+const VALID_TYPES = ['recovery', 'run', 'long-run', 'tempo', 'interval', 'form-drill', 'muscle', 'strength', 'rest', 'race'];
 const TYPE_LABELS = {
   recovery: '恢復', run: '跑步', 'long-run': '長跑',
-  tempo: '節奏跑', interval: '間歇跑', 'form-drill': '跑姿訓練', strength: '重量訓練', rest: '休息', race: '比賽',
+  tempo: '節奏跑', interval: '間歇跑', 'form-drill': '跑姿訓練', muscle: '肌力訓練', strength: '重量訓練', rest: '休息', race: '比賽',
   'walk-run': '走跑交替（舊類型，請改選）', // v3 舊覆寫文件裡可能還有；只供顯示，不在 VALID_TYPES 下拉
 };
 // Store.dayStatus() 的回傳值 → 畫面文字。unfinished 不是 dayStatus 的回傳值：過去的日子

@@ -22,7 +22,7 @@ from datetime import date, timedelta
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEEKDAY = "一二三四五六日"
 VALID_TYPES = {"recovery", "run", "long-run", "tempo", "interval",
-               "form-drill", "strength", "rest", "race"}  # interval＝間歇跑（決策紀錄第 40 條，出廠課表目前沒有）
+               "form-drill", "muscle", "strength", "rest", "race"}  # interval＝間歇跑（第 40 條）、muscle＝肌力訓練（第 47 條），出廠課表目前都沒有
 # 週跑量目標只算這幾種（js/store.js weekVolume 用同一組；兩邊是不同執行環境，靠註解同步）。
 # race 刻意不在裡面：比賽是整份計畫的終點，不是「賽週的跑量目標」——算進去會讓賽週目標
 # 變成 47K+，進度條整週停在 10%，26 週的圖也被那一根拉到看不出其他週的差異。
@@ -120,6 +120,17 @@ def main():
 
     bad = [f'W{a}D{b} {it["type"]}' for a, b, it in items if it["type"] not in VALID_TYPES]
     check("type 全部在列舉內", not bad, str(bad[:5]))
+    # 決策紀錄第 47 條：兩邊的類型清單以前只靠註解提醒同步——讀 JS 原始碼直接比對，漏改一邊就擋下
+    def js_list(path, name):
+        src = open(os.path.join(ROOT, path), encoding="utf-8").read()
+        m = re.search(r"const " + name + r" = \[([^\]]*)\]", src)
+        return set(re.findall(r"'([^']+)'", m.group(1))) if m else None
+    js_types = js_list("js/views.js", "VALID_TYPES")
+    check("js/views.js VALID_TYPES 跟這支腳本一致", js_types == VALID_TYPES,
+          f"JS 多：{sorted((js_types or set()) - VALID_TYPES)}，JS 少：{sorted(VALID_TYPES - (js_types or set()))}")
+    js_run = js_list("js/store.js", "RUN_TYPES")
+    check("js/store.js RUN_TYPES 跟這支腳本一致", js_run == RUN_TYPES,
+          f"JS 多：{sorted((js_run or set()) - RUN_TYPES)}，JS 少：{sorted(RUN_TYPES - (js_run or set()))}")
     bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items
            if (it["duration"] and it["duration"]["min"] > it["duration"]["max"])
            or (it["distanceKm"] and it["distanceKm"]["min"] > it["distanceKm"]["max"])]
