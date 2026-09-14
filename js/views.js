@@ -46,7 +46,7 @@ const FLAG_LABELS = { leakage: '漏尿', pain: '疼痛', overTired: '過度疲�
 // 'km' 沿用跑量既有的 fmtKmRange；'num' 是純數字，step 決定輸入框的精度。
 const PHASE_TARGET_META = [
   { key: 'zone2Pace', label: 'Zone 2 配速目標', unit: '/km', kind: 'pace' },
-  { key: 'volumeKm', label: '跑量目標', unit: 'km', kind: 'km', step: 0.5 },
+  { key: 'volumeKm', label: '目標跑量', unit: 'km', kind: 'km', step: 0.5 },
   { key: 'cadence', label: 'Cadence 步頻', unit: 'spm', kind: 'num', step: 1 },
   { key: 'verticalOscillation', label: 'Vertical Oscillation 垂直振幅', unit: 'cm', kind: 'num', step: 0.1 },
   { key: 'groundContactTime', label: 'Ground Contact Time 觸地時間', unit: 'ms', kind: 'num', step: 1 },
@@ -1191,12 +1191,15 @@ function renderOverviewPage(state) {
   const viewingUserId = state.viewingUserId || Store.activeUserId;
   const viewingUser = PlanData.userById[viewingUserId];
   const isSelf = viewingUserId === Store.activeUserId;
+  // 決策紀錄第 48 條：已經過完的週（有填實際公里的）平均
+  const avgVol = Store.averageWeeklyVolume(viewingUserId);
 
   const stats = `
     <div class="stat-row">
       <div class="stat-tile"><div class="n">${wn}</div><div class="l">目前週次 / ${PlanData.plan.totalWeeks}</div></div>
       <div class="stat-tile"><div class="n">${dr >= 0 ? dr : 0}</div><div class="l">距離比賽（天）</div></div>
       <div class="stat-tile"><div class="n">${pct(Store.weekCompletionRate(wn, viewingUserId))}</div><div class="l">本週完成率</div></div>
+      <div class="stat-tile"><div class="n">${avgVol ? avgVol.km : '—'}</div><div class="l">平均週跑量 km${avgVol ? `（${avgVol.weeks} 週）` : ''}</div></div>
     </div>
   `;
 
@@ -1335,32 +1338,26 @@ function renderPhaseTargetsCard(currentPhase, viewingUserId, isSelf, viewingUser
       ${phases.map((p) => `<option value="${p.phaseId}" ${p.phaseId === shownPhaseId ? 'selected' : ''}>${h(p.name)}${p.phaseId === currentPhase.phaseId ? '（目前）' : ''}</option>`).join('')}
     </select>`;
 
-  // 跑量目標：唯一有「累積實際 vs 目標」的一項，額外算課表這階段的自動參考量（純提示）。
+  // 決策紀錄第 48 條：跑量拆成三行。
+  //   目標跑量：教練填的數字，不跟任何東西連動、不比對、不提醒（以前輸入框的灰字是課表加總，看起來像目標就是課表）
+  //   預計跑量：課表這階段每週自動目標的加總（phaseVolumeAutoRange）
+  //   實際跑量：這階段已經填的實際公里加總（phaseVolumeActual，沒有任何紀錄寫 —，第 0 條：沒資料不是 0）
   const volMeta = PHASE_TARGET_META[1]; // volumeKm
   const volTarget = targets.volumeKm;
-  const volAuto = Store.phaseVolumeAutoRange(phase.phaseId, viewingUserId);
+  const volPlan = Store.phaseVolumeAutoRange(phase.phaseId, viewingUserId);
   const volActual = Store.phaseVolumeActual(phase.phaseId, viewingUserId);
-  const volAnchor = volTarget ? (volTarget.min > 0 ? volTarget.min : volTarget.max) : 0;
-  const volPct = volTarget && volAnchor > 0 && volActual != null ? Math.min(100, Math.round((volActual / volAnchor) * 100)) : 0;
-  const volOverAuto = !!(volTarget && volAuto && volTarget.max > volAuto.max);
-
-  const volRow = editable ? `
+  const kmLabel = (text) => `<span class="ptgt-label">${h(text)}<span class="muted"> km</span></span>`;
+  const targetRow = editable ? `
     <div class="ptgt-row">
-      <span class="ptgt-label">${h(volMeta.label)}<span class="muted"> ${h(volMeta.unit)}</span></span>
+      ${kmLabel(volMeta.label)}
       <div class="ptgt-inputs">
-        <input name="volumeKm_min" type="number" step="${volMeta.step}" min="0" value="${volTarget ? volTarget.min : ''}" placeholder="${volAuto ? volAuto.min : ''}">
+        <input name="volumeKm_min" type="number" step="${volMeta.step}" min="0" value="${volTarget ? volTarget.min : ''}">
         <span class="muted">–</span>
-        <input name="volumeKm_max" type="number" step="${volMeta.step}" min="0" value="${volTarget ? volTarget.max : ''}" placeholder="${volAuto ? volAuto.max : ''}">
+        <input name="volumeKm_max" type="number" step="${volMeta.step}" min="0" value="${volTarget ? volTarget.max : ''}">
       </div>
-    </div>
-    ${volAuto ? `<div class="ptgt-hint${volOverAuto ? ' warn' : ''}">課表這階段大約 ${fmtKmRange(volAuto)} km${volOverAuto ? '——你的目標比這高' : ''}。</div>` : ''}
-  ` : (volTarget ? `<div class="ptgt-row"><span class="ptgt-label">${h(volMeta.label)}</span><span class="ptgt-val">${fmtKmRange(volTarget)} ${h(volMeta.unit)}</span></div>` : '');
-
-  const volProgress = volTarget ? `
-    <div class="ptgt-progress">
-      <span class="ptgt-progress-nums">本階段累積 <b>${volActual == null ? '—' : volActual}</b> / ${fmtKmRange(volTarget)} km</span>
-      <div class="progress-track"><div class="progress-fill ${volPct >= 100 ? 'reached' : ''}" style="width:${volPct}%"></div></div>
-    </div>` : '';
+    </div>` : (volTarget ? `<div class="ptgt-row">${kmLabel(volMeta.label)}<span class="ptgt-val">${fmtKmRange(volTarget)}</span></div>` : '');
+  const planRow = volPlan ? `<div class="ptgt-row">${kmLabel('預計跑量')}<span class="ptgt-val">${fmtKmRange(volPlan)}</span></div>` : '';
+  const actualRow = `<div class="ptgt-row">${kmLabel('實際跑量')}<span class="ptgt-val">${volActual == null ? '—' : volActual}</span></div>`;
 
   // 這階段 Zone 2 的體感（RPE／強度說明）：配速目標旁邊的背景參考（決策紀錄第 22 條——配速
   // 沒有像跑量那樣的自動天花板可以卡，只能提供這個當安全邊界的提醒，不擋存檔）。
@@ -1390,23 +1387,23 @@ function renderPhaseTargetsCard(currentPhase, viewingUserId, isSelf, viewingUser
       </div>${hint}`;
   }).join('');
 
-  const editHint = editable ? `<div class="ptgt-note">教練依訓練階段自己判斷，這幾項數字不會被自動限制或比對（跑量的累積比對除外）。</div>` : '';
+  const editHint = editable ? `<div class="ptgt-note">目標由教練依訓練階段自己判斷，不會被自動限制或比對。預計跑量＝課表這階段的加總；實際跑量＝這階段已填的實際公里加總。</div>` : '';
   const saveBtn = editable ? `<div class="actions" style="margin-top:10px"><button class="btn secondary" style="width:auto;padding:7px 14px;font-size:13px" onclick="A.savePhaseTargets('${jsq(phase.phaseId)}','${jsq(viewingUserId)}')">儲存本階段目標</button></div>` : '';
-  const empty = !editable && !volTarget && PHASE_TARGET_META.every((m) => m.key === 'volumeKm' || !targets[m.key]);
+  const noTargets = !volTarget && PHASE_TARGET_META.every((m) => m.key === 'volumeKm' || !targets[m.key]);
 
   return `
     <div class="section">
       <div class="section-title">階段目標${!isSelf ? `（${h(viewingUser ? viewingUser.displayName : viewingUserId)}）` : ''}</div>
       <div class="card ptgt-card">
         <div class="ptgt-head">${phaseSelect}</div>
-        ${empty ? `<div class="muted" style="font-size:13px">還沒設定目標</div>` : `
-          <form id="ptgt-form" onsubmit="return false">
-            ${volRow}
-            ${volProgress}
-            ${otherRows}
-          </form>
-          ${editHint}
-        `}
+        <form id="ptgt-form" onsubmit="return false">
+          ${targetRow}
+          ${planRow}
+          ${actualRow}
+          ${otherRows}
+        </form>
+        ${!editable && noTargets ? `<div class="muted" style="font-size:13px;margin-top:6px">教練還沒設定這階段的目標</div>` : ''}
+        ${editHint}
         ${saveBtn}
       </div>
     </div>

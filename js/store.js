@@ -697,6 +697,19 @@ const Store = {
     return hasAny ? round1(sum) : null;
   },
 
+  // 決策紀錄第 48 條：總覽「進度」的平均週跑量。只算已經過完的週（這週還沒過完，算進去會把平均往下拉），
+  // 而且只算有填實際的週——沒有任何紀錄的週不當成 0（第 0 條：沒資料不是做了 0）。沒有可以算的週回傳 null。
+  averageWeeklyVolume(userId) {
+    const loc = PlanData.locateToday();
+    const lastDone = loc.status === 'in-plan' ? loc.weekNumber - 1 : (loc.status === 'after-plan' ? PlanData.plan.totalWeeks : 0);
+    let sum = 0, weeks = 0;
+    for (let w = 1; w <= lastDone; w++) {
+      const v = this.weekVolume(w, userId);
+      if (v.actual != null) { sum += v.actual; weeks++; }
+    }
+    return weeks ? { km: round1(sum / weeks), weeks } : null;
+  },
+
   // ── 教練模式：課表內容的共用覆寫層 ──────────────────────────────────────
   // planOverrides[weekNumber] 存在時整週優先讀它，不存在時退回 PlanData 的出廠預設值
   // （tools/build_plan.py 產生、git 版控的 data/plan.json）。三個白名單成員都能寫
