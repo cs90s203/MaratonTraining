@@ -431,7 +431,10 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   if (isExpired) return secs.length ? `<div class="card rec-card">${secs.map((s) => `<div class="rec-sec">${s}</div>`).join('')}</div>` : '';
 
   // ── ① 實際數字＋完成 ──
-  const showNums = !isFuture && st !== 'rested' && (st === 'substituted' || activeTrains);
+  // 決策紀錄第 38 條（使用者裁定）：今天以後的日子也看得到、填得了實際公里／分鐘——以前（v0.10.0 起）未來的日子
+  // 不畫數字欄，看起來像欄位被刪掉。填了不會自動打勾（Store.setActualStats 對未來的日子不打勾，第 31 條），
+  // 「完成」也照舊要當天才出現。
+  const showNums = st !== 'rested' && (st === 'substituted' || activeTrains);
   // 換成騎車／游泳的公里沒有意義（週跑量只算跑步）；還沒選類型的舊紀錄照舊可以記公里
   const showKm = showNums && (st === 'substituted' ? (!subType || subType === 'run') : hasRun);
   const showMin = showNums && (st === 'substituted' ? true : hasDuration);
@@ -442,7 +445,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   const kmVal = entry && entry.actualDistanceKm != null ? entry.actualDistanceKm : '';
   const durVal = entry && entry.actualDurationMinutes != null ? entry.actualDurationMinutes : '';
   const nums = (showKm || showMin || showDone) ? `
-    ${isFuture && isDone ? '<div class="status-hint">這天還沒到，應該是誤觸了——再點一下「照表完成」就能取消。當天就能填公里跟分鐘。</div>' : ''}
+    ${isFuture && isDone ? '<div class="status-hint">這天還沒到，應該是誤觸了——再點一下「完成」就能取消。</div>' : ''}
     <div class="rec-nums">
       ${showKm ? `<label class="rec-num">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>` : ''}
       ${showMin ? `<label class="rec-num">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
