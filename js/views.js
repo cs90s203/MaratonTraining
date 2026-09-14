@@ -298,7 +298,8 @@ function itemPlanParts(item) {
       links.push(`<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener">${ICON.play} ${h(v.title || '看影片')}</a>`);
     } else if (v && v.linkType === 'search') {
       const q = encodeURIComponent(v.searchQuery || v.title);
-      links.push(`<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${ICON.search} 搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</a>`);
+      // 只要是影片一律 ▶ 開頭（第 32 條：使用者要一眼分得出哪些是影片），搜尋型的用文字講「搜尋」
+      links.push(`<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${ICON.play} 搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</a>`);
     }
   });
   let workoutBlock = '';
@@ -1388,7 +1389,7 @@ function renderLibraryPanel(state) {
   const videos = Store.libraryList('video');
   const videoRows = videos.map((v) => isEditing('video', v.id)
     ? renderVideoEditor(edit)
-    : row(v, h(v.title), v.linkType === 'video' ? '貼上的影片網址' : `搜尋「${h(v.searchQuery)}」`)).join('');
+    : row(v, `${ICON.play}${h(v.title)}`, v.linkType === 'video' ? '貼上的影片網址' : `搜尋「${h(v.searchQuery)}」`)).join('');
 
   return `
     <div class="section">

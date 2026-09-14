@@ -159,6 +159,10 @@ button.item-check::after, .rec-tick::after, button.rec-radio::after { content: '
   background: var(--card); border: 1px solid var(--inpBorder); color: var(--accent2); display: inline-flex; gap: 5px; align-items: center;
   max-width: 100%; overflow-wrap: anywhere; /* 連結上寫影片名稱（第 28 條），長標題在手機上要能換行 */
 }
+/* 影片名稱前的 ▶（決策紀錄第 32 條）。一定要給尺寸跟 flex:none：svg 只有 viewBox 沒有寬高，
+   在 inline-flex 裡會被旁邊的長標題擠成 0 寬——v0.12.0 以前一直是這樣，圖示在畫面上看不到。 */
+.item-link svg, .lib-name svg { flex: none; width: 12px; height: 12px; }
+.lib-name svg { color: var(--accent2); margin-right: 5px; vertical-align: -1px; }
 
 .choice-or { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--text3); letter-spacing: .06em; margin: -2px 0 8px; }
 .choice-note { font-size: 12.5px; color: var(--text2); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--inpBorder); }
