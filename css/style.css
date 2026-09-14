@@ -376,6 +376,11 @@ textarea.note-input {
 .pick-empty { font-size: 12.5px; color: var(--text3); padding: 10px; line-height: 1.5; border-bottom: 1px solid var(--line); }
 .pick-list .pick-foot { display: block; width: 100%; text-align: left; padding: 9px 10px; font-size: 12.5px; }
 .amt-group { display: inline-flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.amt-view {
+  border: 0; background: transparent; color: inherit; font: inherit; padding: 0; cursor: pointer;
+  border-bottom: 1px dashed var(--text3); touch-action: manipulation; -webkit-user-select: none; user-select: none;
+}
+.amt-view.empty { color: var(--text3); }
 .amt-edit { display: inline-flex; align-items: center; gap: 4px; }
 .amt-edit input {
   width: 52px; border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text);
@@ -519,6 +524,17 @@ button.rec-radio { cursor: pointer; }
 
 /* ── 本週頁手風琴（決策紀錄第 17 條）───────────────────────────── */
 .week-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+/* 第 X 週：點一下切換教練模式（決策紀錄第 46 條）。「教練」小標籤平常是淡的框，開著是實心 */
+.week-title-btn {
+  display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--text);
+  font: inherit; font-weight: 800; font-size: 17px; padding: 2px 4px; cursor: pointer; border-radius: 8px;
+}
+.week-title-btn .wt-coach {
+  font-size: 10.5px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 6px;
+  border: 1px solid var(--line); color: var(--text3);
+}
+.week-title-btn.on .wt-coach { border-color: var(--warn); background: var(--warnBg); color: var(--warn); }
+.week-title-btn:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
 .weekday-acc { border-bottom: 1px solid var(--line); scroll-margin-top: 140px; }
 .weekday-acc:last-child { border-bottom: none; }
 .weekday-acc .weekday-row { border-bottom: none; }

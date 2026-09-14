@@ -10,6 +10,7 @@ const App = {
     expandedDay: null,     // {weekNumber,dayIndex}：本週頁手風琴目前展開的那一列；null = 全收
     itemPicker: null,      // 決策紀錄第 45 條：教練模式打開的項目庫清單 {weekNumber,dayIndex,itemId|'add'}
     savedFlash: null,      // 剛按「存成常用」的課表項目 id：那張卡寫「已存進項目庫」
+    amountEdit: null,      // 決策紀錄第 46 條：點兩下正在改時間的課表項目 {weekNumber,dayIndex,itemId}
     helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
     modal: null,           // 'safety' | null
     privateNoteOpen: null, // 身體狀況的備註框被手動展開的那一天（dateKey）
@@ -38,6 +39,7 @@ const App = {
     this.state.page = page;
     if (page === 'week') this._focusToday();
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     this.state.libraryEdit = null;
     this.state.modal = null;
     render();
@@ -49,6 +51,7 @@ const App = {
     const same = e && e.weekNumber === weekNumber && e.dayIndex === dayIndex;
     this.state.expandedDay = same ? null : { weekNumber, dayIndex };
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     this.state.libraryEdit = null; // 第 33 條：從卡片打開的清單編輯器不能跟著跑到別天
     render();
   },
@@ -60,6 +63,7 @@ const App = {
     this.state.expandedDay = (loc.status === 'in-plan' && loc.weekNumber === weekNumber)
       ? { weekNumber, dayIndex: loc.dayIndex } : null;
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     this.state.libraryEdit = null;
     render();
   },
@@ -188,6 +192,12 @@ const App = {
   _sortable: null,
   afterRender() {
     Store.markPlanSeen();
+    if (this._focusAmount) {
+      const g = [...document.querySelectorAll('.amt-group')].find((x) => x.dataset.amtItem === this._focusAmount);
+      this._focusAmount = null;
+      const input = g && g.querySelector('input');
+      if (input) { input.focus(); try { input.select(); } catch (e) { /* number input 有些瀏覽器不給 select */ } }
+    }
     const le = this.state.libraryEdit;
     if (le && le.scrollOnce) {
       le.scrollOnce = false;
@@ -249,6 +259,7 @@ const App = {
       this.state.expandedDay = { weekNumber, dayIndex: d };
     }
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     this.state.libraryEdit = null;
     Store.saveWeekOverride(weekNumber, week);
     render();
@@ -306,6 +317,7 @@ const App = {
   toggleCoachMode() {
     Store.setCoachMode(!Store.coachMode);
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     this.state.libraryEdit = null;
     render();
   },
@@ -320,6 +332,29 @@ const App = {
       return true;
     }
     return false;
+  },
+
+  // 時間的文字點兩下才變輸入框（第 46 條）。自己判斷兩下（400ms 內點同一個），不靠 dblclick——
+  // iOS Safari 對不是連結的元素不一定送 dblclick。第一下不重畫（畫面沒有要變的）。
+  _lastAmountTap: null,
+  amountTap(weekNumber, dayIndex, itemId) {
+    const key = `${weekNumber}-${dayIndex}-${itemId}`;
+    const now = Date.now();
+    const last = this._lastAmountTap;
+    if (!(last && last.key === key && now - last.t < 400)) { this._lastAmountTap = { key, t: now }; return; }
+    this._lastAmountTap = null;
+    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    this.state.amountEdit = { weekNumber, dayIndex, itemId };
+    this.state.itemPicker = null;
+    this._focusAmount = itemId;
+    render();
+  },
+  // 焦點離開整組時間輸入框（不是跳到同一組的另一格）：改完了，收回文字。存檔是各格的 onchange 做的。
+  amountFocusOut(ev, group) {
+    const next = ev && ev.relatedTarget;
+    if (next && group && group.contains(next)) return;
+    this.state.amountEdit = null;
+    setTimeout(() => render(), 0);
   },
 
   toggleItemPicker(weekNumber, dayIndex, itemId) {
@@ -348,6 +383,7 @@ const App = {
     // 二擇一是一組：教練動了其中一個就是整組看過了，一起清掉 derived（verify_plan.py B4 守的就是兩個選項對等）
     if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     this.state.savedFlash = null;
     Store.saveWeekOverride(weekNumber, week);
     render();
@@ -362,6 +398,7 @@ const App = {
     day.items.push(this._itemFromTemplate(tpl, newItemId()));
     if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     this.state.savedFlash = null;
     Store.saveWeekOverride(weekNumber, week);
     render();
@@ -389,15 +426,19 @@ const App = {
       if (lo > hi) { if (inputs.indexOf(el) === 1) lo = hi; else hi = lo; }
       range = { min: lo, max: hi };
     }
+    // 點兩下正在改（第 46 條）：存檔不重畫——瀏覽器實測按 Tab 從下限跳到上限時，change 當下的重畫會把整組輸入框換掉，
+    // 游標到不了上限那格。改完離開整組時（amountFocusOut）才重畫一次。
+    const ae = this.state.amountEdit;
+    const editing = !!(ae && ae.weekNumber === weekNumber && ae.dayIndex === dayIndex && ae.itemId === itemId);
     const week = this._cloneEffectiveWeek(weekNumber);
     const it = week.days[dayIndex].items.find((x) => x.id === itemId);
     if (!it) { render(); return; }
-    if (JSON.stringify(it[key] || null) === JSON.stringify(range)) { render(); return; } // 沒變（例如 30–30 寫成 30）
+    if (JSON.stringify(it[key] || null) === JSON.stringify(range)) { if (!editing) render(); return; } // 沒變（例如 30–30 寫成 30）
     it[key] = range;
     it.derived = false; // 教練動過數字就是確認過（第 19 條）
     this.state.savedFlash = null;
-    Store.saveWeekOverride(weekNumber, week);
-    render();
+    Store.saveWeekOverride(weekNumber, week, editing);
+    if (!editing) render();
   },
 
   // ── 常用項目庫（決策紀錄第 26 條）─────────────────────────────────────────────
@@ -470,6 +511,7 @@ const App = {
       scrollOnce: !!copyOf,
     };
     this.state.itemPicker = null;
+    this.state.amountEdit = null;
     render();
   },
 

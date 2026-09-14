@@ -278,7 +278,7 @@ function renderDayBody(weekNumber, dayIndex) {
     if (addOpen) html += renderLibraryPickList(weekNumber, dayIndex, 'add', null);
   }
 
-  if (!isExpired) html += renderDayRecordCard(weekNumber, dayIndex, d, entry, false);
+  // 第 46 條：教練模式是改課表的地方，當天紀錄（實際數字、沒照表、體感強度、附註、身體狀況）不畫，關掉教練模式照舊
 
   html += `</div>`;
   return html;
@@ -378,7 +378,6 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   const active = d.selectOne ? (chosen ? [chosen] : []) : d.items;
   const activeTrains = active.some((it) => it.type !== 'rest');
   const hasRun = active.some((it) => isRunType(it.type) || it.type === 'race');
-  const hasDuration = active.some((it) => it.duration);
   // 「完成」按鈕只給「非二擇一、只有一個不是休息的項目」的日子——跟 Store.setActualStats
   // 自動打勾的條件同一套；兩項的日子勾在各自那一行，二擇一「選」本身就算完成。
   const single = !d.selectOne && d.items.length === 1 && d.items[0].type !== 'rest' ? d.items[0] : null;
@@ -450,7 +449,9 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   const showNums = st !== 'rested' && (st === 'substituted' || activeTrains);
   // 換成騎車／游泳的公里沒有意義（週跑量只算跑步）；還沒選類型的舊紀錄照舊可以記公里
   const showKm = showNums && (st === 'substituted' ? (!subType || subType === 'run') : hasRun);
-  const showMin = showNums && (st === 'substituted' ? true : hasDuration);
+  // 第 46 條：以前只有課表寫了時長才給「實際分鐘」，從項目庫換來的間歇跑（只有段落、沒有總時長）只剩公里，
+  // 記不了用時。有訓練的日子一律給。
+  const showMin = showNums;
   const isDone = derived === 'done';
   // 決策紀錄第 13b 條：未來的日子不能預先打勾完成，所以不給「完成」——但已經被打成完成的
   // （誤觸，或 v0.12.0 以前的漏洞留下的）一定要給，不然沒有任何地方能取消（第 31 條）。
@@ -461,7 +462,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
     ${isFuture && isDone ? '<div class="status-hint">這天還沒到，應該是誤觸了——再點一下「完成」就能取消。</div>' : ''}
     <div class="rec-nums">
       ${showKm ? `<label class="rec-num">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>` : ''}
-      ${showMin ? `<label class="rec-num">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
+      ${showMin ? `<label class="rec-num">實際時間<input type="number" inputmode="decimal" min="0" placeholder="分鐘" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
       ${showDone ? `<button class="rec-done ${isDone ? 'on' : ''} ${showKm || showMin ? '' : 'solo'}" onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(single.id)}')" aria-pressed="${isDone}"><span class="rec-done-circ">${ICON.check}</span>${showKm || showMin ? '完成' : '照表完成'}</button>` : ''}
     </div>` : '';
 
@@ -539,7 +540,11 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   const editable = coach && dateKey >= PlanData.dayKey(PlanData.today());
   const pk = App.state.itemPicker;
   const pickerOpen = editable && !!(pk && pk.weekNumber === weekNumber && pk.dayIndex === dayIndex && pk.itemId === item.id);
-  const amountHtml = editable && item.type !== 'rest' ? renderAmountEdit(weekNumber, dayIndex, item) : '';
+  // 時間平常是文字，點兩下才變輸入框（第 46 條：避免一碰就改到）
+  const ae = App.state.amountEdit;
+  const amountEditing = editable && !!(ae && ae.weekNumber === weekNumber && ae.dayIndex === dayIndex && ae.itemId === item.id);
+  const amountHtml = !editable || item.type === 'rest' ? ''
+    : amountEditing ? renderAmountEdit(weekNumber, dayIndex, item) : renderAmountView(weekNumber, dayIndex, item);
   const parts = itemPlanParts(item, { dateKey, coachEdit: coach ? { weekNumber, dayIndex } : null, amountHtml });
 
   // 只有圓圈能打勾（決策紀錄第 29 條）：以前整張卡都能點，點「查看動作」、影片或備註旁邊都會打勾。
@@ -754,14 +759,21 @@ function renderLibraryPickList(weekNumber, dayIndex, target, current) {
 function renderAmountEdit(weekNumber, dayIndex, item) {
   const box = (name, r, key, unit, step) => `
     <span class="amt-edit" data-amt="${key}">
-      <input type="number" min="0" ${step ? `step="${step}" inputmode="decimal"` : 'inputmode="numeric"'} value="${r ? h(r.min) : ''}" aria-label="${name}下限" onchange="A.setItemAmount(${weekNumber},${dayIndex},'${jsq(item.id)}',this)">
+      <input type="number" min="0" ${step ? `step="${step}" inputmode="decimal"` : 'inputmode="numeric"'} value="${r ? h(r.min) : ''}" aria-label="${name}下限" onchange="A.setItemAmount(${weekNumber},${dayIndex},'${jsq(item.id)}',this)" onkeydown="if(event.key==='Enter')this.blur()">
       <span>–</span>
-      <input type="number" min="0" ${step ? `step="${step}" inputmode="decimal"` : 'inputmode="numeric"'} value="${r ? h(r.max) : ''}" aria-label="${name}上限" onchange="A.setItemAmount(${weekNumber},${dayIndex},'${jsq(item.id)}',this)">
+      <input type="number" min="0" ${step ? `step="${step}" inputmode="decimal"` : 'inputmode="numeric"'} value="${r ? h(r.max) : ''}" aria-label="${name}上限" onchange="A.setItemAmount(${weekNumber},${dayIndex},'${jsq(item.id)}',this)" onkeydown="if(event.key==='Enter')this.blur()">
       <span>${unit}</span>
     </span>`;
   const useKm = !!item.distanceKm && !item.duration;
   const both = !!item.distanceKm && !!item.duration;
-  return `<span class="amt-group">${useKm ? '' : box('時長', item.duration, 'duration', '分', null)}${useKm || both ? box('距離', item.distanceKm, 'distanceKm', 'K', '0.1') : ''}</span>`;
+  // 焦點離開整組（不是跳到同一組的另一格）＝改完了，收回文字
+  return `<span class="amt-group" data-amt-item="${h(item.id)}" onfocusout="A.amountFocusOut(event,this)">${useKm ? '' : box('時長', item.duration, 'duration', '分', null)}${useKm || both ? box('距離', item.distanceKm, 'distanceKm', 'K', '0.1') : ''}</span>`;
+}
+
+// 課表項目卡上時間的文字（第 46 條）：點兩下變成輸入框。沒有時間的寫「— 分」，才有地方點。
+function renderAmountView(weekNumber, dayIndex, item) {
+  const txt = PlanData.fmtItemMeta(item) || '— 分';
+  return `<button type="button" class="amt-view ${PlanData.fmtItemMeta(item) ? '' : 'empty'}" onclick="A.amountTap(${weekNumber},${dayIndex},'${jsq(item.id)}')" title="點兩下修改時間" aria-label="時間 ${h(txt)}，點兩下修改">${h(txt)}</button>`;
 }
 
 // 附註欄標題旁的「誰看得到」（決策紀錄第 13a 條：分流靠標題，不靠 placeholder）。
@@ -924,7 +936,7 @@ function renderWeekPage(state) {
       <div class="week-head">
         <button class="navbtn" style="opacity:${canPrev ? 1 : .3}" ${canPrev ? `onclick="A.setWeekView(${wn - 1})"` : 'disabled'}>‹ 上週</button>
         <div style="text-align:center">
-          <div style="font-weight:800;font-size:17px">第 ${wn} 週</div>
+          <button type="button" class="week-title-btn ${coach ? 'on' : ''}" onclick="A.toggleCoachMode()" aria-pressed="${coach}" title="點一下切換教練模式">第 ${wn} 週<span class="wt-coach">教練</span></button>
           <div style="font-size:12px;color:var(--text2)">${h(phase.name)}</div>
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
