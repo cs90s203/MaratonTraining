@@ -269,7 +269,9 @@ function renderDayBody(weekNumber, dayIndex) {
   }
 
   if (isEditingThisDay && editing.itemId === 'new') {
-    html += renderItemEditForm(weekNumber, dayIndex, null, { prefill: editing.prefill || null, templateId: editing.templateId || '' });
+    html += editing.step === 'form'
+      ? renderItemEditForm(weekNumber, dayIndex, null, { prefill: editing.prefill || null, templateName: editing.templateName || '' })
+      : renderTemplatePicker(weekNumber, dayIndex);
   } else {
     html += `<div class="coach-add-row"><button class="btn coach-add-row" onclick="A.startAddItem(${weekNumber},${dayIndex})">+ 新增項目</button></div>`;
   }
@@ -329,7 +331,7 @@ function itemPlanParts(item, opts) {
               return `<div>· ${h(ex.name)} · ${ex.sets} 組 × ${qty}${ex.perSide ? '（每邊）' : ''}${ex.notes ? '　' + h(ex.notes) : ''}</div>`;
             }).join('')}
             ${wo.safetyNote ? `<div class="wo-safety">${h(wo.safetyNote)}</div>` : ''}
-            ${wo.derived && wo.derivedNote ? `<div class="wo-derived">推導值：${h(wo.derivedNote)}</div>` : ''}
+            ${wo.derived && wo.derivedNote ? `<div class="wo-derived">${h(wo.derivedNote)}</div>` : ''}
             ${ce && !wo.deleted ? `<button type="button" class="link-btn wo-edit" onclick="A.startLibraryEditFromCard(${ce.weekNumber},${ce.dayIndex},'${jsq(item.id)}','${jsq(item.workoutRef)}')">編輯這份動作清單</button>` : ''}
           </div>
         </details>`;
@@ -627,13 +629,18 @@ function renderSegmentEditor(segments) {
 // 教練模式的項目編輯表單。item 為 null 時是「新增項目」。用 scoped querySelector
 // 讀值（A.saveItemEdit 會找 #item-edit-... 容器內的 [name=...]），不是把每個欄位
 // 塞進 onclick 參數——12 個欄位塞進 inline onclick 字串太脆弱（引號/特殊字元）。
-// opts.prefill：新增項目時從常用項目帶入的內容（複製，決策紀錄第 26 條）；opts.templateId：
-// 新增表單上目前選了哪個常用項目。opts.libraryTemplate：在設定頁的常用項目庫編輯範本本身——
+// opts.prefill：新增項目時從常用項目帶入的內容（複製，決策紀錄第 26 條）；opts.templateName：
+// 帶入的是哪個常用項目。opts.libraryTemplate：在設定頁的常用項目庫編輯範本本身——
 // 同一份表單，存檔按鈕改走 A.saveTemplateEdit，多一個「範本名稱」欄位。
+// 決策紀錄第 44 條：項目的「定義」（類型、心率、RPE、段落、影片、動作）在常用項目庫編；課表這邊
+// 只調這天的數字。所以課表上編輯既有項目、或從常用項目帶入的新項目，是「簡易表單」：上面只有
+// 時長／距離／備註，其餘收進「更多設定」（欄位照樣在 DOM 裡，_readItemForm 照讀）。
+// 常用項目庫本身、課表上「空白項目」沒有來源可以帶，是完整表單。
 function renderItemEditForm(weekNumber, dayIndex, item, opts) {
   opts = opts || {};
   const tpl = opts.libraryTemplate || null;
   const isNew = !item && !tpl;
+  const simple = !tpl && (!isNew || !!opts.prefill);
   const blank = { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, segments: null, videoRefs: [], videoRef: null, workoutRef: null, notes: '', derived: false };
   const it = item || (tpl && tpl.item) || opts.prefill || blank;
   const formId = tpl ? `tpl-edit-${tpl.id}` : `item-edit-${weekNumber}-${dayIndex}-${isNew ? 'new' : it.id}`;
@@ -650,16 +657,6 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
       ? '（這台裝置找不到這個自訂項目，存檔會保留原設定）'
       : `${h(label(x))}${String(x.id).startsWith('c-') ? '（自訂）' : ''}${x.__deleted ? '（已從庫中刪除）' : ''}`}</option>`).join('');
   };
-  const templates = isNew ? Store.libraryList('item') : [];
-  const templatePicker = templates.length ? `
-        <div class="field wide tpl-picker">
-          <label class="field-lbl">從常用項目帶入</label>
-          <select onchange="A.applyTemplateToNewItem(${weekNumber},${dayIndex},this.value)">
-            <option value="">（空白項目）</option>
-            ${templates.map((t) => `<option value="${h(t.id)}" ${opts.templateId === t.id ? 'selected' : ''}>${h(t.name)} · ${h(TYPE_LABELS[t.item.type] || t.item.type)}</option>`).join('')}
-          </select>
-          <div class="tpl-hint">帶入是複製一份：之後改範本，不會改到已經排好的日子。</div>
-        </div>` : '';
   // 影片可以好幾部（第 28 條）：一部一列下拉，「＋ 再加一部影片」從 <template> 複製一列新的進來、
   // ✕ 拿掉那一列——兩個都直接改 DOM、不重繪（見 A.addVideoRow 的註解）。存檔時 _readItemForm
   // 讀全部 [name=videoRefs]；<template> 裡那列不在 DOM 樹上，querySelectorAll 讀不到，不會多算一部。
@@ -693,12 +690,7 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
     ? `<div class="edit-provenance">${provenance.join('<br>')}<br>你存檔後就當作你確認過了，標題旁的標籤會拿掉。</div>`
     : '';
 
-  return `
-    <div class="item coach-editing" id="${formId}">
-      <div class="edit-form">
-        ${templatePicker}
-        ${tpl ? `<div class="field wide"><label class="field-lbl">範本名稱</label><input name="templateName" type="text" value="${h(tpl.name)}" placeholder="例如：Zone 2 跑（Phase 2）"></div>` : ''}
-        ${provenanceNote}
+  const fTypeTitle = `
         <div class="row">
           <div class="field">
             <label class="field-lbl">類型</label>
@@ -708,20 +700,22 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
             <label class="field-lbl">標題</label>
             <input name="title" type="text" value="${h(it.title)}" placeholder="例如：Zone 2 跑">
           </div>
-        </div>
+        </div>`;
+  const fAmount = `
         <div class="row">
           <div class="field"><label class="field-lbl">時長下限（分）</label><input name="durationMin" type="number" min="0" value="${h(durMin)}"></div>
           <div class="field"><label class="field-lbl">時長上限（分）</label><input name="durationMax" type="number" min="0" value="${h(durMax)}"></div>
           <div class="field"><label class="field-lbl">距離下限（K）</label><input name="distanceMin" type="number" min="0" step="0.1" value="${h(kmMin)}"></div>
           <div class="field"><label class="field-lbl">距離上限（K）</label><input name="distanceMax" type="number" min="0" step="0.1" value="${h(kmMax)}"></div>
-        </div>
+        </div>`;
+  const fIntensity = `
         <div class="row">
           <div class="field"><label class="field-lbl">心率區間</label><select name="heartRateZone"><option value="">（無）</option>${hrOptions}</select></div>
           <div class="field"><label class="field-lbl">RPE 下限</label><input name="rpeMin" type="number" min="0" max="10" value="${h(rpeMin)}"></div>
           <div class="field"><label class="field-lbl">RPE 上限</label><input name="rpeMax" type="number" min="0" max="10" value="${h(rpeMax)}"></div>
         </div>
-        <div class="field wide"><label class="field-lbl">強度說明</label><input name="intensityNote" type="text" value="${h(it.intensityNote || '')}"></div>
-        ${renderSegmentEditor(it.segments)}
+        <div class="field wide"><label class="field-lbl">強度說明</label><input name="intensityNote" type="text" value="${h(it.intensityNote || '')}"></div>`;
+  const fRefs = `
         <div class="field wide">
           <label class="field-lbl">影片參照</label>
           <div class="vref-list">${(curVideos.length ? curVideos : [null]).map(videoRow).join('')}</div>
@@ -731,18 +725,103 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
         <div class="field wide">
           <label class="field-lbl">動作參照</label>
           <select name="workoutRef"><option value="">（無）</option>${refOptions(Store.allWorkouts(), it.workoutRef, (id) => Store.workoutById(id), (w) => w.name)}</select>
-        </div>
-        <div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>
+        </div>`;
+  const fNotes = `<div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>`;
+  const actions = `
         <div class="actions">
           ${tpl
             ? `<button class="btn" style="background:var(--warn)" onclick="A.saveTemplateEdit('${jsq(tpl.id)}')">儲存範本</button>
                <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>`
             : `<button class="btn" style="background:var(--warn)" onclick="A.saveItemEdit(${weekNumber},${dayIndex},'${isNew ? 'new' : jsq(it.id)}')">儲存</button>
                <button class="btn secondary" onclick="A.cancelEditItem()">取消</button>`}
-        </div>
+        </div>`;
+
+  if (simple) {
+    // 簡易表單的標頭：新增的寫「帶入：常用項目名稱」＋換一個；既有的寫標題・類型
+    const head = isNew
+      ? `<div class="item-src"><span>帶入：<b>${h(opts.templateName || it.title)}</b></span><button type="button" class="link-btn" onclick="A.backToTemplatePicker(${weekNumber},${dayIndex})">換一個</button></div>`
+      : `<div class="item-src"><span><b>${h(it.title)}</b></span></div>`;
+    const includes = itemIncludesText(it);
+    return `
+    <div class="item coach-editing" id="${formId}">
+      <div class="edit-form">
+        ${head}
+        ${includes ? `<div class="item-includes">${includes}</div>` : ''}
+        ${provenanceNote}
+        ${fAmount}
+        ${fNotes}
+        <details class="more-settings">
+          <summary>更多設定（通常不用改）</summary>
+          <div class="more-settings-body">
+            <div class="tpl-hint">這裡改的只影響這一天。要改常用項目本身（之後帶入的預設內容），到「設定 → 常用項目庫」。</div>
+            ${fTypeTitle}
+            ${fIntensity}
+            ${renderSegmentEditor(it.segments)}
+            ${fRefs}
+          </div>
+        </details>
+        ${actions}
       </div>
     </div>
   `;
+  }
+
+  return `
+    <div class="item coach-editing" id="${formId}">
+      <div class="edit-form">
+        ${isNew ? `<div class="item-src"><span><b>空白項目</b>：全部自己填</span><button type="button" class="link-btn" onclick="A.backToTemplatePicker(${weekNumber},${dayIndex})">改從常用項目挑</button></div>` : ''}
+        ${tpl ? `<div class="field wide"><label class="field-lbl">範本名稱（選填，空白就用標題）</label><input name="templateName" type="text" value="${h(tpl.name)}" placeholder="例如：Zone 2 跑（Phase 2）"></div>` : ''}
+        ${provenanceNote}
+        ${fTypeTitle}
+        ${fAmount}
+        ${fIntensity}
+        ${renderSegmentEditor(it.segments)}
+        ${fRefs}
+        ${fNotes}
+        ${actions}
+      </div>
+    </div>
+  `;
+}
+
+// 簡易表單上「這個項目包含什麼」：時長／距離以外、收在「更多設定」裡的內容，一行讀完。
+function itemIncludesText(it) {
+  const bits = [TYPE_LABELS[it.type] || it.type];
+  const hr = PlanData.fmtHeartRateZone(it.heartRateZone);
+  if (hr) bits.push(hr);
+  if (it.rpe && Number.isFinite(it.rpe.min)) bits.push(`RPE ${PlanData.fmtRange(it.rpe, '')}`);
+  const segs = PlanData.itemSegments(it);
+  if (segs.length) bits.push(`${segs.length} 段訓練段落`);
+  const vids = PlanData.itemVideoRefs(it).map((id) => Store.videoById(id)).filter(Boolean);
+  if (vids.length) bits.push(`影片：${vids.map((v) => v.title).join('、')}`);
+  const wo = it.workoutRef ? Store.workoutById(it.workoutRef) : null;
+  if (wo) bits.push(`動作：${wo.name}`);
+  return h(bits.filter(Boolean).join(' · '));
+}
+
+// 「＋ 新增項目」的第一步（第 44 條）：從常用項目挑一個，一次帶入全部設定；沒有合適的才用空白項目。
+function renderTemplatePicker(weekNumber, dayIndex) {
+  const templates = Store.libraryList('item');
+  const list = templates.map((t) => {
+    const meta = [itemIncludesText(t.item), h(PlanData.fmtItemMeta(t.item))].filter(Boolean).join(' · ');
+    return `<button type="button" class="tpl-pick" onclick="A.pickTemplateForNewItem(${weekNumber},${dayIndex},'${jsq(t.id)}')">
+        <span class="tpl-pick-name">${h(t.name)}</span>
+        <span class="tpl-pick-meta">${meta}</span>
+      </button>`;
+  }).join('');
+  return `
+    <div class="item coach-editing tpl-picker-card">
+      <div class="edit-form">
+        <div class="lib-head">從常用項目挑一個</div>
+        ${templates.length
+          ? `<div class="tpl-pick-list">${list}</div>`
+          : `<div class="tpl-hint">常用項目庫還是空的。可以在課表項目下面按「存成常用」，或到「設定 → 常用項目庫」新增。</div>`}
+        <div class="actions">
+          <button type="button" class="btn secondary" onclick="A.pickTemplateForNewItem(${weekNumber},${dayIndex},'')">空白項目（全部自己填）</button>
+          <button type="button" class="btn secondary" onclick="A.cancelEditItem()">取消</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 // 附註欄標題旁的「誰看得到」（決策紀錄第 13a 條：分流靠標題，不靠 placeholder）。
@@ -1554,7 +1633,7 @@ function renderLibraryPanel(state) {
       <div class="card lib-card">
         <div class="lib-group">
           <div class="lib-head">常用項目</div>
-          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。新增課表項目時可以直接帶入；帶入是複製一份，之後改範本不會改到已經排好的日子。</div>
+          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。項目的類型、心率、訓練段落、影片、動作在這裡設定好；課表「＋ 新增項目」第一步就是從這裡挑，帶入後只要調時長／距離。帶入是複製一份，之後改範本不會改到已經排好的日子。</div>
           ${itemRows || (isEditing('item', 'new') ? '' : '<div class="lib-empty">還沒有常用項目。</div>')}
           ${newItemForm}
         </div>

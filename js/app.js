@@ -315,8 +315,9 @@ const App = {
     render();
   },
 
+  // 第 44 條：新增項目先挑常用項目（step 'pick'），挑了才進表單（step 'form'）
   startAddItem(weekNumber, dayIndex) {
-    this.state.editingItem = { weekNumber, dayIndex, itemId: 'new' };
+    this.state.editingItem = { weekNumber, dayIndex, itemId: 'new', step: 'pick' };
     this.state.libraryEdit = null;
     render();
   },
@@ -340,15 +341,23 @@ const App = {
     alert(`已存成常用項目「${saved.name}」。之後在任何一天按「＋ 新增項目」就能帶入；到「設定」頁的常用項目庫可以改名、改內容或刪除。`);
   },
 
-  // 新增項目表單上選了一個常用項目：把它的內容複製進表單（深拷貝，改表單不會動到範本）。
-  // 選回「（空白項目）」就清空。
-  applyTemplateToNewItem(weekNumber, dayIndex, templateId) {
-    const tpl = templateId ? Store.libraryDoc(templateId) : null;
+  // 新增項目挑了一個常用項目：把它的內容複製進表單（深拷貝，改表單不會動到範本）。
+  // templateId 空字串＝空白項目（完整表單，全部自己填）。
+  pickTemplateForNewItem(weekNumber, dayIndex, templateId) {
+    const tpl = templateId ? Store.libraryList('item').find((t) => t.id === templateId) : null;
+    if (templateId && !tpl) {
+      alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return;
+    }
     this.state.editingItem = {
-      weekNumber, dayIndex, itemId: 'new',
+      weekNumber, dayIndex, itemId: 'new', step: 'form',
       prefill: tpl ? JSON.parse(JSON.stringify(tpl.item)) : null,
-      templateId: tpl ? tpl.id : '',
+      templateName: tpl ? tpl.name : '',
     };
+    render();
+  },
+
+  backToTemplatePicker(weekNumber, dayIndex) {
+    this.state.editingItem = { weekNumber, dayIndex, itemId: 'new', step: 'pick' };
     render();
   },
 
@@ -800,7 +809,12 @@ const App = {
     const fields = this._readItemForm(formId);
     if (!fields) return;
     const err = this._validateItemFields(fields);
-    if (err) { alert(err); return; }
+    if (err) {
+      // 簡易表單的錯誤常常在收起來的「更多設定」裡（段落、RPE），打開才找得到
+      const more = document.getElementById(formId).querySelector('details.more-settings');
+      if (more) more.open = true;
+      alert(err); return;
+    }
 
     delete fields.__segError;
     const week = this._cloneEffectiveWeek(weekNumber);

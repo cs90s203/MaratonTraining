@@ -121,7 +121,12 @@ async function boot() {
   // 不重畫整頁——表單裡還沒存的字（訓練段落、影片列、下拉選單）都只在 DOM 上，一重畫就沒了。
   // 以前只擋「正在打字的輸入框」，下拉選單跟剛離開輸入框的那一刻擋不到。
   // 使用者自己的動作（存檔、取消、加段）照常直接呼叫 render()；表單關掉的那次 render 會帶上期間所有的新資料。
-  const renderFromData = () => { if (App.state.editingItem || App.state.libraryEdit) return; render(); };
+  // 新增項目的「挑常用項目」那一步（第 44 條）沒有打到一半的東西，照常重畫——剛同步進來、剛按「存成常用」的項目才會出現在清單上。
+  const renderFromData = () => {
+    const e = App.state.editingItem;
+    if ((e && e.step !== 'pick') || App.state.libraryEdit) return;
+    render();
+  };
   Store.onChange(renderFromData);
   Sync.onChange(renderFromData);
   Sync.init();

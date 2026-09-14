@@ -45,7 +45,7 @@
         }
       ],
       "derived": true,
-      "derivedNote": "原文第三節模板只寫「死蟲式、鳥狗式、橋式呼吸」與 10-15 分鐘，沒有組數次數。這裡的組數次數為推導值，依身體感覺調整即可。"
+      "derivedNote": "組數次數依身體感覺調整即可"
     },
     {
       "id": "pelvic-core-advanced",
@@ -100,7 +100,7 @@
         }
       ],
       "derived": true,
-      "derivedNote": "原文完全沒有這份清單——第三節只寫「核心/骨盆底進階(15分鐘)」。五個動作是以 basic 版加難度推導的。出現漏尿或下墜感就退回 pelvic-core-basic。"
+      "derivedNote": "推導值：原文完全沒有這份清單——第三節只寫「核心/骨盆底進階(15分鐘)」。五個動作是以 basic 版加難度推導的。出現漏尿或下墜感就退回 pelvic-core-basic。"
     },
     {
       "id": "strength-a",
