@@ -671,3 +671,42 @@ button.rec-radio { cursor: pointer; }
 .ptgt-note { font-size: 11px; color: var(--text3); margin-top: 10px; line-height: 1.5; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ── 訓練段落（決策紀錄第 42 條）───────────────────────────────────────────
+   卡片上：一段一行，類型是小標籤；重複組左邊寫「4 ×」，組裡的段用左框線包起來。
+   編輯器：一段兩列（類型／數量／單位；心率／說明／工具），重複組一個虛線框。 */
+.seg-view { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 2px; font-size: 13px; color: var(--text2); }
+.seg-v-line { display: flex; align-items: baseline; gap: 8px; line-height: 1.5; }
+.seg-v-kind { flex: none; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--track); color: var(--text2); }
+.seg-v-kind.k-main { background: var(--accentBg); color: var(--accent2); }
+.seg-v-kind.k-recover { background: var(--card2); color: var(--text3); border: 1px solid var(--line); }
+.seg-v-kind.k-drill { background: var(--warnBg); color: var(--warn); }
+.seg-v-body { min-width: 0; overflow-wrap: anywhere; }
+.seg-v-repeat { display: flex; align-items: stretch; gap: 8px; }
+.seg-v-times { flex: none; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.seg-v-steps { display: flex; flex-direction: column; gap: 4px; border-left: 2px solid var(--line); padding-left: 8px; min-width: 0; }
+
+.seg-editor { gap: 6px; }
+.seg-hint { font-size: 11.5px; color: var(--text3); line-height: 1.5; }
+.seg-list { display: flex; flex-direction: column; gap: 6px; }
+.seg-step { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); }
+.seg-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+/* 心率＋說明：寬的時候並排、手機上各一列（auto-fit 依寬度決定欄數） */
+.seg-line.seg-line-zn { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; }
+.edit-form .seg-line select, .edit-form .seg-line input { min-width: 0; }
+.edit-form .seg-line select[data-f="kind"] { flex: 1 1 auto; }
+.edit-form .seg-line input[data-f="min"], .edit-form .seg-line input[data-f="max"] { flex: 1 1 0; }
+.edit-form .seg-line select[data-f="unit"] { flex: 0 0 78px; }
+.seg-dash { flex: none; color: var(--text3); }
+.seg-tools { flex: none; display: inline-flex; gap: 4px; }
+.seg-tools .link-btn { min-width: 36px; min-height: 36px; padding: 6px 8px; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; }
+.seg-tools .link-btn.lib-del { margin-left: 8px; } /* ✕ 跟 ↓ 拉開，手指按下移不會按到刪除 */
+.seg-sum { font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.seg-sum:empty { display: none; }
+.seg-repeat { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1.5px dashed var(--warn); border-radius: 12px; }
+.seg-repeat-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.edit-form .seg-repeat-head input { width: 64px; flex: none; }
+.seg-repeat-head .seg-tools { margin-left: auto; }
+.link-btn.seg-add-in { align-self: flex-start; font-size: 12.5px; padding: 2px 0; }
+.seg-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.seg-actions .link-btn { font-size: 12.5px; padding: 4px 0; }

@@ -69,7 +69,7 @@ Z = {
 
 
 def item(type_, title, zone="none", dur=None, km=None, video=None, workout=None,
-         notes=None, derived=False):
+         notes=None, derived=False, segments=None):
     """一個訓練項目。dur/km 都是 [min, max] 或 None——原計畫幾乎全是區間，
     壓成單一數字等於在轉檔時偷偷替使用者做訓練決策。"""
     z = Z[zone]
@@ -86,6 +86,7 @@ def item(type_, title, zone="none", dur=None, km=None, video=None, workout=None,
         "workoutRef": workout,
         "notes": notes,
         "derived": derived,
+        **({"segments": segments} if segments else {}),
     }
 
 
@@ -141,15 +142,26 @@ JUMP_WARNING = ("產後提醒：骨盆穩定度是跑姿訓練的第一優先。
                 "不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。")
 
 
+def drill_sets(*names):
+    """原文第七節「各 2 組 x 20 公尺」寫成訓練段落（決策紀錄第 42 條）：每個動作一組「重複 2 次、20 公尺」。
+    原文沒寫組間休息、暖身，這裡也不補。"""
+    return [{"kind": "repeat", "times": 2,
+             "steps": [{"kind": "drill", "amount": {"unit": "m", "min": 20, "max": 20}, "zone": None, "note": n}]}
+            for n in names]
+
+
 def form_drill(w):
+    """回傳 (備註, 訓練段落)。原文有寫組數距離的（W9-16）放進段落。
+    備註**保留**原本的組數距離文字：還開著舊版網頁（不認得 segments）的裝置存這個項目時會把段落洗掉，
+    文字留著至少指示不會整個消失（對抗式審查抓到；跟第 28 條 videoRef 兩個都寫同一個道理）。"""
     if w <= 12:
         return ("重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。"
-                f"（跳躍類延後到 W13 之後）{FORM_CUE}")
+                f"（跳躍類延後到 W13 之後）{FORM_CUE}"), drill_sets("高抬腿", "後踢腿")
     if w <= 16:
         return ("重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；"
-                f"節拍器抓步頻（目標 170-180 spm）、原地小跳步。{JUMP_WARNING} {FORM_CUE}")
+                f"節拍器抓步頻（目標 170-180 spm）、原地小跳步。{JUMP_WARNING} {FORM_CUE}"), drill_sets("A-Skip", "B-Skip")
     return ("重點：力量轉換效率。上坡衝刺（短距離、低強度版）、彈跳訓練（輕量）。"
-            f"{JUMP_WARNING} {FORM_CUE}")
+            f"{JUMP_WARNING} {FORM_CUE}"), None
 
 
 # --- 每週模板 -----------------------------------------------------------------
@@ -202,7 +214,7 @@ def week_p2(w):
         day(item("strength", "重量訓練 A（下肢主導）", "none", dur=[30, 30],
                  workout="strength-a", derived=True,
                  notes="Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）")),
-        day(item("form-drill", "跑姿訓練日", "zone2", dur=[15, 20], notes=form_drill(w)),
+        day(item("form-drill", "跑姿訓練日", "zone2", dur=[15, 20], notes=form_drill(w)[0], segments=form_drill(w)[1]),
             item("recovery", "核心", "recovery", dur=[10, 10], workout="pelvic-core-advanced",
                  notes="10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。")),
         day(item("strength", "重量訓練 B（全身／上肢＋核心）", "none", dur=[30, 30],
@@ -230,7 +242,7 @@ def week_p3(w):
                item("strength", "重量訓練 B（維持）", "none", dur=[30, 30],
                     workout="strength-b", derived=True),
                notes="原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。"),
-        day(item("form-drill", "跑姿訓練", "zone2", dur=[15, 20], notes=form_drill(w)),
+        day(item("form-drill", "跑姿訓練", "zone2", dur=[15, 20], notes=form_drill(w)[0], segments=form_drill(w)[1]),
             item("tempo", "節奏跑", "tempo", dur=[10, 15],
                  notes="原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。")),
         choice(item("run", "輕鬆跑", "recovery", dur=[30, 30]),

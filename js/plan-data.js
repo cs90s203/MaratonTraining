@@ -154,6 +154,80 @@ const PlanData = (() => {
     return s; // 看不懂的舊文字（教練手打的）原樣顯示，不猜
   }
 
+  // ── 訓練段落（決策紀錄第 42 條）─────────────────────────────────────────────
+  // 間歇跑「暖身 → 4 × (400 公尺＋恢復 90 秒) → 緩和」這種結構，原本只能塞進備註。item.segments：
+  //   段：   { kind: 'warmup'|'main'|'recover'|'drill'|'cooldown', amount: {unit, min, max} | null, zone, note }
+  //   重複組：{ kind: 'repeat', times: 1-50, steps: [段, ...] }（組裡不能再放重複組）
+  // 段落是「當天怎麼跑」的說明；算週跑量照舊用項目的總時長／總距離（段落常常時間跟距離混著寫，換算不了）。
+  // **讀寫一律過 cleanSegments**：教練表單、常用項目庫、Firestore 手改進來的都一樣，形狀不對的段直接丟掉。
+  const SEGMENT_KINDS = { warmup: '暖身', main: '主段', recover: '恢復', drill: '技術動作', cooldown: '緩和' };
+  const SEGMENT_UNITS = { min: '分', sec: '秒', m: '公尺', km: '公里' };
+  const SEGMENT_LIMITS = { top: 20, inRepeat: 10, times: 50, note: 60 };
+  // 每種單位的合理上限（跟項目的總時長 300 分、距離 100 公里同一個尺度）：「800 分」這種忘了換單位的手滑要擋下來
+  const SEGMENT_UNIT_CAPS = { min: 300, sec: 3600, m: 50000, km: 100 };
+  function cleanSegmentStep(s) {
+    if (!s || !SEGMENT_KINDS[s.kind]) return null;
+    let amount = null;
+    const a = s.amount;
+    if (a && SEGMENT_UNITS[a.unit]) {
+      const num = (v) => (v === '' || v == null ? null : Number(v));
+      let lo = num(a.min), hi = num(a.max);
+      if (lo == null) lo = hi;
+      if (hi == null) hi = lo;
+      if (lo != null && Number.isFinite(lo) && Number.isFinite(hi) && Math.min(lo, hi) > 0 && Math.max(lo, hi) <= SEGMENT_UNIT_CAPS[a.unit]) {
+        amount = { unit: a.unit, min: Math.min(lo, hi), max: Math.max(lo, hi) };
+      }
+    }
+    const zone = HR_ZONE_OPTIONS.includes(s.zone) ? s.zone : null;
+    const note = String(s.note == null ? '' : s.note).trim().slice(0, SEGMENT_LIMITS.note);
+    // 數量、心率、說明都沒寫的段不算。只選了心率也算內容（「恢復到 Zone 1-2」是常見的寫法）
+    if (!amount && !note && !zone) return null;
+    return { kind: s.kind, amount, zone, note };
+  }
+  function cleanSegments(list) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    list.forEach((s) => {
+      if (out.length >= SEGMENT_LIMITS.top || !s) return;
+      if (s.kind === 'repeat') {
+        const times = Math.round(Number(s.times));
+        if (!Number.isFinite(times) || times < 1 || times > SEGMENT_LIMITS.times) return;
+        const steps = (Array.isArray(s.steps) ? s.steps : []).map(cleanSegmentStep).filter(Boolean).slice(0, SEGMENT_LIMITS.inRepeat);
+        if (steps.length) out.push({ kind: 'repeat', times, steps });
+        return;
+      }
+      const step = cleanSegmentStep(s);
+      if (step) out.push(step);
+    });
+    return out;
+  }
+  function itemSegments(item) { return item ? cleanSegments(item.segments) : []; }
+  function fmtSegmentAmount(a) {
+    if (!a) return '';
+    const n = (x) => (Number.isInteger(x) ? String(x) : String(Math.round(x * 100) / 100));
+    return `${a.min === a.max ? n(a.min) : `${n(a.min)}–${n(a.max)}`} ${SEGMENT_UNITS[a.unit]}`;
+  }
+  // 段落加總（編輯器上的提示用）：距離段換成公里、時間段換成分鐘，重複組乘上次數。只算有寫數量的段。
+  function segmentTotals(segments) {
+    const t = { km: { min: 0, max: 0 }, minutes: { min: 0, max: 0 }, hasKm: false, hasTime: false };
+    const add = (step, times) => {
+      const a = step.amount;
+      if (!a) return;
+      if (a.unit === 'm' || a.unit === 'km') {
+        const f = a.unit === 'm' ? 0.001 : 1;
+        t.km.min += a.min * f * times; t.km.max += a.max * f * times; t.hasKm = true;
+      } else {
+        const f = a.unit === 'sec' ? 1 / 60 : 1;
+        t.minutes.min += a.min * f * times; t.minutes.max += a.max * f * times; t.hasTime = true;
+      }
+    };
+    cleanSegments(segments).forEach((s) => {
+      if (s.kind === 'repeat') s.steps.forEach((st) => add(st, s.times));
+      else add(s, 1);
+    });
+    return t;
+  }
+
   const MAX_ITEM_VIDEOS = 10;
   function itemVideoRefs(item) {
     const list = [];
@@ -182,5 +256,6 @@ const PlanData = (() => {
     parseLocalDate, dayKey, dateForWeekDay, keyForWeekDay, today, locateToday, locateKey,
     isExpired, daysUntilRace, phaseForWeek, week, day, weekdayLabel,
     fmtRange, fmtItemMeta, itemVideoRefs, MAX_ITEM_VIDEOS, fmtHeartRateZone, HR_ZONE_OPTIONS,
+    SEGMENT_KINDS, SEGMENT_UNITS, SEGMENT_LIMITS, SEGMENT_UNIT_CAPS, cleanSegments, itemSegments, fmtSegmentAmount, segmentTotals,
   };
 })();

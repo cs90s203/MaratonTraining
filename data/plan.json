@@ -1889,6 +1889,40 @@
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "高抬腿"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "後踢腿"
+                    }
+                  ]
+                }
+              ],
               "id": "9-3-0"
             },
             {
@@ -2121,6 +2155,40 @@
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "高抬腿"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "後踢腿"
+                    }
+                  ]
+                }
+              ],
               "id": "10-3-0"
             },
             {
@@ -2353,6 +2421,40 @@
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "高抬腿"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "後踢腿"
+                    }
+                  ]
+                }
+              ],
               "id": "11-3-0"
             },
             {
@@ -2585,6 +2687,40 @@
               "workoutRef": null,
               "notes": "重點：姿勢重建、觸地方式。高抬腿、後踢腿各 2 組 x 20 公尺。（跳躍類延後到 W13 之後）骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "高抬腿"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "後踢腿"
+                    }
+                  ]
+                }
+              ],
               "id": "12-3-0"
             },
             {
@@ -2817,6 +2953,40 @@
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "A-Skip"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "B-Skip"
+                    }
+                  ]
+                }
+              ],
               "id": "13-3-0"
             },
             {
@@ -3049,6 +3219,40 @@
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "A-Skip"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "B-Skip"
+                    }
+                  ]
+                }
+              ],
               "id": "14-3-0"
             },
             {
@@ -3281,6 +3485,40 @@
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "A-Skip"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "B-Skip"
+                    }
+                  ]
+                }
+              ],
               "id": "15-3-0"
             },
             {
@@ -3513,6 +3751,40 @@
               "workoutRef": null,
               "notes": "重點：步頻與觸地時間。A-Skip、B-Skip 各 2 組 x 20 公尺；節拍器抓步頻（目標 170-180 spm）、原地小跳步。產後提醒：骨盆穩定度是跑姿訓練的第一優先。核心/骨盆底沒練起來之前，不要做太多跳躍類(Skip、彈跳)，以免增加骨盆底負擔。 骨盆維持中立(產後核心弱化容易骨盆前傾)、避免過度跨步(overstride)、上身微前傾、手臂自然擺動不過度用力",
               "derived": false,
+              "segments": [
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "A-Skip"
+                    }
+                  ]
+                },
+                {
+                  "kind": "repeat",
+                  "times": 2,
+                  "steps": [
+                    {
+                      "kind": "drill",
+                      "amount": {
+                        "unit": "m",
+                        "min": 20,
+                        "max": 20
+                      },
+                      "zone": null,
+                      "note": "B-Skip"
+                    }
+                  ]
+                }
+              ],
               "id": "16-3-0"
             },
             {

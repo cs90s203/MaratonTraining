@@ -976,6 +976,8 @@ const Store = {
         heartRateZone: PlanData.fmtHeartRateZone(it.heartRateZone) ? text(PlanData.fmtHeartRateZone(it.heartRateZone), 30) : null,
         rpe: rng(it.rpe, 0, 10),
         intensityNote: it.intensityNote ? text(it.intensityNote, 120) : null,
+        // 第 42 條：訓練段落跟著存成常用、帶入時一起複製
+        segments: PlanData.cleanSegments(it.segments).length ? PlanData.cleanSegments(it.segments) : null,
         // 第 28 條：兩個都寫，videoRef＝第一部（舊版網頁只看得懂這個）
         videoRefs, videoRef: videoRefs[0] || null, workoutRef: it.workoutRef || null,
         notes: it.notes ? text(it.notes, 500) : null,

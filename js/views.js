@@ -335,8 +335,15 @@ function itemPlanParts(item, opts) {
         </details>`;
     }
   }
+  // 訓練段落（第 42 條）：一段一行，重複組左邊寫「4 ×」，組裡的段縮排
+  const segs = PlanData.itemSegments(item);
+  const segLine = (st) => `<div class="seg-v-line"><span class="seg-v-kind k-${st.kind}">${h(PlanData.SEGMENT_KINDS[st.kind])}</span><span class="seg-v-body">${[PlanData.fmtSegmentAmount(st.amount), st.zone, st.note].filter(Boolean).map(h).join(' · ')}</span></div>`;
+  const segBlock = segs.length ? `<div class="seg-view">${segs.map((sg) => (sg.kind === 'repeat'
+    ? `<div class="seg-v-repeat"><div class="seg-v-times">${sg.times} ×</div><div class="seg-v-steps">${sg.steps.map(segLine).join('')}</div></div>`
+    : segLine(sg))).join('')}</div>` : '';
   const body = `
     ${meta.length ? `<div class="item-meta">${meta.join('')}</div>` : ''}
+    ${segBlock}
     ${item.notes ? `<div class="item-notes">${h(item.notes)}</div>` : ''}
     ${links.length ? `<div class="item-links">${links.join('')}</div>` : ''}
     ${workoutBlock}`;
@@ -561,6 +568,62 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   `;
 }
 
+// ── 訓練段落編輯器（決策紀錄第 42 條）─────────────────────────────────────────
+// 一段一列（類型、數量、單位、心率、說明），重複組是一個框：「重複 N 次」＋組裡的段。
+// 加段／刪段／上下移都直接改表單 DOM、不重繪（跟影片列同一個理由：表單其他欄位打到一半的字不在 state 裡）；
+// 新的段從 <template> 複製。存檔時 A._readItemForm 從 DOM 讀，再過 PlanData.cleanSegments。
+function renderSegStep(st) {
+  st = st || { kind: 'main', amount: null, zone: null, note: '' };
+  const a = st.amount || {};
+  const tools = `<span class="seg-tools"><button type="button" class="link-btn" onclick="A.segMove(this,-1)" aria-label="往上移">↑</button><button type="button" class="link-btn" onclick="A.segMove(this,1)" aria-label="往下移">↓</button><button type="button" class="link-btn lib-del" onclick="A.segRemove(this)" aria-label="刪除這段">✕</button></span>`;
+  return `
+    <div class="seg-step" data-seg="step">
+      <div class="seg-line">
+        <select data-f="kind" aria-label="段落類型">${Object.keys(PlanData.SEGMENT_KINDS).map((k) => `<option value="${k}" ${st.kind === k ? 'selected' : ''}>${PlanData.SEGMENT_KINDS[k]}</option>`).join('')}</select>
+        ${tools}
+      </div>
+      <div class="seg-line">
+        <input data-f="min" type="number" inputmode="decimal" min="0" step="any" value="${a.min != null ? h(a.min) : ''}" placeholder="數量" aria-label="數量">
+        <span class="seg-dash">–</span>
+        <input data-f="max" type="number" inputmode="decimal" min="0" step="any" value="${a.max != null && a.max !== a.min ? h(a.max) : ''}" placeholder="上限" aria-label="上限（選填）">
+        <select data-f="unit" aria-label="單位">${Object.keys(PlanData.SEGMENT_UNITS).map((u) => `<option value="${u}" ${(a.unit || 'min') === u ? 'selected' : ''}>${PlanData.SEGMENT_UNITS[u]}</option>`).join('')}</select>
+      </div>
+      <div class="seg-line seg-line-zn">
+        <select data-f="zone" aria-label="心率區間"><option value="">心率不指定</option>${PlanData.HR_ZONE_OPTIONS.map((z) => `<option value="${z}" ${st.zone === z ? 'selected' : ''}>${z}</option>`).join('')}</select>
+        <input data-f="note" type="text" maxlength="${PlanData.SEGMENT_LIMITS.note}" value="${h(st.note || '')}" placeholder="說明，例如：MP 配速、慢跑或走路" aria-label="說明">
+      </div>
+    </div>`;
+}
+function renderSegRepeat(r) {
+  r = r || { times: 4, steps: [{ kind: 'main', amount: null, zone: null, note: '' }, { kind: 'recover', amount: null, zone: null, note: '' }] };
+  return `
+    <div class="seg-repeat" data-seg="repeat">
+      <div class="seg-repeat-head">
+        <span>重複</span><input data-f="times" type="number" inputmode="numeric" min="1" max="${PlanData.SEGMENT_LIMITS.times}" value="${h(r.times)}" aria-label="重複次數"><span>次</span>
+        <span class="seg-tools"><button type="button" class="link-btn" onclick="A.segMove(this,-1)" aria-label="往上移">↑</button><button type="button" class="link-btn" onclick="A.segMove(this,1)" aria-label="往下移">↓</button><button type="button" class="link-btn lib-del" onclick="A.segRemove(this)" aria-label="刪除這組">✕</button></span>
+      </div>
+      <div class="seg-list">${r.steps.map(renderSegStep).join('')}</div>
+      <button type="button" class="link-btn seg-add-in" onclick="A.segAdd(this,'step')">＋ 在這組加一段</button>
+    </div>`;
+}
+function renderSegmentEditor(segments) {
+  const segs = PlanData.cleanSegments(segments);
+  return `
+        <div class="field wide seg-editor" onchange="A.segUpdateSum(this)">
+          <label class="field-lbl">訓練段落（選填）</label>
+          <div class="seg-hint">把當天怎麼跑拆開寫，例如間歇跑：暖身 10 分 → 重複 4 次（400 公尺＋恢復 90 秒）→ 緩和 10 分。上面的時長／距離是整堂課的量，照舊用來算週跑量。</div>
+          <div class="seg-list seg-root">${segs.map((sg) => (sg.kind === 'repeat' ? renderSegRepeat(sg) : renderSegStep(sg))).join('')}</div>
+          <div class="seg-sum">${(() => { const t = PlanData.segmentTotals(segs); const r1 = (x) => Math.round(x * 10) / 10; const rng = (o, u) => (r1(o.min) === r1(o.max) ? `${r1(o.min)} ${u}` : `${r1(o.min)}–${r1(o.max)} ${u}`); const p = [t.hasKm ? rng(t.km, '公里') : '', t.hasTime ? rng(t.minutes, '分') : ''].filter(Boolean); return p.length ? `段落合計：約 ${p.join('＋')}` : ''; })()}</div>
+          <div class="seg-actions">
+            <button type="button" class="link-btn" onclick="A.segAdd(this,'step')">＋ 加一段</button>
+            <button type="button" class="link-btn" onclick="A.segAdd(this,'repeat')">＋ 加一組重複</button>
+            <button type="button" class="link-btn" onclick="A.segIntervalTemplate(this)">套用間歇範本</button>
+          </div>
+          <template class="seg-step-tpl">${renderSegStep(null)}</template>
+          <template class="seg-repeat-tpl">${renderSegRepeat(null)}</template>
+        </div>`;
+}
+
 // 教練模式的項目編輯表單。item 為 null 時是「新增項目」。用 scoped querySelector
 // 讀值（A.saveItemEdit 會找 #item-edit-... 容器內的 [name=...]），不是把每個欄位
 // 塞進 onclick 參數——12 個欄位塞進 inline onclick 字串太脆弱（引號/特殊字元）。
@@ -571,7 +634,7 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
   opts = opts || {};
   const tpl = opts.libraryTemplate || null;
   const isNew = !item && !tpl;
-  const blank = { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, videoRefs: [], videoRef: null, workoutRef: null, notes: '', derived: false };
+  const blank = { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, segments: null, videoRefs: [], videoRef: null, workoutRef: null, notes: '', derived: false };
   const it = item || (tpl && tpl.item) || opts.prefill || blank;
   const formId = tpl ? `tpl-edit-${tpl.id}` : `item-edit-${weekNumber}-${dayIndex}-${isNew ? 'new' : it.id}`;
   // 下拉選單：內建＋庫裡的自訂。這個項目現在引用的若是已經從庫裡刪掉的，也要放進選項，
@@ -658,6 +721,7 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
           <div class="field"><label class="field-lbl">RPE 上限</label><input name="rpeMax" type="number" min="0" max="10" value="${h(rpeMax)}"></div>
         </div>
         <div class="field wide"><label class="field-lbl">強度說明</label><input name="intensityNote" type="text" value="${h(it.intensityNote || '')}"></div>
+        ${renderSegmentEditor(it.segments)}
         <div class="field wide">
           <label class="field-lbl">影片參照</label>
           <div class="vref-list">${(curVideos.length ? curVideos : [null]).map(videoRow).join('')}</div>

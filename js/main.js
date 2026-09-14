@@ -117,8 +117,13 @@ async function boot() {
     });
   }
 
-  Store.onChange(render);
-  Sync.onChange(render);
+  // 決策紀錄第 42 條（審查抓到）：教練的項目表單／常用項目編輯器開著時，同步快照、別人改課表這類「資料變了」
+  // 不重畫整頁——表單裡還沒存的字（訓練段落、影片列、下拉選單）都只在 DOM 上，一重畫就沒了。
+  // 以前只擋「正在打字的輸入框」，下拉選單跟剛離開輸入框的那一刻擋不到。
+  // 使用者自己的動作（存檔、取消、加段）照常直接呼叫 render()；表單關掉的那次 render 會帶上期間所有的新資料。
+  const renderFromData = () => { if (App.state.editingItem || App.state.libraryEdit) return; render(); };
+  Store.onChange(renderFromData);
+  Sync.onChange(renderFromData);
   Sync.init();
 
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') renderIfDayChanged(); });

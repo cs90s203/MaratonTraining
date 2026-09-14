@@ -222,6 +222,35 @@ def main():
     bad = [f'{w["id"]}/{e["name"]}' for w in workouts["workouts"] for e in w["exercises"]
            if isinstance(e.get("holdSeconds"), int) or isinstance(e.get("reps"), int)]
     check("reps/holdSeconds 一律用 {min,max}", not bad, str(bad[:4]))
+    # 決策紀錄第 42 條：訓練段落的形狀（跟 js/plan-data.js cleanSegments 同一套規則；形狀不對的段 App 會直接丟掉，
+    # 出廠資料不能靠 App 幫忙丟）
+    SEG_KINDS = {"warmup", "main", "recover", "drill", "cooldown"}
+    SEG_UNIT_CAPS = {"min": 300, "sec": 3600, "m": 50000, "km": 100}  # 跟 plan-data.js SEGMENT_UNIT_CAPS 一致
+    HR_ZONES = {"Zone 1", "Zone 1-2", "Zone 2", "Zone 2-3", "Zone 3", "Zone 3-4", "Zone 4", "Zone 4-5", "Zone 5"}
+    def step_ok(st):
+        a = st.get("amount")
+        amount_ok = a is None or (a.get("unit") in SEG_UNIT_CAPS and 0 < a["min"] <= a["max"] <= SEG_UNIT_CAPS[a["unit"]])
+        note = st.get("note") or ""
+        zone_ok = st.get("zone") is None or st.get("zone") in HR_ZONES
+        has_content = a is not None or note.strip() or st.get("zone")
+        return (st.get("kind") in SEG_KINDS and amount_ok and zone_ok and bool(has_content)
+                and note == note.strip() and len(note) <= 60)
+    bad = []
+    for a_, b_, it in items:
+        segs = it.get("segments") or []
+        if len(segs) > 20:
+            bad.append(f"W{a_}D{b_} {it['title']}（超過 20 段）")
+        for sg in segs:
+            if sg.get("kind") == "repeat":
+                if not (isinstance(sg.get("times"), int) and 1 <= sg["times"] <= 50 and sg.get("steps")
+                        and len(sg["steps"]) <= 10 and all(step_ok(x) for x in sg["steps"])):
+                    bad.append(f"W{a_}D{b_} {it['title']}")
+            elif not step_ok(sg):
+                bad.append(f"W{a_}D{b_} {it['title']}")
+    check("訓練段落形狀正確（第 42 條）", not bad, str(bad[:4]))
+    drill_days = [(a_, it) for a_, b_, it in items if it["type"] == "form-drill" and 9 <= a_ <= 16]
+    check("W9-16 跑姿訓練的動作寫進訓練段落（原文第七節有組數距離）",
+          bool(drill_days) and all(it.get("segments") for _, it in drill_days))
     # 決策紀錄第 33 條：內建動作清單可以被教練在 App 裡改，safetyNote 是改不掉的那一段——
     # 畫面一律從這個檔案拿。這裡守「每份都有、而且真的講到漏尿／下墜感」。
     bad = [w["id"] for w in workouts["workouts"]

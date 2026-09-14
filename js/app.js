@@ -526,6 +526,7 @@ const App = {
     if (!fields) return;
     const err = this._validateItemFields(fields);
     if (err) { alert(err); return; }
+    delete fields.__segError;
     const root = document.getElementById(formId);
     const nameEl = root && root.querySelector('[name="templateName"]');
     const name = nameEl ? nameEl.value.trim() : '';
@@ -573,6 +574,10 @@ const App = {
       if (Number.isNaN(a) || Number.isNaN(b)) return null;
       return { min: Math.min(a, b), max: Math.max(a, b) };
     };
+    // 訓練段落（第 42 條）：從表單 DOM 讀出來（_readSegmentsDom），數字不合法的記下錯誤，_validateItemFields 擋
+    const segRead = this._readSegmentsDom(root.querySelector('.seg-root'));
+    const segError = segRead.error;
+    const segments = PlanData.cleanSegments(segRead.raw);
     // 影片（第 28 條）：每列一個下拉，選「（無）」的列當沒填；重複選同一部只留一次
     const videoRefs = [];
     root.querySelectorAll('select[name="videoRefs"]').forEach((el) => {
@@ -587,6 +592,8 @@ const App = {
       heartRateZone: PlanData.fmtHeartRateZone(val('heartRateZone')) || null, // 第 30 條：一律存成 Zone
       rpe: range('rpeMin', 'rpeMax'),
       intensityNote: val('intensityNote') || null,
+      segments: segments.length ? segments : null,
+      __segError: segError, // 只給 _validateItemFields 看，存檔前拿掉
       // 兩個都寫：videoRef＝第一部，給還開著舊版網頁的裝置看（見 PlanData.itemVideoRefs）
       videoRefs,
       videoRef: videoRefs[0] || null,
@@ -615,7 +622,105 @@ const App = {
     const p = fields.rpe;
     if (p && (p.min < 0 || p.max > 10)) return 'RPE 要在 0-10 之間';
     if (fields.videoRefs && fields.videoRefs.length > PlanData.MAX_ITEM_VIDEOS) return `一個項目最多 ${PlanData.MAX_ITEM_VIDEOS} 部影片`;
+    if (fields.__segError) return fields.__segError;
     return null;
+  },
+
+  // ── 訓練段落編輯器（第 42 條）：直接改表單 DOM，不重繪 ────────────────────────
+  // 從 DOM 讀段落，回傳 { raw, error }。只看 .seg-root 底下直接的子元素：<template> 的內容不在 DOM 樹上，不會被讀到。
+  // error 是給教練看的第一個問題（數量不合法、超過單位上限、重複次數、空的重複組）——
+  // cleanSegments 會把這些靜靜丟掉，所以要在這裡先講出來，不能讓她存完才發現段落不見了（審查抓到）。
+  _readSegmentsDom(segRoot) {
+    let error = null;
+    const setErr = (m) => { if (!error) error = m; };
+    const readStep = (el) => {
+      const v = (n) => { const x = el.querySelector(`[data-f="${n}"]`); return x ? x.value.trim() : ''; };
+      const unit = v('unit');
+      ['min', 'max'].forEach((n) => {
+        const x = v(n);
+        if (x === '') return;
+        const num = Number(x);
+        if (!(num > 0) || !Number.isFinite(num)) setErr('訓練段落的數量要是大於 0 的數字（不需要就留空）');
+        else if (PlanData.SEGMENT_UNIT_CAPS[unit] && num > PlanData.SEGMENT_UNIT_CAPS[unit]) {
+          setErr(`訓練段落的數量太大：「${PlanData.SEGMENT_UNITS[unit]}」最多 ${PlanData.SEGMENT_UNIT_CAPS[unit]}，是不是單位選錯了？`);
+        }
+      });
+      return { kind: v('kind'), amount: { unit, min: v('min'), max: v('max') }, zone: v('zone') || null, note: v('note') };
+    };
+    const raw = segRoot ? [...segRoot.children].filter((el) => el.dataset && el.dataset.seg).map((el) => {
+      if (el.dataset.seg !== 'repeat') return readStep(el);
+      const t = el.querySelector('[data-f="times"]');
+      const times = t ? Number(t.value) : NaN;
+      if (!Number.isInteger(times) || times < 1 || times > PlanData.SEGMENT_LIMITS.times) setErr(`重複次數要是 1 到 ${PlanData.SEGMENT_LIMITS.times} 的整數`);
+      const list = el.querySelector('.seg-list');
+      const steps = list ? [...list.children].filter((c) => c.dataset && c.dataset.seg === 'step').map(readStep) : [];
+      const group = { kind: 'repeat', times, steps };
+      if (!PlanData.cleanSegments([{ ...group, times: 1 }]).length) setErr('有一組重複裡面沒有內容：填上數量、心率或說明，或按 ✕ 刪掉這組');
+      return group;
+    }) : [];
+    return { raw, error };
+  },
+  // 段落合計（編輯器底下的提示）：換單位手滑、跟總時長／距離對不上，一眼看得出來
+  segUpdateSum(anyEl) {
+    const editor = anyEl && anyEl.closest ? anyEl.closest('.seg-editor') : null;
+    const out = editor && editor.querySelector('.seg-sum');
+    if (!out) return;
+    const segs = PlanData.cleanSegments(this._readSegmentsDom(editor.querySelector('.seg-root')).raw);
+    const t = PlanData.segmentTotals(segs);
+    const r1 = (x) => Math.round(x * 10) / 10;
+    const rng = (o, unit) => (r1(o.min) === r1(o.max) ? `${r1(o.min)} ${unit}` : `${r1(o.min)}–${r1(o.max)} ${unit}`);
+    const parts = [t.hasKm ? rng(t.km, '公里') : '', t.hasTime ? rng(t.minutes, '分') : ''].filter(Boolean);
+    out.textContent = parts.length ? `段落合計：約 ${parts.join('＋')}` : '';
+  },
+
+  // ── 訓練段落編輯器的按鈕 ───────────────────
+  segAdd(btn, kind) {
+    const editor = btn.closest('.seg-editor');
+    if (!editor) return;
+    const inRepeat = btn.classList.contains('seg-add-in');
+    const list = inRepeat ? btn.closest('.seg-repeat').querySelector('.seg-list') : editor.querySelector('.seg-root');
+    const limit = inRepeat ? PlanData.SEGMENT_LIMITS.inRepeat : PlanData.SEGMENT_LIMITS.top;
+    if ([...list.children].filter((c) => c.dataset && c.dataset.seg).length >= limit) {
+      alert(inRepeat ? `一組重複最多 ${limit} 段。` : `訓練段落最多 ${limit} 段（重複組算一段）。`);
+      return;
+    }
+    const tpl = editor.querySelector(kind === 'repeat' && !inRepeat ? 'template.seg-repeat-tpl' : 'template.seg-step-tpl');
+    list.appendChild(tpl.content.cloneNode(true));
+    this.segUpdateSum(editor);
+  },
+  segMove(btn, dir) {
+    const el = btn.closest('[data-seg]');
+    if (!el) return;
+    if (dir < 0 && el.previousElementSibling) el.parentNode.insertBefore(el, el.previousElementSibling);
+    if (dir > 0 && el.nextElementSibling) el.parentNode.insertBefore(el.nextElementSibling, el);
+  },
+  segRemove(btn) {
+    const el = btn.closest('[data-seg]');
+    if (!el) return;
+    const editor = el.closest('.seg-editor');
+    // 整組刪掉會連組裡打好的段一起沒了，而且沒有復原——有內容就先問
+    if (el.dataset.seg === 'repeat') {
+      const read = this._readSegmentsDom({ children: [el] });
+      if (PlanData.cleanSegments(read.raw.map((g) => ({ ...g, times: 1 }))).length && !confirm('刪掉這整組重複（連同組裡的段）？')) return;
+    }
+    el.remove();
+    this.segUpdateSum(editor);
+  },
+  // 間歇範本：她舉的例子「400 公尺 × 4 次，前後加暖身緩和」。心率不預設（第 40 條：強度由教練決定）。
+  segIntervalTemplate(btn) {
+    const editor = btn.closest('.seg-editor');
+    const list = editor && editor.querySelector('.seg-root');
+    if (!list) return;
+    if ([...list.children].some((c) => c.dataset && c.dataset.seg) && !confirm('用間歇範本取代目前的訓練段落？')) return;
+    list.innerHTML = [
+      renderSegStep({ kind: 'warmup', amount: { unit: 'min', min: 10, max: 10 }, zone: null, note: '輕鬆跑' }),
+      renderSegRepeat({ times: 4, steps: [
+        { kind: 'main', amount: { unit: 'm', min: 400, max: 400 }, zone: null, note: '' },
+        { kind: 'recover', amount: { unit: 'sec', min: 90, max: 90 }, zone: null, note: '慢跑或走路' },
+      ] }),
+      renderSegStep({ kind: 'cooldown', amount: { unit: 'min', min: 10, max: 10 }, zone: null, note: '輕鬆跑' }),
+    ].join('');
+    this.segUpdateSum(editor);
   },
 
   // 項目表單的「＋ 再加一部影片」／✕（第 28 條）：直接改表單 DOM，不重繪。表單其他欄位
@@ -646,6 +751,7 @@ const App = {
     const err = this._validateItemFields(fields);
     if (err) { alert(err); return; }
 
+    delete fields.__segError;
     const week = this._cloneEffectiveWeek(weekNumber);
     const day = week.days[dayIndex];
     if (isNew) {
