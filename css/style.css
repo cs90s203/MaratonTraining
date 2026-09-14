@@ -471,6 +471,10 @@ button.rec-radio { cursor: pointer; }
 .rec-done.on .rec-done-circ svg { opacity: 1; }
 
 .rec-alt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 數字欄跟「沒照表？更換項目｜自主休息」在同一個區塊裡，中間要留空（第 37 條：原本貼在一起）。
+   照表時數字在上、按鈕在下；更換項目時反過來，兩種順序都要有間隔。 */
+.rec-nums + .rec-alt { margin-top: 14px; }
+.rec-sec > * + .rec-nums { margin-top: 14px; }
 .rec-q { font-size: 11.5px; color: var(--text3); }
 .rec-private { }
 
@@ -481,7 +485,13 @@ button.rec-radio { cursor: pointer; }
 .weekday-acc { border-bottom: 1px solid var(--line); scroll-margin-top: 140px; }
 .weekday-acc:last-child { border-bottom: none; }
 .weekday-acc .weekday-row { border-bottom: none; }
-.weekday-acc.open .weekday-row { background: var(--card2); border-radius: 10px; }
+/* 展開的那一天整塊一個底色（決策紀錄第 37 條）：原本只有標題列有底色，底下的紀錄卡看起來像另一塊。
+   底色放在整個 .weekday-acc 上，標題列跟內容包在同一塊裡；紀錄卡用 --card，在 --card2 的底上浮出來。 */
+.weekday-acc.open { background: var(--card2); border-radius: 12px; margin: 4px 0; border-bottom-color: transparent; }
+.weekday-acc.open .weekday-row { padding-left: 8px; padding-right: 8px; }
+.weekday-acc.open .weekday-body { padding: 0 8px 8px; }
+/* 教練模式的項目卡本來是 --card2，放在同色的底上會糊成一片，改用 --card（打勾、編輯中的顏色照舊） */
+.weekday-acc.open .weekday-body .item:not(.done):not(.coach-editing) { background: var(--card); }
 .weekday-chevron { flex: none; width: 18px; height: 18px; color: var(--text3); transition: transform .15s; }
 .weekday-chevron svg { width: 18px; height: 18px; }
 .weekday-acc.open .weekday-chevron { transform: rotate(90deg); }
