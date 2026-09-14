@@ -167,6 +167,9 @@ const Store = {
   _overrideInFlight: {}, // 正在存的內建修改版 id：同一份還沒存完不能再存（兩次樂觀寫入疊在一起，失敗時退不回正確的版本）
 
   init() {
+    // 決策紀錄第 41 條：這台裝置有沒有「真的選過」身分。沒選過＝預設的第一個人，登入自動選身分時
+    // 登入前記的紀錄可以跟著搬過去（見 migrateLocalRecords）。
+    this.activeUserExplicit = localStorage.getItem(ACTIVE_USER_KEY) !== null;
     this.activeUserId = localStorage.getItem(ACTIVE_USER_KEY) || (PlanData.users[0] && PlanData.users[0].userId) || null;
     this.theme = localStorage.getItem(THEME_KEY) || 'system';
     this.coachMode = localStorage.getItem(COACH_MODE_KEY) === '1';
@@ -219,9 +222,48 @@ const Store = {
   setActiveUser(userId) {
     if (userId === this.activeUserId) return;
     this.activeUserId = userId;
+    this.activeUserExplicit = true;
     localStorage.setItem(ACTIVE_USER_KEY, userId);
     this._loadUserCache(userId);
-    if (window.Sync) window.Sync.resubscribe();
+    if (window.Sync) window.Sync.resubscribe(true);
+    this._notify();
+  },
+
+  // ── 登入自動選身分的配套（決策紀錄第 41 條，對抗式審查抓到）──────────────────
+  // 這台裝置曾經收過這個人的雲端資料（登入過）：記在 localStorage。沒收過的話，本機的紀錄一定是
+  // 登入前在這台記的，才可以搬給登入的那個人；收過的話那是別人的雲端資料，絕對不能搬。
+  markUserSynced(userId) {
+    if (!userId) return;
+    const set = loadJSON('mt_synced_users', []);
+    if (!set.includes(userId)) { set.push(userId); saveJSON('mt_synced_users', set); }
+  },
+  userEverSynced(userId) { return loadJSON('mt_synced_users', []).includes(userId); },
+  // 把 from 名下的本機紀錄（打勾／數字、身體狀況、本週降量）搬到 to，回傳搬了幾天的打勾紀錄。
+  // 只在「沒選過身分、from 從沒同步過」時由 firebase-sync.js 呼叫。同一天兩邊都有就逐欄位合併。
+  migrateLocalRecords(from, to) {
+    if (!from || !to || from === to) return 0;
+    const move = (prefix) => {
+      const src = loadJSON(`${prefix}::${from}`, {});
+      const keys = Object.keys(src);
+      if (!keys.length) return 0;
+      const dst = loadJSON(`${prefix}::${to}`, {});
+      keys.forEach((k) => { dst[k] = mergeDocs(dst[k], src[k]); });
+      saveJSON(`${prefix}::${to}`, dst);
+      localStorage.removeItem(`${prefix}::${from}`);
+      return keys.length;
+    };
+    const n = move('mt_entries');
+    move('mt_private');
+    move('mt_weekadj');
+    delete this.entries[from];
+    delete this.weekAdjustments[from];
+    return n;
+  },
+  // 登出時清掉「自動選過去的那個人」的身體狀況快取：共用裝置上，下一個人不能打開看到上一個人的私人紀錄。
+  clearPrivateCache(userId) {
+    if (!userId) return;
+    localStorage.removeItem(`mt_private::${userId}`);
+    if (userId === this.activeUserId) this.privateData = {};
     this._notify();
   },
 

@@ -106,6 +106,10 @@ const Sync = {
       this.authResolved = true; // 第 35 條：沒登入的提示要等這裡回來過一次才顯示，不然每次開 App 都會閃一下
       if (!user) {
         this.user = null;
+        this.detectedUserId = null;
+        this._identityProbeSeq++; // 還在跑的身分偵測結果作廢
+        // 這次是自動選過去的身分：登出時把那個人的身體狀況快取清掉（共用裝置上下一個人看不到）
+        if (this._autoSelectedUserId) { Store.clearPrivateCache(this._autoSelectedUserId); this._autoSelectedUserId = null; }
         this._detachListeners();
         this._detachPlanOverrides();
         this._detachLibrary();
@@ -122,11 +126,15 @@ const Sync = {
       // 訂閱 Firestore 時被 rules 拒絕，走 _handleSnapErr 的 permission-denied 分支。
       const email = normEmail(user.email);
       this.user = { email, displayName: user.displayName, photoURL: user.photoURL };
+      this.detectedUserId = null;
       this._set('syncing', '同步中…');
       this._attachListeners();
       this._attachPlanOverrides();
       this._attachLibrary();
-      this._backfillLocal(Store.activeUserId);
+      // 本機補推要等「這個帳號是誰」確認完再做（決策紀錄第 41 條）：裝置上選的身分如果不是這個帳號，
+      // 先補推只會送出注定被 rules 拒絕的寫入，還會把那個人記成「這次已經補推過」；登入前記的紀錄
+      // 也要先搬到正確的人名下，補推才推得上去。
+      this._detectIdentity();
     });
 
     // 只有 popup 被瀏覽器擋掉、退回 signInWithRedirect 時才會有結果；平常 resolve 成
@@ -171,9 +179,63 @@ const Sync = {
     unsubOtherWeekAdj = {};
   },
 
+  // 登入後自動選身分（決策紀錄第 41 條）。email → userId 的對照只存在 firestore.rules.local 的 isSelf()
+  // （repo 是 public，不能把第三人的 email 寫進程式碼——babylog 把名單寫在 js 裡，這裡刻意不跟）。
+  // 所以不在前端另存一份對照，直接問 rules：每個 userId 的 private（身體狀況）只有本人讀得到，
+  // 對每個人各讀一次（limit 1、一定走伺服器，不能用離線快取——快取不看 rules），讀得到的那一個就是這個帳號。
+  // 只有「剛好一個讀得到、其他都明確被拒」才切換；離線、rules 對到零個或好幾個，一律維持裝置上原本選的。
+  // 對照表只有一份（rules），加人的時候不會有第二個地方忘了改。
+  detectedUserId: null,
+  _identityProbeSeq: 0,
+  _detectIdentity() {
+    const seq = ++this._identityProbeSeq;
+    const email = this.user && this.user.email;
+    const users = PlanData.users.map((u) => u.userId);
+    const probe = (uid) => fbDb.collection('users').doc(uid).collection('private').limit(1).get({ source: 'server' })
+      .then(() => ({ uid, ok: true, denied: false }))
+      .catch((err) => ({ uid, ok: false, denied: !!(err && err.code === 'permission-denied') }));
+    return Promise.all(users.map(probe)).then((results) => {
+      // 等結果的期間登出、換了帳號、或又觸發了一次偵測：這次的結果作廢
+      if (seq !== this._identityProbeSeq || !this.user || this.user.email !== email) return null;
+      const mine = results.filter((r) => r.ok).map((r) => r.uid);
+      const decided = mine.length === 1 && results.every((r) => r.ok || r.denied);
+      this.detectedUserId = decided ? mine[0] : null;
+      if (this.detectedUserId && this.detectedUserId !== Store.activeUserId) {
+        const prev = Store.activeUserId;
+        // 這台裝置從沒選過身分、預設的那個人也從沒在這台同步過：本機紀錄一定是登入前記的，搬給登入的人。
+        // 不搬的話，那些紀錄會留在預設的人名下，切過去之後畫面上看不到、也永遠不會上傳（審查抓到）。
+        const moved = !Store.activeUserExplicit && !Store.userEverSynced(prev) ? Store.migrateLocalRecords(prev, this.detectedUserId) : 0;
+        this._autoSelectedUserId = this.detectedUserId;
+        Store.setActiveUser(this.detectedUserId); // 會呼叫 resubscribe(true)，清掉上一個身分的錯誤狀態、補推新身分的本機紀錄
+        if (moved && typeof alert === 'function') {
+          const from = PlanData.userById[prev], to = PlanData.userById[this.detectedUserId];
+          setTimeout(() => alert(`登入前在這台裝置記的 ${moved} 天紀錄，原本記在「${from ? from.displayName : prev}」名下，已經移到「${to ? to.displayName : this.detectedUserId}」並上傳。`), 0);
+        }
+      } else {
+        this._backfillLocal(Store.activeUserId);
+        this._notify();
+      }
+      return this.detectedUserId;
+    });
+  },
+
   // 使用者切換裝置上的「我是誰」時重新訂閱（Store.setActiveUser 會呼叫這個）。
-  resubscribe() {
+  // identityChanged：換了身分（Store.setActiveUser 傳 true）。跟上一個身分綁在一起的狀態要清掉——
+  // 「身分不符」、那個身分被拒絕的寫入（failedWrites 裡沒有第三段 userId 的 entries／private／weekAdjustments），
+  // 不然膠囊會一直掛著上一個人的錯誤訊息，這個人的同一天也被標成「尚未同步」（第 41 條審查）。
+  // 「身分不符」在任何重新訂閱時都先清掉：身分還是錯的話，private 訂閱會馬上再設回來。
+  resubscribe(identityChanged) {
     if (!this.isSignedIn()) return;
+    if (identityChanged) {
+      [...this.failedWrites].forEach((k) => {
+        const parts = k.split(':');
+        if (parts.length === 2 && ['entries', 'private', 'weekAdjustments'].includes(parts[0])) this.failedWrites.delete(k);
+      });
+    }
+    if (this.state === 'wrong-identity' || (identityChanged && this.state === 'write-denied' && this.failedWrites.size === 0)) {
+      this.state = 'syncing';
+      this.message = '同步中…';
+    }
     this._detachListeners();
     this.pendingByCollection = { entries: false, private: false, weekAdjustments: false, profile: false };
     this._attachListeners();
@@ -192,6 +254,7 @@ const Sync = {
     unsubEntries = fbDb.collection(`users/${userId}/entries`)
       .onSnapshot({ includeMetadataChanges: true }, (snap) => {
         this.pendingByCollection.entries = snap.metadata.hasPendingWrites;
+        if (!snap.metadata.fromCache) Store.markUserSynced(userId); // 第 41 條：這台收過這個人的雲端資料
         snap.docChanges().forEach((c) => {
           if (c.type === 'removed') return;
           Store.mergeRemoteEntry(userId, c.doc.id, c.doc.data());

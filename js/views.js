@@ -1118,7 +1118,7 @@ function renderOverviewPage(state) {
           </div>`;
         }).join('')}
       </div>
-      <div class="share-box" style="margin-top:10px">同一個網址，對方自己在「設定」選自己的名字即可，不需要 GitHub 帳號。</div>
+      <div class="share-box" style="margin-top:10px">同一個網址，對方用自己的 Google 帳號登入就會自動選成自己；沒有自動選到的話，到「設定」選自己的名字。不需要 GitHub 帳號。</div>
     </div>
   ` : '';
 
@@ -1606,12 +1606,12 @@ function renderSettingsPage(state) {
         ${users.map((u) => `
           <div class="user-opt ${u.userId === Store.activeUserId ? 'active' : ''}" onclick="A.switchIdentity('${jsq(u.userId)}')">
             <div class="avatar">${h(u.displayName).slice(0, 1)}</div>
-            <div class="name">${h(u.displayName)}</div>
+            <div class="name">${h(u.displayName)}${Sync.detectedUserId === u.userId ? ' <span class="lib-tag">登入的帳號</span>' : ''}</div>
             ${u.userId === Store.activeUserId ? `<span class="check">${ICON.check}</span>` : ''}
           </div>
         `).join('')}
       </div>
-      <div class="share-box" style="margin-top:10px">切換身分決定你打勾寫進哪個人的紀錄——久久才換一次，跟總覽頁「查看別人進度」是分開的功能。</div>
+      <div class="share-box" style="margin-top:10px">登入 Google 帳號後會自動選成那個帳號的人（決策紀錄第 41 條）。切換身分決定你打勾寫進哪個人的紀錄，跟總覽頁「查看別人進度」是分開的功能。</div>
     </div>
 
     <div class="section">
@@ -1640,7 +1640,7 @@ function renderSettingsPage(state) {
     <div class="section">
       <div class="section-title">分享連結</div>
       <div class="share-box">
-        同一個網址分享給對方，對方登入自己的 Google 帳號後，在這頁選自己的名字即可——不需要對方有 GitHub 帳號。<br>
+        同一個網址分享給對方，對方登入自己的 Google 帳號後會自動選成自己；沒有自動選到（例如沒網路）再到這頁選自己的名字。不需要對方有 GitHub 帳號。<br>
         目前網址：<code>${h(location.href.split('#')[0])}</code>
       </div>
     </div>
