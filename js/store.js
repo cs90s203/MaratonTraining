@@ -508,7 +508,9 @@ const Store = {
   // 當成「要編輯的出廠天」用，順序被打亂會編輯到錯的一天。不合法的 dayOrder（缺值、
   // 舊格式）一律退回 identity，不讓壞資料讓畫面錯位——跟 _isValidWeekShape 同一個精神。
   effectiveDayOrder(weekNumber, userId) {
-    if (this.coachMode) return IDENTITY_ORDER;
+    // 教練模式看的是共用課表本身（出廠順序），只對「自己」這個編輯情境成立；看別人的紀錄（第 53 條）要照那個人自己的順序，
+    // 不然他對調過的日子，打的勾會對到錯的課
+    if (this.coachMode && (!userId || userId === this.activeUserId)) return IDENTITY_ORDER;
     const adj = this.weekAdjustmentFor(weekNumber, userId);
     const order = adj && adj.dayOrder;
     return isValidDayOrder(order) ? order : IDENTITY_ORDER;

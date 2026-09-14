@@ -12,6 +12,7 @@ const App = {
     savedFlash: null,      // 剛按「存成常用」的課表項目 id：那張卡寫「已存進項目庫」
     amountEdit: null,      // 決策紀錄第 46 條：點兩下正在改時間的課表項目 {weekNumber,dayIndex,itemId}
     libFlash: '',          // 決策紀錄第 52 條：改常用項目之後「已套用到 N 天」的一次性訊息
+    viewMenuOpen: false,   // 決策紀錄第 53 條：本週訓練目標前面的名字點開的「要看誰」選單
     helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
     modal: null,           // 'safety' | null
     privateNoteOpen: null, // 身體狀況的備註框被手動展開的那一天（dateKey）
@@ -89,6 +90,21 @@ const App = {
   closeModal() { this.state.modal = null; render(); },
 
   openPrivateNote(dateKey) { this.state.privateNoteOpen = dateKey; render(); },
+
+  // 決策紀錄第 53 條：看某個人每天的紀錄（唯讀）。null＝回到自己。fromOverview：從總覽過來，跳到本週頁今天那一列。
+  viewWeekOf(userId, fromOverview) {
+    this.state.viewingUserId = userId && userId !== Store.activeUserId ? userId : null;
+    this.state.viewMenuOpen = false;
+    this.state.itemPicker = null;
+    this.state.amountEdit = null;
+    this.state.libraryEdit = null;
+    if (fromOverview) { this.goTo('week'); return; }
+    render();
+  },
+  toggleViewMenu() {
+    this.state.viewMenuOpen = !this.state.viewMenuOpen;
+    render();
+  },
 
   viewProgress(userId) {
     this.state.viewingUserId = userId;

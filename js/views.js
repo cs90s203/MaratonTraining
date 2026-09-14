@@ -107,7 +107,7 @@ function renderApp(state) {
   const dr = PlanData.daysUntilRace();
   const raceLine = dr > 0 ? `距離比賽還有 ${dr} 天` : dr === 0 ? '今天是比賽日！' : `已完賽 ${-dr} 天`;
   return `
-    ${Store.coachMode ? `<div class="coach-banner">🛠 教練模式——這裡改的是所有人共用的課表，不是你自己的紀錄</div>` : ''}
+    ${Store.coachMode && !(state.page === 'week' && state.viewingUserId && state.viewingUserId !== Store.activeUserId) ? `<div class="coach-banner">🛠 教練模式——這裡改的是所有人共用的課表，不是你自己的紀錄</div>` : ''}
     <div class="topbar">
       <div class="topbar-inner">
         <div class="topbar-title">東京馬拉松 2027
@@ -216,18 +216,21 @@ function renderPage(state) {
 // 一般模式：一張「當天紀錄卡」，課表項目是卡片標題，底下照運動回來先記什麼排
 // （見 renderDayRecordCard）。教練模式：項目卡另外畫（有編輯工具列，塞不進合併的卡片），
 // 紀錄卡畫在下面、不重畫標題。本週回顧不在這裡——第 23 條搬到頂端的本週訓練目標卡。
-function renderDayBody(weekNumber, dayIndex) {
+// userId：決策紀錄第 53 條，看別人的紀錄時是那個人（唯讀）；沒給＝自己。
+function renderDayBody(weekNumber, dayIndex, userId) {
+  const uid = userId || Store.activeUserId;
+  const viewingOther = uid !== Store.activeUserId;
   const w = Store.effectiveWeek(weekNumber);
   // dayIndex 是日曆格子；教練模式下 effectiveDayOrder 一律回傳出廠順序，所以這裡
   // 同時是「要編輯的出廠天」（coach 專用的按鈕都掛在這條路徑上，見下方 coachToolbar）。
   // 非教練模式時若這天被對調過（決策紀錄第 14 條），這裡顯示的就是對調後的內容。
-  const order = Store.effectiveDayOrder(weekNumber, Store.activeUserId);
+  const order = Store.effectiveDayOrder(weekNumber, uid);
   const contentIndex = order[dayIndex];
   const d = w.days[contentIndex];
   const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
   const isExpired = PlanData.isExpired(weekNumber, dayIndex);
-  const entry = Store.entryFor(Store.activeUserId, dateKey);
-  const coach = Store.coachMode;
+  const entry = Store.entryFor(uid, dateKey);
+  const coach = Store.coachMode && !viewingOther;
 
   let html = `<div class="section day-body">`;
 
@@ -235,12 +238,20 @@ function renderDayBody(weekNumber, dayIndex) {
     html += `<div class="banner info">${ICON.info}<div><b>這天已過期</b>起算日修正後，${h(PlanData.plan.expiredBefore)} 之前的日期不計入完成率，也不需要補做。</div></div>`;
   }
 
-  {
+  // 身體狀況只有本人讀得到（Firebase 規則），看別人時不畫
+  if (!viewingOther) {
     const priv = Store.privateFor(dateKey);
     if (priv && priv.flags && (priv.flags.leakage || priv.flags.pain || priv.flags.overTired)) {
       const active = Object.keys(priv.flags).filter((k) => priv.flags[k]).map((k) => FLAG_LABELS[k]).join('、');
       html += `<div class="banner crit">${ICON.warn}<div><b>這天記錄了異常：${h(active)}</b>建議隔天視狀況減量或休息。若持續出現，${h(PlanData.plan.safety.disclaimer)}</div></div>`;
     }
+  }
+
+  if (viewingOther) {
+    if (d.dayNotes) html += `<div class="banner info">${ICON.info}<div>${h(d.dayNotes)}</div></div>`;
+    html += renderReadOnlyDay(weekNumber, dayIndex, d, entry, uid);
+    html += `</div>`;
+    return html;
   }
 
   if (!coach) {
@@ -283,6 +294,39 @@ function renderDayBody(weekNumber, dayIndex) {
 
   html += `</div>`;
   return html;
+}
+
+// 決策紀錄第 53 條：看別人的一天（唯讀）。課表項目＋那個人打的勾、當天狀態、實際時間／公里、體感、附註。
+// 全部是文字，沒有任何按鈕會寫資料。身體狀況只有本人讀得到，只寫一行說明。
+function renderReadOnlyDay(weekNumber, dayIndex, d, entry, uid) {
+  const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
+  const status = Store.dayStatus(weekNumber, dayIndex, uid);
+  const st = entryStatus(entry);
+  const items = d.items.map((it) => {
+    const done = d.selectOne
+      ? !!(entry && entry.selectedItemId === it.id && entry.done && entry.done[it.id])
+      : !!(entry && entry.done && entry.done[it.id]);
+    return `
+      <div class="ro-item ${done ? 'done' : ''}">
+        <span class="ro-mark" aria-label="${done ? '完成' : '未勾'}">${done ? ICON.check : ''}</span>
+        <div class="ro-body"><div class="rec-title">${h(it.title)}${it.type === 'race' ? ' 🏁' : ''}</div>${itemPlanParts(it, { dateKey }).body}</div>
+      </div>`;
+  }).join(d.selectOne ? '<div class="choice-or">或</div>' : '');
+  const nums = [];
+  if (entry && entry.actualDurationMinutes != null) nums.push(`實際時間 ${entry.actualDurationMinutes} 分`);
+  if (entry && entry.actualDistanceKm != null) nums.push(`實際公里 ${entry.actualDistanceKm} km`);
+  if (entry && Number.isInteger(entry.effort) && st !== 'rested') nums.push(`體感 ${entry.effort} · ${effortLabel(entry.effort)}`);
+  const isAllRest = d.items.every((it) => it.type === 'rest');
+  return `
+    <div class="card rec-card ro-card">
+      <div class="rec-sec">${items}</div>
+      <div class="rec-sec">
+        <div class="ro-status">${isAllRest && status === 'pending' ? '休息日' : h(dayStatusLabel(status, dateKey) + (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType] ? '·' + SUBSTITUTE_LABELS[entry.substituteType] : ''))}</div>
+        ${nums.length ? `<div class="ro-nums">${h(nums.join('　'))}</div>` : ''}
+        ${entry && entry.actualNote ? `<div class="ro-note"><span class="rec-lbl">附註</span>${h(entry.actualNote)}</div>` : ''}
+      </div>
+      <div class="rec-sec ro-private">🔒 身體狀況只有本人看得到。</div>
+    </div>`;
 }
 
 // 項目的課表說明（時長／心率／RPE、影片、動作清單）——教練模式的項目卡跟當天紀錄卡的
@@ -828,15 +872,17 @@ function renderEffortControl(weekNumber, dayIndex, d, entry) {
 // 二擇一取選中的那個）、本週已降量的標記。吃力天數只是提醒「下週不要加」，
 // 不是叫她補——第 0 條。決策紀錄第 23 條：從週日那一列搬到頂端「本週訓練目標」卡，
 // 每天都看得到；沒有異常、沒有吃力、沒有標記降量時整段不顯示。
-function renderWeeklyReviewCard(weekNumber) {
+function renderWeeklyReviewCard(weekNumber, userId) {
+  const uid = userId || Store.activeUserId;
+  const self = uid === Store.activeUserId; // 看別人（第 53 條）：身體狀況讀不到、降量也不能幫他標
   let flaggedDays = 0, overDays = 0;
   const w = Store.effectiveWeek(weekNumber);
-  const order = Store.effectiveDayOrder(weekNumber, Store.activeUserId);
+  const order = Store.effectiveDayOrder(weekNumber, uid);
   for (let i = 0; i < 7; i++) {
     const key = PlanData.keyForWeekDay(weekNumber, i);
-    const p = Store.privateFor(key);
+    const p = self ? Store.privateFor(key) : null;
     if (p && p.flags && (p.flags.leakage || p.flags.pain || p.flags.overTired)) flaggedDays++;
-    const e = Store.entryFor(Store.activeUserId, key);
+    const e = Store.entryFor(uid, key);
     if (e && Number.isInteger(e.effort)) {
       const d = w.days[order[i]];
       const items = d.selectOne ? d.items.filter((it) => it.id === e.selectedItemId) : d.items;
@@ -844,7 +890,7 @@ function renderWeeklyReviewCard(weekNumber) {
       if (maxes.length && e.effort > Math.max(...maxes)) overDays++;
     }
   }
-  const adj = Store.weekAdjustmentFor(weekNumber);
+  const adj = Store.weekAdjustmentFor(weekNumber, uid);
   // 看 reduced 不看 adj 存不存在：拖曳換過順序（第 18 條）也會產生 weekAdjustments 文件，
   // 那不代表這週有事要回顧——搬到頂端之後，這個判斷錯了會每天掛一句「這週狀況正常」。
   const reduced = !!(adj && adj.reduced);
@@ -861,7 +907,7 @@ function renderWeeklyReviewCard(weekNumber) {
         ${summary}${overLine}
         ${reduced
           ? `<div style="margin-top:6px;font-weight:600">✓ 已標記本週降量${adj.note ? '：' + h(adj.note) : ''}</div>`
-          : `<button class="btn secondary" style="margin-top:8px;width:auto;padding:7px 12px;font-size:12.5px" onclick="A.markWeekReduced(${weekNumber})">標記本週已降量</button>`}
+          : (self ? `<button class="btn secondary" style="margin-top:8px;width:auto;padding:7px 12px;font-size:12.5px" onclick="A.markWeekReduced(${weekNumber})">標記本週已降量</button>` : '')}
       </div>
     </div>
   `;
@@ -872,7 +918,14 @@ function renderWeekPage(state) {
   const wn = state.weekViewNumber;
   const w = Store.effectiveWeek(wn);
   const phase = PlanData.phaseForWeek(wn);
-  const coach = Store.coachMode;
+  // 決策紀錄第 53 條：「在看誰」跟「我是誰」分開。看別人時整頁唯讀：畫那個人的紀錄，改課表的工具收起來
+  const viewingId = state.viewingUserId && state.viewingUserId !== Store.activeUserId && PlanData.userById[state.viewingUserId] ? state.viewingUserId : null;
+  const uid = viewingId || Store.activeUserId;
+  if (viewingId) {
+    Sync.subscribeOtherEntries(viewingId, () => window.render && window.render());
+    Sync.subscribeOtherWeekAdjustments(viewingId, () => window.render && window.render());
+  }
+  const coach = Store.coachMode && !viewingId;
   const hasOverride = !!Store.planOverrides[wn];
   const loc = PlanData.locateToday();
   const todayKey = loc.status === 'in-plan' ? loc.key : null;
@@ -880,8 +933,8 @@ function renderWeekPage(state) {
   const todayKeyNow = PlanData.dayKey(PlanData.today());
 
   const table = Store.weekViewMode === 'table';
-  const vol = Store.weekVolume(wn, Store.activeUserId);
-  const order = Store.effectiveDayOrder(wn, Store.activeUserId);
+  const vol = Store.weekVolume(wn, uid);
+  const order = Store.effectiveDayOrder(wn, uid);
   const expanded = state.expandedDay && state.expandedDay.weekNumber === wn ? state.expandedDay.dayIndex : -1;
 
   // 拖曳換順序（第 18 條）：教練模式下 effectiveDayOrder 一律回傳出廠順序，拖了也不會生效，
@@ -889,15 +942,15 @@ function renderWeekPage(state) {
   // 決策紀錄第 50 條（取代第 43 條的「只限還沒開始的週」）：教練模式拖到另一天上放開＝兩天的共用課表直接對調
   // （所有人一起變），這週也可以；今天以前的日子鎖住（沒有把手、也不能當落點）。
   // 一般模式拖的照舊是自己的本週順序（第 14、18 條）。
-  const canDrag = !table && typeof Sortable !== 'undefined';
+  const canDrag = !table && typeof Sortable !== 'undefined' && !viewingId;
 
   // 手風琴（決策紀錄第 17 條）：一次只展開一列，展開的列身就是原本「今日」頁的內容。
   const rows = order.map((contentIndex, i) => {
     const d = w.days[contentIndex];
-    const status = Store.dayStatus(wn, i);
+    const status = Store.dayStatus(wn, i, uid);
     const dateLabel = PlanData.dateForWeekDay(wn, i);
     const dateKey = PlanData.keyForWeekDay(wn, i);
-    const entry = Store.entryFor(Store.activeUserId, dateKey);
+    const entry = Store.entryFor(uid, dateKey);
     const isToday = dateKey === todayKey;
     const isOpen = i === expanded;
     const titles = d.items.map((it) => it.title).join(d.selectOne ? ' 或 ' : '、');
@@ -914,7 +967,7 @@ function renderWeekPage(state) {
           <span class="weekday-chevron">${ICON.chevron}</span>
           ${canDrag && !(coach && dateKey < todayKeyNow) ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="${coach ? '按住拖到另一天，兩天對調' : '按住拖曳換順序'}">${ICON.grip}</span>` : ''}
         </div>
-        ${isOpen ? `<div class="weekday-body">${renderDayBody(wn, i)}</div>` : ''}
+        ${isOpen ? `<div class="weekday-body">${renderDayBody(wn, i, uid)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -945,15 +998,16 @@ function renderWeekPage(state) {
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
+      ${viewingId ? `<div class="banner info view-banner">${ICON.info}<div>正在看 <b>${h(PlanData.userById[viewingId].displayName)}</b> 的紀錄（唯讀）。打勾、改課表要回到自己。<div><button class="btn secondary lib-add" style="margin-top:8px" onclick="A.viewWeekOf(null)">回到自己</button></div></div></div>` : ''}
       ${signedOutBanner}
       ${planBanner}
-      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', who: (PlanData.userById[Store.activeUserId] || {}).displayName || Store.activeUserId, title: '跑量', footer: renderWeeklyReviewCard(wn), showSafetyAlert: true })}
+      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', who: (PlanData.userById[uid] || {}).displayName || uid, whoMenu: Sync.isSignedIn() ? renderViewPicker(state, uid) : null, title: '跑量', footer: renderWeeklyReviewCard(wn, uid), showSafetyAlert: true })}
       <div class="view-toggle">
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
       </div>
-      ${table ? renderWeekTable(wn, w, order, todayKey) : `<div class="card" ${canDrag ? `data-daylist="${wn}" data-coach="${coach ? 1 : 0}"` : ''}>${rows}</div>`}
-      ${!coach ? renderDayOrderHint(wn, order, canDrag) : renderCoachDragHint(canDrag)}
+      ${table ? renderWeekTable(wn, w, order, todayKey, uid) : `<div class="card" ${canDrag ? `data-daylist="${wn}" data-coach="${coach ? 1 : 0}"` : ''}>${rows}</div>`}
+      ${viewingId ? '' : (!coach ? renderDayOrderHint(wn, order, canDrag) : renderCoachDragHint(canDrag))}
       ${coach ? renderWeekCoachPanel(wn, w, hasOverride, vol) : ''}
     </div>
   `;
@@ -999,12 +1053,18 @@ function renderWeekVolumeCard(vol, opts) {
   opts = opts || {};
   // 本週頁頂端是「本週訓練目標」（決策紀錄第 23 條）：跑量變成其中一項，底下接本週回顧。
   // 總覽頁用同一張卡但不帶 heading／footer。
-  // opts.who：現在是誰的紀錄（使用者要的：標題前面放名字，才知道目前是誰）
+  // opts.who：現在是誰的紀錄（使用者要的：標題前面放名字，才知道目前是誰）。
+  // opts.whoMenu：登入後名字可以點開，選要看誰（第 53 條）；選單本身由 renderViewPicker 畫
+  const whoChip = !opts.who ? ''
+    : opts.whoMenu != null
+      ? `<button type="button" class="vol-who pick" onclick="A.toggleViewMenu()" aria-expanded="${!!App.state.viewMenuOpen}">${h(opts.who)}${ICON.chevronDown}</button>`
+      : `<span class="vol-who">${h(opts.who)}</span>`;
   const heading = opts.heading ? `<div class="vol-heading">
-    <span class="vol-heading-text">${opts.who ? `<span class="vol-who">${h(opts.who)}</span>` : ''}${h(opts.heading)}</span>
+    <span class="vol-heading-text">${whoChip}${h(opts.heading)}</span>
     ${opts.showSafetyAlert ? `<button class="icon-btn alert" onclick="A.openModal('safety')" aria-label="安全提醒" title="開始前 / 安全提醒">${ICON.alert}</button>` : ''}
   </div>` : '';
   const footer = opts.footer || '';
+  const whoMenu = opts.whoMenu && App.state.viewMenuOpen ? opts.whoMenu : '';
   const t = vol.target, actual = vol.actual;
   const anchor = t.min > 0 ? t.min : t.max;
   const reached = actual != null && anchor > 0 && actual >= anchor;
@@ -1027,6 +1087,7 @@ function renderWeekVolumeCard(vol, opts) {
     return `
       <div class="card vol-card">
         ${heading}
+        ${whoMenu}
         <div class="vol-head">
           <span class="vol-title">${h(opts.title || '本週跑量')}</span>
           <span class="vol-nums"><b>${actualStr}</b> km</span>
@@ -1042,6 +1103,7 @@ function renderWeekVolumeCard(vol, opts) {
   return `
     <div class="card vol-card">
       ${heading}
+      ${whoMenu}
       <div class="vol-head">
         <span class="vol-title">${h(opts.title || '本週跑量')}</span>
         <span class="vol-nums"><b>${actualStr}</b> / ${fmtKmRange(t)} km${reached && !over ? ' ✓' : ''}</span>
@@ -1057,14 +1119,27 @@ function renderWeekVolumeCard(vol, opts) {
   `;
 }
 
+// 決策紀錄第 53 條：本週訓練目標前面的名字點開＝選要看誰的紀錄（自己可以打勾；別人唯讀）
+function renderViewPicker(state, uid) {
+  return `<div class="pick-list view-pick">${PlanData.users.map((u) => {
+    const self = u.userId === Store.activeUserId;
+    const on = u.userId === uid;
+    return `<button type="button" class="pick-row ${on ? 'on' : ''}" onclick="A.viewWeekOf(${self ? 'null' : `'${jsq(u.userId)}'`})">
+        <span class="pick-mark">${on ? ICON.check : ''}</span>
+        <span class="pick-text"><span class="pick-name">${h(u.displayName)}${self ? '（自己）' : ''}</span><span class="pick-meta">${self ? '可以打勾、記紀錄' : '看每天的紀錄（唯讀）'}</span></span>
+      </button>`;
+  }).join('')}</div>`;
+}
+
 // 表格模式：課表｜實際 並排，模仿舊 Notion 課表那張表——給回顧用；手機上打勾用卡片模式。
-function renderWeekTable(wn, w, order, todayKey) {
+function renderWeekTable(wn, w, order, todayKey, userId) {
+  const uid = userId || Store.activeUserId;
   const rows = order.map((contentIndex, i) => {
     const d = w.days[contentIndex];
-    const status = Store.dayStatus(wn, i);
+    const status = Store.dayStatus(wn, i, uid);
     const dateLabel = PlanData.dateForWeekDay(wn, i);
     const dateKey = PlanData.keyForWeekDay(wn, i);
-    const entry = Store.entryFor(Store.activeUserId, dateKey);
+    const entry = Store.entryFor(uid, dateKey);
     const planCell = (contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : '') +
       d.items.map((it) => {
         const meta = [PlanData.fmtItemMeta(it), PlanData.fmtHeartRateZone(it.heartRateZone)].filter(Boolean).join(' · ');
@@ -1245,6 +1320,7 @@ function renderOverviewPage(state) {
       <div>
         <div class="section">
           <div class="section-title">${isSelf ? '我的進度' : `${h(viewingUser ? viewingUser.displayName : viewingUserId)} 的進度（唯讀）`}</div>
+          ${!isSelf ? `<button class="btn secondary lib-add" style="margin-bottom:10px" onclick="A.viewWeekOf('${jsq(viewingUserId)}', true)">看 ${h(viewingUser ? viewingUser.displayName : viewingUserId)} 每天的紀錄 ›</button>` : ''}
           ${stats}
           ${phaseStrip}
         </div>
