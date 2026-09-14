@@ -48,6 +48,7 @@ const App = {
     const same = e && e.weekNumber === weekNumber && e.dayIndex === dayIndex;
     this.state.expandedDay = same ? null : { weekNumber, dayIndex };
     this.state.editingItem = null;
+    this.state.libraryEdit = null; // 第 33 條：從卡片打開的清單編輯器不能跟著跑到別天
     render();
   },
 
@@ -58,6 +59,7 @@ const App = {
     this.state.expandedDay = (loc.status === 'in-plan' && loc.weekNumber === weekNumber)
       ? { weekNumber, dayIndex: loc.dayIndex } : null;
     this.state.editingItem = null;
+    this.state.libraryEdit = null;
     render();
   },
 
@@ -155,6 +157,7 @@ const App = {
 
   setWeekViewMode(mode) {
     Store.setWeekViewMode(mode);
+    this.state.libraryEdit = null;
     render();
   },
 
@@ -272,11 +275,13 @@ const App = {
 
   startEditItem(weekNumber, dayIndex, itemId) {
     this.state.editingItem = { weekNumber, dayIndex, itemId };
+    this.state.libraryEdit = null; // 同時開兩個表單，一邊的重繪會洗掉另一邊還沒存的字
     render();
   },
 
   startAddItem(weekNumber, dayIndex) {
     this.state.editingItem = { weekNumber, dayIndex, itemId: 'new' };
+    this.state.libraryEdit = null;
     render();
   },
 
@@ -313,9 +318,18 @@ const App = {
 
   _blankExercise() { return { name: '', sets: 2, qty: 'reps', min: 8, max: 10, perSide: false, notes: '' }; },
 
-  startLibraryEdit(kind, id) {
-    const doc = id !== 'new' ? Store.libraryDoc(id) : null;
-    if (id !== 'new' && !doc) return;
+  // 打開動作清單／影片／常用項目的編輯器。
+  // 內建的（第 33 條）也從這裡進來：預填「今天看到的版本」（有修改版用修改版，沒有用 JSON），
+  // 不能用 Store.libraryDoc——還沒改過的內建清單在庫裡根本沒有文件，按了會沒反應。
+  // baseUpdatedAt：打開這一刻修改版的 updatedAt（沒有＝null），存檔時交給 transaction 比對。
+  // origin：從本週頁某張卡的「查看動作」打開的，編輯器就畫在那張卡的位置。
+  startLibraryEdit(kind, id, origin) {
+    const isBuiltin = id !== 'new' && (kind === 'workout' ? !!PlanData.workoutById[id] : (kind === 'video' ? !!PlanData.videoById[id] : false));
+    let doc = null;
+    if (id !== 'new') {
+      doc = kind === 'workout' ? Store.workoutFor(id) : (kind === 'video' ? Store.videoFor(id) : Store.libraryDoc(id));
+      if (!doc) { alert('找不到這份內容，可能還沒同步到這台裝置。'); return; }
+    }
     let draft = null;
     if (kind === 'workout') {
       const exs = doc ? doc.exercises : [];
@@ -330,13 +344,42 @@ const App = {
     } else if (kind === 'video') {
       draft = {
         title: doc ? doc.title : '', creator: doc ? (doc.creator || '') : '',
-        linkType: doc && doc.linkType === 'video' ? 'video' : 'search',
+        linkType: doc && (doc.linkType === 'video' || doc.linkType === 'none') ? doc.linkType : 'search',
         searchQuery: doc ? (doc.searchQuery || '') : '', url: doc ? (doc.url || '') : '',
         notes: doc ? (doc.notes || '') : '',
       };
     }
     // kind === 'item'：範本內容直接用 renderItemEditForm 的表單讀，不需要 draft
-    this.state.libraryEdit = { kind, id, draft };
+    const base = isBuiltin ? (kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id]) : null;
+    this.state.libraryEdit = {
+      kind, id, draft,
+      builtin: isBuiltin,
+      baseUpdatedAt: isBuiltin ? Store.libraryServerUpdatedAt(id) : null,
+      origin: origin || null,
+      safetyNote: kind === 'workout' && base ? base.safetyNote || '' : '',
+      builtinNotes: kind === 'video' && base ? base.notes || '' : '',
+    };
+    this.state.editingItem = null;
+    render();
+  },
+
+  startLibraryEditFromCard(weekNumber, dayIndex, itemId, workoutId) {
+    this.startLibraryEdit('workout', workoutId, { weekNumber, dayIndex, itemId });
+  },
+
+  // 內建內容還原成 JSON 的版本，一樣只從今天起（第 33 條）
+  restoreBuiltin(kind, id) {
+    const base = kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id];
+    if (!base) return;
+    if (!Sync.isSignedIn()) { alert('要先登入才能還原內建內容（三個人共用）。'); return; }
+    const u = Store.libraryUsage(kind, id);
+    const name = kind === 'workout' ? base.name : base.title;
+    if (!confirm(`把「${name}」還原成內建版本？\n今天起用到它的 ${u.upcoming} 天會回到內建內容；今天以前的日子維持原樣。`)) return;
+    const r = Store.saveBuiltinOverride(kind, id, null, Store.libraryServerUpdatedAt(id), (ok, msg) => {
+      if (!ok) { render(); alert(`${msg}\n「${name}」維持原本的內容。`); }
+    });
+    if (!r.ok) { alert(r.reason); return; }
+    if (this.state.libraryEdit && this.state.libraryEdit.id === id) this.state.libraryEdit = null;
     render();
   },
 
@@ -362,6 +405,26 @@ const App = {
     const e = this.state.libraryEdit;
     if (!e || !e.draft) return;
     e.draft.exercises.push(this._blankExercise());
+    render();
+  },
+  // 內建內容存檔的結果回呼（第 33 條）。雲端存不進去時，把編輯器連同剛剛改的內容打開回來、跳出原因——
+  // 編輯器在按下儲存那一刻就關了（本機先改），不留這份草稿的話，失敗就等於改的東西全部不見。
+  _builtinSaveResult(keep) {
+    return (ok, msg) => {
+      if (ok) return;
+      this.state.libraryEdit = { ...keep, baseUpdatedAt: Store.libraryServerUpdatedAt(keep.id) };
+      render();
+      alert(`${msg}\n你改的內容還在編輯器裡：確定要用你的版本就再按一次儲存；不要的話按取消。`);
+    };
+  },
+
+  moveLibExercise(i, dir) {
+    const e = this.state.libraryEdit;
+    if (!e || !e.draft || !e.draft.exercises) return;
+    const j = i + dir;
+    const list = e.draft.exercises;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
     render();
   },
   removeLibExercise(i) {
@@ -393,8 +456,17 @@ const App = {
       exercises.push({ name, sets, reps: ex.qty === 'hold' ? null : r, holdSeconds: ex.qty === 'hold' ? r : null, perSide: !!ex.perSide, notes: ex.notes });
     }
     if (!exercises.length) { alert('至少要有一個有名稱的動作。'); return; }
-    const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'workout', { name: d.name, loadGuidance: d.loadGuidance, exercises });
-    if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    const fields = { name: d.name, loadGuidance: d.loadGuidance, exercises };
+    if (e.builtin) {
+      const r = Store.saveBuiltinOverride('workout', e.id, fields, e.baseUpdatedAt, this._builtinSaveResult(JSON.parse(JSON.stringify(e))));
+      if (!r.ok) { alert(r.reason); return; }
+    } else {
+      if (e.id !== 'new' && Store.library[e.id] && Store.library[e.id].deleted) {
+        alert('這份動作清單已經從常用項目庫刪掉了，不能再改。要改的話請新增一份。'); return;
+      }
+      const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'workout', fields);
+      if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    }
     this.state.libraryEdit = null;
     render();
   },
@@ -407,9 +479,14 @@ const App = {
     if (d.linkType === 'video' && !/^https:\/\//i.test(String(d.url || '').trim())) {
       alert('影片網址要以 https:// 開頭——直接從 YouTube 複製網址貼上。'); return;
     }
-    if (d.linkType !== 'video' && !String(d.searchQuery || '').trim()) { alert('請填搜尋關鍵字。'); return; }
-    const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'video', d);
-    if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    if (d.linkType === 'search' && !String(d.searchQuery || '').trim()) { alert('請填搜尋關鍵字。'); return; }
+    if (e.builtin) {
+      const r = Store.saveBuiltinOverride('video', e.id, d, e.baseUpdatedAt, this._builtinSaveResult(JSON.parse(JSON.stringify(e))));
+      if (!r.ok) { alert(r.reason); return; }
+    } else {
+      const saved = Store.saveLibraryDoc(e.id === 'new' ? null : e.id, 'video', d);
+      if (!saved) { alert('內容不完整，沒有存檔。'); return; }
+    }
     this.state.libraryEdit = null;
     render();
   },

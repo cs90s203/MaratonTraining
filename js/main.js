@@ -30,6 +30,8 @@ function isTypingInRoot() {
   return tag === 'TEXTAREA' || (tag === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(el.type));
 }
 
+// 決策紀錄第 36 條起 index.html 的 viewport 固定帶 maximum-scale=1，點欄位本來就不會放大了；
+// 下面這支留著當備援（某些 iOS 版本若不理 maximum-scale，放大之後照樣縮得回來）。
 // iOS Safari 把 focus 的 input 字型小於 16px 時自動放大畫面（這裡幾乎每個數字欄都比
 // 16px 小），失焦後理應自動縮回，但常常縮不回去——因為失焦的原因是「整個 #root 被
 // 我們自己的 render() 換掉」，不是使用者悠悠地點別處（跟 babylog 同一個坑，同一個修法：

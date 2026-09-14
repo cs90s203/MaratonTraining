@@ -161,8 +161,23 @@ button.item-check::after, .rec-tick::after, button.rec-radio::after { content: '
 }
 /* 影片名稱前的 ▶（決策紀錄第 32 條）。一定要給尺寸跟 flex:none：svg 只有 viewBox 沒有寬高，
    在 inline-flex 裡會被旁邊的長標題擠成 0 寬——v0.12.0 以前一直是這樣，圖示在畫面上看不到。 */
-.item-link svg, .lib-name svg { flex: none; width: 12px; height: 12px; }
-.lib-name svg { color: var(--accent2); margin-right: 5px; vertical-align: -1px; }
+.item-link svg, .lib-name svg { flex: none; width: 16px; height: 16px; }
+.lib-name svg { color: var(--accent2); margin-right: 6px; vertical-align: -3px; }
+/* 實心圓＋挖空的三角形（第 34 條）：圓用文字色，三角形用所在卡片的底色，看起來像反白 */
+.play-circle .pc-bg { fill: currentColor; }
+.play-circle .pc-fg { fill: var(--card); }
+.item-link { gap: 6px; }
+.item-link.plain { color: var(--text2); border-style: dashed; font-weight: 500; }
+
+/* 「查看動作」展開的內容（第 33 條）：負荷說明在上、動作、固定的安全提醒、推導值說明、教練的編輯按鈕 */
+.wo-body { margin-top: 8px; font-size: 13px; color: var(--text2); line-height: 1.7; }
+.wo-guide { margin-bottom: 4px; color: var(--text); }
+.wo-safety { margin-top: 6px; color: var(--warn); }
+.wo-safety.locked { font-size: 12px; line-height: 1.6; background: var(--card); border-radius: 8px; padding: 8px 10px; margin-top: 0; }
+.wo-derived { margin-top: 4px; color: var(--warn); }
+.link-btn.wo-edit { display: inline-block; margin-top: 6px; font-size: 12.5px; padding: 4px 0; }
+.lib-tag { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--text2); background: var(--track); border-radius: 5px; padding: 1px 6px; vertical-align: 1px; }
+.lib-tag.mod { color: var(--warn); background: var(--warnBg); }
 
 .choice-or { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--text3); letter-spacing: .06em; margin: -2px 0 8px; }
 .choice-note { font-size: 12.5px; color: var(--text2); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--inpBorder); }
@@ -324,7 +339,12 @@ textarea.note-input {
 .link-btn.lib-del { color: var(--crit); }
 .btn.lib-add { width: auto; align-self: flex-start; padding: 7px 12px; font-size: 13px; }
 .ex-row { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--warn); }
-.ex-foot { align-items: center; }
+.ex-foot { align-items: center; justify-content: space-between; }
+.ex-head { align-items: flex-end; flex-wrap: nowrap !important; }
+.ex-move { display: flex; gap: 2px; flex: none; padding-bottom: 6px; }
+.ex-move .link-btn { font-size: 16px; padding: 4px 8px; }
+.ex-move .link-btn:disabled { opacity: .3; }
+.edit-form textarea.ex-notes { min-height: 40px; }
 .ex-perside { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text2); flex: none; }
 .edit-form .ex-perside input { width: auto; }
 .tpl-picker { padding-bottom: 10px; border-bottom: 1px dashed var(--warn); }

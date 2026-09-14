@@ -87,6 +87,7 @@ const Sync = {
         this._notify();
       });
     } catch (e) {
+      this.authResolved = true;
       this._set('fail', '初始化失敗：' + e.message);
       return;
     }
@@ -99,8 +100,10 @@ const Sync = {
     Store._cloudPushPlanOverride = this.pushPlanOverride.bind(this);
     Store._cloudDeletePlanOverride = this.deletePlanOverride.bind(this);
     Store._cloudPushLibrary = this.pushLibrary.bind(this);
+    Store._cloudPushLibraryOverride = this.pushLibraryOverride.bind(this);
 
     fbAuth.onAuthStateChanged((user) => {
+      this.authResolved = true; // 第 35 條：沒登入的提示要等這裡回來過一次才顯示，不然每次開 App 都會閃一下
       if (!user) {
         this.user = null;
         this._detachListeners();
@@ -258,6 +261,7 @@ const Sync = {
   // Console 上的規則還沒加上 library 那一段。這**不能**走 _handleSnapErr 的通用分支：那條會
   // 判成「帳號未授權」直接登出，結果只是規則少貼一段，三個人全部被踢出去。
   libraryDenied: false,
+  authResolved: false, // Firebase 回報過一次登入狀態了沒（開 App 時要等一下下才知道有沒有登入）
   _attachLibrary() {
     if (unsubLibrary) return;
     let backfilled = false;
@@ -270,8 +274,11 @@ const Sync = {
         let removed = false;
         // docChanges() 不帶參數＝不含「只有 metadata 變」的文件（快取→伺服器確認、寫入中→寫完）
         snap.docChanges().forEach((c) => {
-          if (c.type === 'removed') { delete Store.library[c.doc.id]; removed = true; return; }
-          Store.mergeRemoteLibrary(c.doc.id, c.doc.data()); // 這個自己會 notify
+          if (c.type === 'removed') { delete Store.library[c.doc.id]; delete Store._libraryServer[c.doc.id]; removed = true; return; }
+          const data = c.doc.data() || {};
+          // 內建內容的修改版整份取代，不逐欄位合併（第 33 條，見 Store.replaceRemoteLibrary）
+          if (data.kind === 'workoutOverride' || data.kind === 'videoOverride') Store.replaceRemoteLibrary(c.doc.id, data);
+          else Store.mergeRemoteLibrary(c.doc.id, data); // 這兩個自己會 notify
         });
         if (!backfilled && !snap.metadata.fromCache) { backfilled = true; this._backfillLibrary(snap); }
         // 決策紀錄第 29 條：只在畫面看得到的東西變了才重繪。以前每個快照都 _notify()——
@@ -291,6 +298,8 @@ const Sync = {
     Object.keys(Store.library).forEach((id) => {
       const local = Store.library[id];
       if (!local) return;
+      // 修改版只能在登入時用 transaction 存（pushLibraryOverride），不會有「沒登入時存的」要補推
+      if (local.kind === 'workoutOverride' || local.kind === 'videoOverride') return;
       const r = remote[id];
       if (!r) { this.pushLibrary(id, local); return; }
       const keys = Object.keys(local).filter((k) => k !== 'fieldAt' && k !== 'updatedAt' && fieldTime(local, k) > fieldTime(r, k));
@@ -321,6 +330,56 @@ const Sync = {
     } catch (err) {
       this._onWriteError('library', docId, '(常用項目庫)', key, err);
     }
+  },
+
+  // 內建動作清單／影片的修改版（決策紀錄第 33 條）。跟 pushPlanOverride 同一套：transaction 讀雲端
+  // 最新的 updatedAt，跟打開編輯器那一刻的 baseUpdatedAt 比對，不一致就中止——兩個人同時改同一份
+  // 內建清單時，後存的人不能靜默蓋掉先存的。整份文件 set（不 merge），content 跟 history 必須一起對。
+  // 結果一律回報 onResult(ok, 訊息)；失敗時 Store 退回雲端確認過的版本，這裡再重新讀一次雲端校正。
+  // 衝突不改同步膠囊的狀態（不是離線，不該顯示「離線，點擊重試」），訊息交給畫面直接跳出來。
+  pushLibraryOverride(docId, doc, baseUpdatedAt, onResult) {
+    const report = (ok, msg) => { if (onResult) onResult(ok, msg); };
+    if (!this.isSignedIn()) {
+      report(false, '要先登入才能改內建的動作清單或影片（三個人共用的內容），這次沒有存。');
+      return;
+    }
+    const key = `library:${docId}`;
+    const clean = JSON.parse(JSON.stringify(doc));
+    const ref = fbDb.collection('library').doc(docId);
+    const resync = () => ref.get()
+      .then((snap) => Store.replaceRemoteLibrary(docId, snap.exists ? snap.data() : null))
+      .catch(() => {});
+    fbDb.runTransaction((tx) => tx.get(ref).then((snap) => {
+      const remoteAt = snap.exists ? (snap.data() || {}).updatedAt || null : null;
+      if (remoteAt !== (baseUpdatedAt || null)) {
+        const err = new Error('library-conflict'); err.code = 'library-conflict'; throw err;
+      }
+      tx.set(ref, clean);
+    })).then(() => {
+      Store._libraryServer[docId] = clean; // 雲端確認過了（快照稍後也會送來同一份）
+      const hadFail = this.failedWrites.delete(key);
+      if (this._overrideFailed && this.state === 'fail') { this._overrideFailed = false; this._set('done', '已同步'); }
+      else if (hadFail && this.state === 'write-denied' && this.failedWrites.size === 0) this._set('done', '已同步');
+      else if (hadFail) this._notify();
+      report(true, '');
+    }).catch((err) => {
+      if (err && err.code === 'library-conflict') {
+        resync();
+        report(false, '這份內容剛被別人改過，你這次的修改沒有存進去。');
+        return;
+      }
+      if (err && err.code === 'permission-denied') {
+        this._onWriteError('library', docId, '(常用項目庫)', key, err);
+        report(false, this.message || '寫入被拒，這次的修改沒有存進去。');
+        return;
+      }
+      // 沒網路（transaction 需要連線）或其他錯誤
+      this.failedWrites.add(key);
+      this._overrideFailed = true;
+      this._set('fail', '沒有連上網路，內建內容的修改沒有存進去。');
+      resync();
+      report(false, '沒有連上網路（或連線不穩），這次的修改沒有存進去。');
+    });
   },
 
   // 三個白名單成員都能寫同一份共用課表，所以「兩人幾乎同時編輯同一週」是真的會

@@ -1,11 +1,12 @@
 {
-  "_note": "重訓與核心的動作清單。原規格書的 day schema 沒有欄位放這些，轉檔時整個第五節會蒸發——週三打開 App 只會看到「重量訓練 A、30 分鐘」，而重訓佔 26 週裡的 52 天。reps 與 holdSeconds 都用 {min,max}；perSide 表示每邊各做該組數。 derived:true 表示這份清單的內容原文沒給、是推導的。",
+  "_note": "重訓與核心的動作清單。原規格書的 day schema 沒有欄位放這些，轉檔時整個第五節會蒸發——週三打開 App 只會看到「重量訓練 A、30 分鐘」，而重訓佔 26 週裡的 52 天。reps 與 holdSeconds 都用 {min,max}；perSide 表示每邊各做該組數。 derived:true 表示這份清單的內容原文沒給、是推導的。 safetyNote 是固定的安全提醒：教練在 App 裡改動作清單（決策紀錄第 33 條）也改不掉，畫面一律從這個檔案拿。",
   "workouts": [
     {
       "id": "pelvic-core-basic",
       "name": "產後核心／骨盆底啟動",
       "phase": "Phase 1",
       "loadGuidance": "全程徒手。重點是「連結」不是「燃燒」——做到有感覺就停，不要追痠。",
+      "safetyNote": "運動中出現漏尿、下墜感或疼痛就先停下來，詳見本週頁標題旁「！」的安全提醒。",
       "exercises": [
         {
           "name": "骨盆底啟動呼吸（仰臥）",
@@ -51,6 +52,7 @@
       "name": "核心／骨盆底進階",
       "phase": "Phase 2 之後",
       "loadGuidance": "動作品質優先。出現漏尿或下墜感就退回 pelvic-core-basic。",
+      "safetyNote": "運動中出現漏尿、下墜感或疼痛就先停下來，改做「產後核心／骨盆底啟動」那份，詳見本週頁標題旁「！」的安全提醒。",
       "exercises": [
         {
           "name": "骨盆底啟動呼吸",
@@ -105,6 +107,7 @@
       "name": "重量訓練 A（下肢主導）",
       "phase": "全程",
       "loadGuidance": "Phase 1 徒手或極輕負荷；Phase 2 開始可加輕啞鈴；Phase 3 維持不加量；Phase 4 極輕量只做喚醒。",
+      "safetyNote": "運動中出現漏尿、下墜感或疼痛就先停下來，詳見本週頁標題旁「！」的安全提醒。",
       "exercises": [
         {
           "name": "骨盆底啟動呼吸（墊上）",
@@ -168,6 +171,7 @@
       "name": "重量訓練 B（全身／上肢＋核心）",
       "phase": "Phase 2",
       "loadGuidance": "原計畫只在 Phase 2 模板排入訓練 B（每週 2 次＝A＋B）。Phase 1 與 Phase 3 各只排 1 次 A——不補第二次，因為那會變相增加強度。",
+      "safetyNote": "運動中出現漏尿、下墜感或疼痛就先停下來，詳見本週頁標題旁「！」的安全提醒。",
       "exercises": [
         {
           "name": "鳥狗式 Bird Dog",

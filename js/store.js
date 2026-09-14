@@ -162,6 +162,9 @@ const Store = {
 
   _cloudPush: null, // wired by firebase-sync.js: (kind, docId, data) => void
   _cloudPushLibrary: null, // wired by firebase-sync.js: (docId, data) => void
+  _cloudPushLibraryOverride: null, // wired by firebase-sync.js: (docId, fullDoc, baseUpdatedAt, onResult(ok, message)) => void
+  _libraryServer: {},   // 內建修改版「雲端確認過」的最後一份（快照或重新讀取來的），寫入失敗時退回這份（第 33 條）
+  _overrideInFlight: {}, // 正在存的內建修改版 id：同一份還沒存完不能再存（兩次樂觀寫入疊在一起，失敗時退不回正確的版本）
 
   init() {
     this.activeUserId = localStorage.getItem(ACTIVE_USER_KEY) || (PlanData.users[0] && PlanData.users[0].userId) || null;
@@ -749,16 +752,65 @@ const Store = {
   // 讀取時的形狀檢查（跟 _isValidWeekShape 同一個精神）：_cleanLibraryFields 只擋得住這台
   // 裝置自己的寫入，從 Firebase Console 手動改壞、或其他版本寫進來的文件擋不住——少了
   // exercises 或 item，整個設定頁（連教練模式開關一起）會渲染失敗、關不掉。形狀不對一律當沒有。
-  _libraryDocOk(d) {
-    if (!d) return false;
+  //
+  // 決策紀錄第 33 條：內建的動作清單／影片（data/*.json）也能改，而且**改動只從今天起生效，之前
+  // 的日子維持原樣**（使用者裁定）。所以動作清單跟影片都有「版本」：
+  //   history: [{ until:'YYYY-MM-DD', content }]（until 由小到大）——那天以前（含）用的是 content
+  //   from:    現在這個版本從哪天開始（同一天再改就直接取代，不另開一個版本）
+  // 某一天要顯示哪個版本：history 裡第一個 dateKey <= until 的；都不符合就是現在的版本。
+  //   kind:'workoutOverride' / 'videoOverride'  內建內容的教練修改版，文件 id＝內建 id。
+  //       { content: {...} | null, from, history }，content 為 null＝這段期間用內建的（還原內建）。
+  //       用新的 kind 而不是沿用 'workout'：舊版網頁的 _libraryDocOk 不認得就會整份略過——
+  //       沿用 'workout' 的話，舊版會把它當成一份自訂清單列出來，還附一顆「刪除」。
+  //   kind:'workout' / 'video'（自訂）：內容照舊放在最上層（舊版網頁讀得到最新版），history 另外存。
+  _workoutShapeOk(c) {
     const rangeOk = (r) => !!(r && Number.isFinite(r.min) && Number.isFinite(r.max));
+    return !!(c && c.name && Array.isArray(c.exercises) && c.exercises.length &&
+      c.exercises.every((ex) => ex && ex.name && Number.isFinite(ex.sets) && (rangeOk(ex.reps) || rangeOk(ex.holdSeconds))));
+  },
+  _videoShapeOk(c) {
+    return !!(c && c.title && (c.linkType === 'video' ? c.url : (c.linkType === 'none' ? true : c.searchQuery)));
+  },
+  _historyOk(hist, contentOk, allowNull) {
+    return hist === undefined || hist === null || (Array.isArray(hist) && hist.every((e) =>
+      e && typeof e.until === 'string' && ((allowNull && e.content === null) || contentOk.call(this, e.content))));
+  },
+  _libraryDocOk(d, id) {
+    if (!d) return false;
+    const docId = id || d.id;
     if (d.kind === 'item') return !!(d.item && typeof d.item.type === 'string' && d.item.title);
-    if (d.kind === 'workout') {
-      return !!(d.name && Array.isArray(d.exercises) && d.exercises.length &&
-        d.exercises.every((ex) => ex && ex.name && Number.isFinite(ex.sets) && (rangeOk(ex.reps) || rangeOk(ex.holdSeconds))));
+    if (d.kind === 'workout') return this._workoutShapeOk(d) && this._historyOk(d.history, this._workoutShapeOk, false);
+    if (d.kind === 'video') return this._videoShapeOk(d) && this._historyOk(d.history, this._videoShapeOk, false);
+    // 修改版只能蓋在真的存在的內建 id 上（id 對不上＝手動改壞或寫錯，一律當沒有，退回內建）
+    if (d.kind === 'workoutOverride') {
+      return !!(docId && PlanData.workoutById[docId]) && (d.content === null || this._workoutShapeOk(d.content)) &&
+        this._historyOk(d.history, this._workoutShapeOk, true);
     }
-    if (d.kind === 'video') return !!(d.title && (d.linkType === 'video' ? d.url : d.searchQuery));
+    if (d.kind === 'videoOverride') {
+      return !!(docId && PlanData.videoById[docId]) && (d.content === null || this._videoShapeOk(d.content)) &&
+        this._historyOk(d.history, this._videoShapeOk, true);
+    }
     return false;
+  },
+
+  todayKey() { return PlanData.dayKey(PlanData.today()); },
+  _dayBefore(dateKey) {
+    const d = PlanData.parseLocalDate(dateKey);
+    d.setDate(d.getDate() - 1);
+    return PlanData.dayKey(d);
+  },
+  // 那一天用哪個版本（見上面的說明）。回傳 { found, content }：found=false 表示用「現在的版本」。
+  _versionOn(history, dateKey) {
+    if (!dateKey || !Array.isArray(history) || !history.length) return { found: false, content: null };
+    const hit = history.slice().sort((a, b) => (a.until < b.until ? -1 : a.until > b.until ? 1 : 0))
+      .find((e) => dateKey <= e.until);
+    return hit ? { found: true, content: hit.content } : { found: false, content: null };
+  },
+  _contentOf(kind, src) {
+    if (!src) return null;
+    return kind === 'workout'
+      ? { name: src.name, loadGuidance: src.loadGuidance || '', exercises: src.exercises }
+      : { title: src.title, creator: src.creator || '', linkType: src.linkType, searchQuery: src.searchQuery || null, url: src.url || null, notes: src.notes || '' };
   },
 
   libraryList(kind) {
@@ -773,22 +825,61 @@ const Store = {
     return d ? { ...d, id } : null;
   },
 
-  // 內建（data/*.json）優先，查不到再找庫裡的自訂——包含已刪除的，理由見上面。
-  // 自訂的 id 一律是 newItemId() 產生的 'c-…'，內建 id 沒有這個前綴，兩邊不會撞。
-  videoById(id) {
+  // 某一天看到的動作清單／影片（第 33 條）。dateKey 不給＝今天（下拉選單的名稱、編輯器預填用）。
+  // 內建：有合法的修改版就照日期挑版本，挑到 null（還原內建的期間）或沒有修改版就用 JSON。
+  // 自訂：照日期挑 history，沒挑到用最上層（現在的版本）；已刪除的照樣查得到（第 26 條）。
+  // 自訂的 id 一律是 newItemId() 產生的 'c-…'，內建 id 沒有這個前綴，兩邊不會撞（verify_plan.py 有守）。
+  // 回傳的 builtin／modified：給設定頁跟編輯器標「內建」「內建·已修改」。
+  // safetyNote 一律從 JSON 拿，修改版蓋不掉——安全提醒不是可以編輯掉的內容。
+  _resolveLibrary(kind, id, dateKey) {
     if (!id) return null;
-    if (PlanData.videoById[id]) return PlanData.videoById[id];
+    const key = dateKey || this.todayKey();
+    const base = kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id];
+    if (base) {
+      const ov = this.library[id];
+      if (ov && ov.kind === (kind === 'workout' ? 'workoutOverride' : 'videoOverride') && this._libraryDocOk(ov, id)) {
+        const v = this._versionOn(ov.history, key);
+        const content = v.found ? v.content : ov.content;
+        if (content) {
+          return { ...content, id, builtin: true, modified: true, derived: false, derivedNote: null,
+            safetyNote: base.safetyNote || null, phase: base.phase, category: base.category };
+        }
+      }
+      return { ...base, builtin: true, modified: false };
+    }
     const d = this.library[id];
-    return d && d.kind === 'video' && this._libraryDocOk(d) ? { ...d, id } : null;
+    if (!(d && d.kind === kind && this._libraryDocOk(d, id))) return null;
+    const v = this._versionOn(d.history, key);
+    const content = v.found && v.content ? v.content : this._contentOf(kind, d);
+    return { ...content, id, builtin: false, modified: false, derived: false, deleted: !!d.deleted };
   },
-  workoutById(id) {
-    if (!id) return null;
-    if (PlanData.workoutById[id]) return PlanData.workoutById[id];
-    const d = this.library[id];
-    return d && d.kind === 'workout' && this._libraryDocOk(d) ? { ...d, id } : null;
+  workoutFor(id, dateKey) { return this._resolveLibrary('workout', id, dateKey); },
+  videoFor(id, dateKey) { return this._resolveLibrary('video', id, dateKey); },
+  videoById(id) { return this.videoFor(id); },
+  workoutById(id) { return this.workoutFor(id); },
+  // 下拉選單：內建（顯示今天的版本，改過名字的看得到新名字）＋自訂
+  allVideos() { return PlanData.videos.map((v) => this.videoFor(v.id)).concat(this.libraryList('video')); },
+  allWorkouts() { return PlanData.workouts.map((w) => this.workoutFor(w.id)).concat(this.libraryList('workout')); },
+  // 內建內容現在有沒有修改版（設定頁「內建·已修改」、要不要顯示「還原內建」）
+  builtinModified(kind, id) {
+    const ov = this.library[id];
+    return !!(ov && ov.kind === (kind === 'workout' ? 'workoutOverride' : 'videoOverride') && this._libraryDocOk(ov, id) && ov.content);
   },
-  allVideos() { return PlanData.videos.concat(this.libraryList('video')); },
-  allWorkouts() { return PlanData.workouts.concat(this.libraryList('workout')); },
+  // 課表裡用到它的日子（共用課表、出廠日期順序）：總共幾天、今天以後（含）幾天。
+  // 給編輯器上方的「存檔後會影響哪些天」跟設定頁的「用在 N 天」。
+  libraryUsage(kind, id) {
+    const today = this.todayKey();
+    let total = 0, upcoming = 0;
+    for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) {
+      this.effectiveWeek(wn).days.forEach((d, di) => {
+        const uses = d.items.some((it) => (kind === 'workout' ? it.workoutRef === id : PlanData.itemVideoRefs(it).includes(id)));
+        if (!uses) return;
+        total++;
+        if (PlanData.keyForWeekDay(wn, di) >= today) upcoming++;
+      });
+    }
+    return { total, upcoming };
+  },
 
   // 寫入前的第二道防線（app.js 表單已經先檢查過一次）：不合形狀的一律不存。
   // 影片網址只收 https:// ——href 放 javascript: 會變成可以執行的連結，h() 擋不了這個。
@@ -803,7 +894,8 @@ const Store = {
     };
     if (kind === 'video') {
       const title = text(fields.title, 120);
-      const linkType = fields.linkType === 'video' ? 'video' : 'search';
+      // none＝只顯示文字、不給按鈕（內建的「死蟲式＋鳥狗式」就是這種，第 33 條開放編輯內建影片時補上）
+      const linkType = fields.linkType === 'video' ? 'video' : (fields.linkType === 'none' ? 'none' : 'search');
       const searchQuery = text(fields.searchQuery, 200);
       const url = text(fields.url, 500);
       if (!title) return null;
@@ -863,6 +955,19 @@ const Store = {
     // 後被刪掉的東西又跑回來。
     const patch = { ...clean, kind, updatedBy: this.activeUserId };
     if (!prev) patch.deleted = false;
+    // 第 33 條：自訂動作清單／影片改了內容，只從今天起生效。上一個版本如果是今天以前開始的，
+    // 收進 history（用到昨天為止）；同一天再改就直接取代。常用項目（item）是複製式，不需要版本。
+    if (kind === 'workout' || kind === 'video') {
+      const today = this.todayKey();
+      if (!prev) {
+        patch.from = today;
+        patch.history = [];
+      } else if ((prev.from || '') < today &&
+        JSON.stringify(this._contentOf(kind, prev)) !== JSON.stringify(this._contentOf(kind, clean))) {
+        patch.history = (Array.isArray(prev.history) ? prev.history : []).concat([{ until: this._dayBefore(today), content: this._contentOf(kind, prev) }]);
+        patch.from = today;
+      }
+    }
     const { next, push } = applyPatch(prev || {}, patch);
     if (prev) { delete push.deleted; next.deleted = !!prev.deleted; }
     this.library[docId] = next;
@@ -886,6 +991,77 @@ const Store = {
   mergeRemoteLibrary(id, doc) {
     this.library[id] = mergeDocs(this.library[id], doc);
     this._notify();
+  },
+
+  // 內建內容的修改版（第 33 條）：整份文件是一個單位，不逐欄位合併——content 跟 history 必須
+  // 一起對，拼兩個人各一半會變成誰都沒看過的版本。雲端來的直接取代本機的。
+  replaceRemoteLibrary(id, doc) {
+    if (doc) { this.library[id] = doc; this._libraryServer[id] = doc; }
+    else { delete this.library[id]; delete this._libraryServer[id]; }
+    this._notify();
+  },
+  // 打開編輯器時記下的「基準版本」：一律用雲端確認過的那份，不用本機樂觀寫入後的——
+  // 本機那份還沒寫進雲端，拿它比對，transaction 一定判成「被別人改過」。
+  libraryServerUpdatedAt(id) {
+    const d = this._libraryServer[id];
+    return d ? d.updatedAt || null : null;
+  },
+
+  // 存內建動作清單／影片的修改版。fields 為 null＝還原內建（從今天起用 JSON）。
+  // baseUpdatedAt：打開編輯器那一刻「雲端確認過」的修改版 updatedAt（還沒有修改版＝null），firebase-sync.js
+  // 用 transaction 跟雲端比對，不一致就中止（兩個人同時改，後存的人不能靜默蓋掉先存的）。
+  // 本機先改（畫面立刻看得到）；雲端寫入失敗或衝突時退回雲端確認過的最後一份，再呼叫 onResult(false, 訊息)
+  // ——不能讓這台看起來改好了、其他兩人其實沒收到（對抗式審查抓到：退回「存檔那一刻本機的樣子」是錯的，
+  // 那份可能是上一次也沒存進去的樂觀寫入）。
+  // 回傳 { ok, reason }：這裡的 ok 只代表「本機接受了、開始存」，雲端結果看 onResult。
+  saveBuiltinOverride(kind, id, fields, baseUpdatedAt, onResult) {
+    const base = kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id];
+    if (!base) return { ok: false, reason: '找不到這份內建內容。' };
+    if (this._overrideInFlight[id]) return { ok: false, reason: '上一次的修改還在儲存，等幾秒再試一次。' };
+    let content = null;
+    if (fields) {
+      const clean = this._cleanLibraryFields(kind, fields);
+      if (!clean) return { ok: false, reason: '內容不完整，沒有存檔。' };
+      content = this._contentOf(kind, clean);
+    }
+    const okind = kind === 'workout' ? 'workoutOverride' : 'videoOverride';
+    const raw = this.library[id];
+    const prev = raw && raw.kind === okind && this._libraryDocOk(raw, id) ? raw : null;
+    const prevContent = prev ? prev.content : null;
+    // 沒有真的改到：跟現在的修改版一樣，或現在用內建的、存的內容也跟內建一模一樣——不寫、不標「已修改」
+    if (JSON.stringify(prevContent) === JSON.stringify(content)) return { ok: true, unchanged: true };
+    // 內建 JSON 少寫的欄位（reps／notes 沒寫就是沒有）要先整理成跟存檔一樣的形狀再比，不然永遠「不一樣」
+    if (prevContent === null && content && JSON.stringify(content) === JSON.stringify(this._contentOf(kind, this._cleanLibraryFields(kind, base)))) {
+      return { ok: true, unchanged: true };
+    }
+    const today = this.todayKey();
+    let history = prev && Array.isArray(prev.history) ? prev.history.slice() : [];
+    let from = today;
+    if (!prev) {
+      history = [{ until: this._dayBefore(today), content: null }]; // 今天以前一律是內建的
+    } else if ((prev.from || '') < today) {
+      history.push({ until: this._dayBefore(today), content: prevContent });
+    } else {
+      from = prev.from; // 同一天再改：取代今天這個版本
+    }
+    const next = { kind: okind, content, from, history, updatedAt: nowIso(), updatedBy: this.activeUserId };
+    this.library[id] = next;
+    this._notify();
+    if (this._cloudPushLibraryOverride) {
+      this._overrideInFlight[id] = true;
+      const base0 = baseUpdatedAt !== undefined ? baseUpdatedAt : this.libraryServerUpdatedAt(id);
+      this._cloudPushLibraryOverride(id, next, base0, (ok, message) => {
+        delete this._overrideInFlight[id];
+        if (!ok) {
+          // 退回雲端確認過的最後一份（不是存檔那一刻本機的樣子——那份可能也沒進雲端，或已經比雲端舊）
+          const server = this._libraryServer[id];
+          if (server) this.library[id] = server; else delete this.library[id];
+          this._notify();
+        }
+        if (onResult) onResult(ok, message);
+      });
+    }
+    return { ok: true, doc: next };
   },
 
   // ── 完成度計算（一律用 effectiveDay/effectiveWeek，讓教練改過的內容也算得對）──

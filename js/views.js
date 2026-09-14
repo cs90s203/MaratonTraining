@@ -21,6 +21,9 @@ const ICON = {
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  // 影片專用（決策紀錄第 34 條）：實心圓＋反白三角形。只用 ▶ 的話跟「查看動作」前面展開的 ▶ 太像。
+  // 三角形的顏色交給 CSS（.pc-fg），跟著所在卡片的底色走，深淺主題都是「挖空」的樣子。
+  playCircle: '<svg class="play-circle" viewBox="0 0 24 24" aria-hidden="true"><circle class="pc-bg" cx="12" cy="12" r="12"/><path class="pc-fg" d="M9.75 7.4v9.2l7.2-4.6z"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4l14 6-14 6"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
@@ -280,7 +283,10 @@ function renderDayBody(weekNumber, dayIndex) {
 // 項目的課表說明（時長／心率／RPE、影片、動作清單）——教練模式的項目卡跟當天紀錄卡的
 // 標題區共用同一份，改一處兩邊一起變。外層卡片不可以點（決策紀錄第 29 條：只有圓圈能打勾），
 // 所以這裡的連結跟 <details> 不用擋冒泡。
-function itemPlanParts(item) {
+// opts.dateKey：這張卡是哪一天的——動作清單／影片照日期挑版本（第 33 條：教練改的內容只從改的那天起生效）。
+// opts.coachEdit：教練模式的項目卡傳 { weekNumber, dayIndex }，「查看動作」裡多一顆「編輯這份動作清單」。
+function itemPlanParts(item, opts) {
+  opts = opts || {};
   const meta = [];
   const metaStr = PlanData.fmtItemMeta(item);
   if (metaStr) meta.push(metaStr);
@@ -292,32 +298,39 @@ function itemPlanParts(item) {
   // 好幾個「看影片」並排會分不出哪個是哪個。查不到的（庫還沒同步到這台）略過不畫。
   const links = [];
   PlanData.itemVideoRefs(item).forEach((ref) => {
-    const v = Store.videoById(ref);
+    const v = Store.videoFor(ref, opts.dateKey);
     // 自訂影片的網址是教練貼的（第 26 條）：只接受 https://，擋掉 javascript: 之類會執行的連結
+    // 只要是影片一律實心圓播放鍵開頭（第 32、34 條：一眼分得出哪些是影片），搜尋型的用文字講「搜尋」
     if (v && v.linkType === 'video' && v.url && /^https:\/\//i.test(v.url)) {
-      links.push(`<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener">${ICON.play} ${h(v.title || '看影片')}</a>`);
+      links.push(`<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener">${ICON.playCircle}<span>${h(v.title || '看影片')}</span></a>`);
     } else if (v && v.linkType === 'search') {
       const q = encodeURIComponent(v.searchQuery || v.title);
-      // 只要是影片一律 ▶ 開頭（第 32 條：使用者要一眼分得出哪些是影片），搜尋型的用文字講「搜尋」
-      links.push(`<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${ICON.play} 搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</a>`);
+      links.push(`<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${ICON.playCircle}<span>搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</span></a>`);
+    } else if (v && v.linkType === 'none') {
+      // 「不需要連結（只是說明）」：只顯示文字，不是影片所以不放播放鍵
+      links.push(`<span class="item-link plain">${h(v.title)}</span>`);
     }
   });
   let workoutBlock = '';
   if (item.workoutRef) {
-    const wo = Store.workoutById(item.workoutRef);
+    const wo = Store.workoutFor(item.workoutRef, opts.dateKey);
     if (wo) {
       // 開關狀態記在 App.state.openDetails（第 29 條），不然任何一次重繪都會把它收起來。
       // key 用項目 id：出廠跟教練新增的 id 全課表唯一；對調日子時開關狀態跟著內容走。
       const dKey = `wo:${item.id || item.workoutRef}`;
+      const ce = opts.coachEdit;
       workoutBlock = `
         <details style="margin-top:8px" ${App.state.openDetails[dKey] ? 'open' : ''} ontoggle="A.setDetailsOpen('${jsq(dKey)}', this.open)">
           <summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--accent2)">查看動作（${wo.exercises.length}）</summary>
-          <div style="margin-top:8px;font-size:13px;color:var(--text2);line-height:1.7">
+          <div class="wo-body">
+            ${wo.loadGuidance ? `<div class="wo-guide">${h(wo.loadGuidance)}</div>` : ''}
             ${wo.exercises.map((ex) => {
               const qty = ex.reps ? PlanData.fmtRange(ex.reps, ' 次') : (ex.holdSeconds ? PlanData.fmtRange(ex.holdSeconds, ' 秒') : '');
               return `<div>· ${h(ex.name)} · ${ex.sets} 組 × ${qty}${ex.perSide ? '（每邊）' : ''}${ex.notes ? '　' + h(ex.notes) : ''}</div>`;
             }).join('')}
-            ${wo.derived ? `<div style="margin-top:4px;color:var(--warn)">推導值：${h(wo.derivedNote)}</div>` : ''}
+            ${wo.safetyNote ? `<div class="wo-safety">${h(wo.safetyNote)}</div>` : ''}
+            ${wo.derived && wo.derivedNote ? `<div class="wo-derived">推導值：${h(wo.derivedNote)}</div>` : ''}
+            ${ce && !wo.deleted ? `<button type="button" class="link-btn wo-edit" onclick="A.startLibraryEditFromCard(${ce.weekNumber},${ce.dayIndex},'${jsq(item.id)}','${jsq(item.workoutRef)}')">編輯這份動作清單</button>` : ''}
           </div>
         </details>`;
     }
@@ -385,7 +398,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
         return `
           <div class="rec-opt ${on ? 'on' : ''} ${dim ? 'dim' : ''}">
             <div class="rec-opt-t">${radio}<span class="rec-title ${it.derived ? 'derived' : ''}">${h(it.title)}</span></div>
-            ${itemPlanParts(it).body}
+            ${itemPlanParts(it, { dateKey }).body}
           </div>`;
       }).join('<span class="rec-or">或</span>');
       secs.push(`
@@ -408,7 +421,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
                 <span class="rec-title ${dim ? 'dim' : ''} ${it.derived ? 'derived' : ''}">${h(it.title)}${it.type === 'race' ? ' 🏁' : ''}</span>
                 ${i === 0 ? statusHtml : ''}
               </div>
-              ${itemPlanParts(it).body}
+              ${itemPlanParts(it, { dateKey }).body}
             </div>
           </div>`;
       }).join(''));
@@ -492,6 +505,11 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   const editing = App.state.editingItem;
   const isEditingThis = coach && editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex && editing.itemId === item.id;
   if (isEditingThis) return renderItemEditForm(weekNumber, dayIndex, item);
+  // 從這張卡的「查看動作」打開的動作清單編輯器，就畫在這張卡的位置（第 33 條）
+  const le = App.state.libraryEdit;
+  if (coach && le && le.origin && le.origin.weekNumber === weekNumber && le.origin.dayIndex === dayIndex && le.origin.itemId === item.id) {
+    return renderWorkoutEditor(le);
+  }
 
   const done = isSelectOne
     ? (entry && entry.selectedItemId === item.id && entry.done && entry.done[item.id])
@@ -503,7 +521,7 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   // 不能讓它看起來跟正常同步過的紀錄一樣。
   const unsynced = Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
 
-  const parts = itemPlanParts(item);
+  const parts = itemPlanParts(item, { dateKey, coachEdit: coach ? { weekNumber, dayIndex } : null });
 
   // 只有圓圈能打勾（決策紀錄第 29 條）：以前整張卡都能點，點「查看動作」、影片或備註旁邊都會打勾。
   // 未來的日子不能預先打勾（第 31 條）：還沒勾的圓圈停用，已經勾了的照樣能點掉
@@ -800,6 +818,16 @@ function renderWeekPage(state) {
     : loc.status === 'after-plan'
       ? `<div class="banner info">${ICON.check}<div>計畫已結束，已完賽 ${loc.daysSincePlanEnd} 天。到「總覽」看整體回顧。</div></div>`
       : '';
+  // 決策紀錄第 35 條：沒登入時看到的是「出廠課表」——教練改過的週、自訂影片、改過的動作清單都存在
+  // 雲端，登入才讀得到。使用者在 Safari 分頁（沒登入）跟主畫面 App（有登入）看到不一樣的內容，
+  // 以為是 bug：iOS 的 Safari 分頁跟主畫面 App 是兩份分開的儲存空間，登入狀態不共用。
+  // 以前只有右上角一顆「點擊登入以同步」，看不出「現在看到的內容不完整」，這裡講清楚。
+  // 等 Firebase 回報過一次登入狀態才顯示（已登入的人開 App 時不閃一下、也不把今天那列擠到頂欄底下）。
+  // 記憶體裡還留著共用內容（登出之前讀到的）就不能說「出廠課表」，改說「可能不是最新的」。
+  const hasSharedInMemory = Object.keys(Store.planOverrides).length > 0 || Object.keys(Store.library).length > 0;
+  const signedOutBanner = Sync.authResolved && !Sync.isSignedIn() && Sync.state !== 'signing-in' ? `
+    <div class="banner info">${ICON.info}<div><b>${hasSharedInMemory ? '還沒登入，看到的課表可能不是最新的' : '還沒登入，看到的是出廠課表'}</b>教練改過的內容、自訂的影片跟動作清單要登入後才看得到。
+      <div><button class="btn secondary lib-add" style="margin-top:8px" onclick="A.signIn()">使用 Google 帳號登入</button></div></div></div>` : '';
   return `
     <div class="section">
       <div class="week-head">
@@ -810,6 +838,7 @@ function renderWeekPage(state) {
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
+      ${signedOutBanner}
       ${planBanner}
       ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', title: '跑量', footer: renderWeeklyReviewCard(wn) })}
       <div class="view-toggle">
@@ -1357,8 +1386,8 @@ function renderLongRunTrend(userId) {
 // ── 常用項目庫（決策紀錄第 26 條）─────────────────────────────────────────────
 // 教練模式開著時出現在設定頁。三區：
 //   常用項目——從課表上任何一個項目按「存成常用」而來；這裡改名、改內容、刪除
-//   動作清單——自訂的（內建 4 份來自 data/workouts.json，不在這裡改）；可以新增
-//   影片——自訂的搜尋關鍵字或貼上的網址；可以新增
+//   動作清單——內建 4 份（data/workouts.json）＋自訂的；都能改，改動從今天起生效（第 33 條）
+//   影片——內建 8 支（data/videos.json）＋自訂的；同上
 // 帶入是複製：改範本不會改到已經排好的日子（使用者選的是複製式）。
 function renderLibraryPanel(state) {
   const edit = state.libraryEdit;
@@ -1381,15 +1410,43 @@ function renderLibraryPanel(state) {
     ? renderItemEditForm(0, 0, null, { libraryTemplate: t })
     : row(t, h(t.name), h([TYPE_LABELS[t.item.type] || t.item.type, PlanData.fmtItemMeta(t.item)].filter(Boolean).join(' · ')))).join('');
 
-  const workouts = Store.libraryList('workout');
-  const workoutRows = workouts.map((w) => isEditing('workout', w.id)
-    ? renderWorkoutEditor(edit)
-    : row(w, h(w.name), `${w.exercises.length} 個動作：${h(w.exercises.map((ex) => ex.name).join('、'))}`)).join('');
+  // 內建內容（第 33 條）：一列一份，標「內建」／「內建·已修改」，按鈕是「編輯」＋改過才有的「還原內建」
+  const usageText = (kind, id) => {
+    const u = Store.libraryUsage(kind, id);
+    return u.total ? `用在 ${u.total} 天（今天起 ${u.upcoming} 天）` : '課表裡目前沒用到';
+  };
+  const builtinRow = (kind, id, main, meta) => {
+    const modified = Store.builtinModified(kind, id);
+    return `
+    <div class="lib-row">
+      <div class="lib-row-main">
+        <div class="lib-name">${main} <span class="lib-tag ${modified ? 'mod' : ''}">${modified ? '內建·已修改' : '內建'}</span></div>
+        <div class="lib-meta">${meta}</div>
+      </div>
+      <div class="lib-actions">
+        <button class="link-btn" onclick="A.startLibraryEdit('${kind}','${jsq(id)}')">編輯</button>
+        ${modified ? `<button class="link-btn lib-del" onclick="A.restoreBuiltin('${kind}','${jsq(id)}')">還原內建</button>` : ''}
+      </div>
+    </div>`;
+  };
+  const workoutMeta = (w) => `${w.exercises.length} 個動作：${h(w.exercises.map((ex) => ex.name).join('、'))}`;
 
+  const builtinWorkoutRows = PlanData.workouts.map((b) => isEditing('workout', b.id) && !edit.origin
+    ? renderWorkoutEditor(edit)
+    : (() => { const w = Store.workoutFor(b.id); return builtinRow('workout', b.id, h(w.name), `${workoutMeta(w)}<br>${usageText('workout', b.id)}`); })()).join('');
+  const workouts = Store.libraryList('workout');
+  const workoutRows = workouts.map((w) => isEditing('workout', w.id) && !edit.origin
+    ? renderWorkoutEditor(edit)
+    : row(w, h(w.name), `${workoutMeta(w)}<br>${usageText('workout', w.id)}`)).join('');
+
+  const videoMeta = (v) => v.linkType === 'video' ? '貼上的影片網址' : (v.linkType === 'none' ? '只顯示文字，沒有連結' : `搜尋「${h(v.searchQuery)}」`);
+  const builtinVideoRows = PlanData.videos.map((b) => isEditing('video', b.id)
+    ? renderVideoEditor(edit)
+    : (() => { const v = Store.videoFor(b.id); return builtinRow('video', b.id, `${ICON.playCircle}${h(v.title)}`, `${videoMeta(v)}<br>${usageText('video', b.id)}`); })()).join('');
   const videos = Store.libraryList('video');
   const videoRows = videos.map((v) => isEditing('video', v.id)
     ? renderVideoEditor(edit)
-    : row(v, `${ICON.play}${h(v.title)}`, v.linkType === 'video' ? '貼上的影片網址' : `搜尋「${h(v.searchQuery)}」`)).join('');
+    : row(v, `${ICON.playCircle}${h(v.title)}`, `${videoMeta(v)}<br>${usageText('video', v.id)}`)).join('');
 
   return `
     <div class="section">
@@ -1403,13 +1460,15 @@ function renderLibraryPanel(state) {
         </div>
         <div class="lib-group">
           <div class="lib-head">動作清單</div>
-          <div class="lib-note">內建 ${PlanData.workouts.length} 份（${h(PlanData.workouts.map((w) => w.name).join('、'))}）不在這裡改。</div>
+          <div class="lib-note">內建的也可以改。改的內容從今天起生效，今天以前的日子維持原樣；「還原內建」也一樣只從今天起。</div>
+          ${builtinWorkoutRows}
           ${workoutRows}
           ${isEditing('workout', 'new') ? renderWorkoutEditor(edit) : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('workout','new')">＋ 新增動作清單</button>`}
         </div>
         <div class="lib-group">
           <div class="lib-head">影片</div>
-          <div class="lib-note">內建 ${PlanData.videos.length} 支不在這裡改。可以存搜尋關鍵字，或直接貼上 YouTube 網址。</div>
+          <div class="lib-note">內建的也可以改，一樣從今天起生效。可以存搜尋關鍵字，或直接貼上 YouTube 網址。</div>
+          ${builtinVideoRows}
           ${videoRows}
           ${isEditing('video', 'new') ? renderVideoEditor(edit) : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('video','new')">＋ 新增影片</button>`}
         </div>
@@ -1417,15 +1476,47 @@ function renderLibraryPanel(state) {
     </div>`;
 }
 
-// 自訂動作清單的編輯器。欄位值存在 App.state.libraryEdit.draft：每個欄位 onchange 只更新
+// 編輯器最上面的說明（第 33 條）：這份是內建還是自訂、存檔會影響哪些天、內建的要登入才能存。
+// 回傳 { head, canSave }。新增的（id==='new'）沒有影響範圍可講。
+function libraryEditorHead(edit, kind) {
+  if (edit.id === 'new') return { head: '', canSave: true };
+  const u = Store.libraryUsage(kind, edit.id);
+  const t = PlanData.today();
+  const todayLabel = `${t.getMonth() + 1}/${t.getDate()}`;
+  const what = kind === 'workout' ? '動作清單' : '影片';
+  const lines = [];
+  const scope = u.total === 0
+    ? `課表裡目前沒有用到這份${what}；之後排進課表的日子會用存檔後的內容。`
+    : `存檔後，今天（${todayLabel}）起用到它的 <b>${u.upcoming}</b> 天會換成新內容${u.total > u.upcoming ? `；今天以前的 ${u.total - u.upcoming} 天維持原樣` : ''}。`;
+  lines.push(`${edit.builtin ? `這是<b>內建</b>的${what}。` : ''}${scope}`);
+  let canSave = true;
+  if (edit.builtin && !Sync.isSignedIn()) {
+    canSave = false;
+    lines.push(`<b>要先登入才能存</b>——內建內容是三個人共用的，不能只存在這台手機。`);
+  } else if (edit.builtin && Sync.libraryDenied) {
+    canSave = false;
+    lines.push(`<b>現在存不了</b>——Firebase 上的規則還沒加上常用項目庫，請把 firestore.rules.local 整份重新貼到 Firebase Console 發布。`);
+  }
+  if (edit.builtin && edit.builtinNotes) lines.push(`內建說明：${h(edit.builtinNotes)}`);
+  return { head: `<div class="edit-provenance">${lines.join('<br>')}</div>`, canSave };
+}
+
+// 動作清單的編輯器（自訂跟內建共用）。欄位值存在 App.state.libraryEdit.draft：每個欄位 onchange 只更新
 // draft、不重繪（重繪會把使用者緊接著點的「儲存」「新增一個動作」吞掉）；只有會改變
-// 版面的操作（切換次數／秒數、新增／移除動作）才重繪。
+// 版面的操作（切換次數／秒數、新增／移除／上下移動作）才重繪。
+// 內建清單的 safetyNote 顯示在最上面、不能改（第 33 條：畫面一律從 data/workouts.json 拿）。
 function renderWorkoutEditor(edit) {
   const d = edit.draft;
+  const { head, canSave } = libraryEditorHead(edit, 'workout');
+  const n = d.exercises.length;
   const rows = d.exercises.map((ex, i) => `
     <div class="ex-row">
-      <div class="row">
-        <div class="field wide"><label class="field-lbl">動作 ${i + 1}</label><input type="text" value="${h(ex.name)}" placeholder="例如：死蟲式 Dead Bug" onchange="A.libDraftExercise(${i},'name',this.value)"></div>
+      <div class="row ex-head">
+        <div class="field wide"><label class="field-lbl">動作 ${i + 1}</label><input type="text" maxlength="80" value="${h(ex.name)}" placeholder="例如：死蟲式 Dead Bug" onchange="A.libDraftExercise(${i},'name',this.value)"></div>
+        <div class="ex-move">
+          <button type="button" class="link-btn" ${i === 0 ? 'disabled' : ''} onclick="A.moveLibExercise(${i},-1)" aria-label="往上移">↑</button>
+          <button type="button" class="link-btn" ${i === n - 1 ? 'disabled' : ''} onclick="A.moveLibExercise(${i},1)" aria-label="往下移">↓</button>
+        </div>
       </div>
       <div class="row">
         <div class="field"><label class="field-lbl">組數</label><input type="number" inputmode="numeric" min="1" max="20" value="${h(ex.sets)}" onchange="A.libDraftExercise(${i},'sets',this.value)"></div>
@@ -1433,50 +1524,58 @@ function renderWorkoutEditor(edit) {
         <div class="field"><label class="field-lbl">${ex.qty === 'hold' ? '秒數' : '次數'}下限</label><input type="number" inputmode="numeric" min="1" value="${h(ex.min)}" onchange="A.libDraftExercise(${i},'min',this.value)"></div>
         <div class="field"><label class="field-lbl">上限</label><input type="number" inputmode="numeric" min="1" value="${h(ex.max)}" onchange="A.libDraftExercise(${i},'max',this.value)"></div>
       </div>
+      <div class="field wide"><textarea class="ex-notes" rows="2" maxlength="200" placeholder="動作要領／備註（選填，最多 200 字）" onchange="A.libDraftExercise(${i},'notes',this.value)">${h(ex.notes)}</textarea></div>
       <div class="row ex-foot">
         <label class="ex-perside"><input type="checkbox" ${ex.perSide ? 'checked' : ''} onchange="A.libDraftExercise(${i},'perSide',this.checked)"> 每邊</label>
-        <div class="field"><input type="text" value="${h(ex.notes)}" placeholder="備註（選填）" onchange="A.libDraftExercise(${i},'notes',this.value)"></div>
         <button class="link-btn lib-del" onclick="A.removeLibExercise(${i})">移除</button>
       </div>
     </div>`).join('');
   return `
     <div class="item coach-editing">
       <div class="edit-form">
-        <div class="field wide"><label class="field-lbl">動作清單名稱</label><input type="text" value="${h(d.name)}" placeholder="例如：產後核心（Phase 2 版）" onchange="A.libDraft('name',this.value)"></div>
-        <div class="field wide"><label class="field-lbl">負荷說明（選填）</label><input type="text" value="${h(d.loadGuidance)}" placeholder="例如：全程徒手，做到有感覺就停" onchange="A.libDraft('loadGuidance',this.value)"></div>
+        ${edit.origin ? `<div class="lib-head">編輯動作清單${edit.builtin ? ' <span class="lib-tag">內建</span>' : ''}</div>` : ''}
+        ${head}
+        ${edit.safetyNote ? `<div class="wo-safety locked">固定的安全提醒（不能改）：${h(edit.safetyNote)}</div>` : ''}
+        <div class="field wide"><label class="field-lbl">動作清單名稱</label><input type="text" maxlength="80" value="${h(d.name)}" placeholder="例如：產後核心（Phase 2 版）" onchange="A.libDraft('name',this.value)"></div>
+        <div class="field wide"><label class="field-lbl">負荷說明（選填，會顯示在每天的「查看動作」最上面）</label><textarea rows="2" maxlength="200" placeholder="例如：全程徒手，做到有感覺就停" onchange="A.libDraft('loadGuidance',this.value)">${h(d.loadGuidance)}</textarea></div>
         ${rows}
         <button class="btn secondary lib-add" onclick="A.addLibExercise()">＋ 新增一個動作</button>
         <div class="actions">
-          <button class="btn" style="background:var(--warn)" onclick="A.saveLibraryWorkout()">儲存動作清單</button>
+          <button class="btn" style="background:var(--warn)" ${canSave ? '' : 'disabled'} onclick="A.saveLibraryWorkout()">儲存動作清單</button>
           <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>
         </div>
       </div>
     </div>`;
 }
 
-// 自訂影片的編輯器（同上，draft 模式）。網址只收 https://（Store 端也會再擋一次）。
+// 影片的編輯器（自訂跟內建共用，同上 draft 模式）。網址只收 https://（Store 端也會再擋一次）。
 // data/videos.json 的規則是「不要生成 YouTube 網址」——這裡的網址是教練自己貼上的真實網址，
-// 不是程式產生的，不違反那條。
+// 不是程式產生的，不違反那條。linkType none＝只顯示文字、不給按鈕（內建的「死蟲式＋鳥狗式」）。
 function renderVideoEditor(edit) {
   const d = edit.draft;
-  const isUrl = d.linkType === 'video';
+  const { head, canSave } = libraryEditorHead(edit, 'video');
+  const lt = d.linkType === 'video' || d.linkType === 'none' ? d.linkType : 'search';
   return `
     <div class="item coach-editing">
       <div class="edit-form">
-        <div class="field wide"><label class="field-lbl">標題</label><input type="text" value="${h(d.title)}" placeholder="例如：產後骨盆底放鬆" onchange="A.libDraft('title',this.value)"></div>
-        <div class="field wide"><label class="field-lbl">作者／頻道（選填）</label><input type="text" value="${h(d.creator)}" onchange="A.libDraft('creator',this.value)"></div>
+        ${head}
+        <div class="field wide"><label class="field-lbl">標題</label><input type="text" maxlength="120" value="${h(d.title)}" placeholder="例如：產後骨盆底放鬆" onchange="A.libDraft('title',this.value)"></div>
+        <div class="field wide"><label class="field-lbl">作者／頻道（選填）</label><input type="text" maxlength="60" value="${h(d.creator)}" onchange="A.libDraft('creator',this.value)"></div>
         <div class="field wide"><label class="field-lbl">連結方式</label>
           <select onchange="A.libDraft('linkType',this.value,true)">
-            <option value="search" ${isUrl ? '' : 'selected'}>用關鍵字搜尋 YouTube</option>
-            <option value="video" ${isUrl ? 'selected' : ''}>貼上影片網址</option>
+            <option value="search" ${lt === 'search' ? 'selected' : ''}>用關鍵字搜尋 YouTube</option>
+            <option value="video" ${lt === 'video' ? 'selected' : ''}>貼上影片網址</option>
+            <option value="none" ${lt === 'none' ? 'selected' : ''}>不需要連結（只是說明）</option>
           </select>
         </div>
-        ${isUrl
-          ? `<div class="field wide"><label class="field-lbl">影片網址</label><input type="url" inputmode="url" value="${h(d.url)}" placeholder="https://www.youtube.com/watch?v=…" onchange="A.libDraft('url',this.value)"></div>`
-          : `<div class="field wide"><label class="field-lbl">搜尋關鍵字</label><input type="text" value="${h(d.searchQuery)}" placeholder="例如：Pamela Reif 10 min ab workout" onchange="A.libDraft('searchQuery',this.value)"></div>`}
-        <div class="field wide"><label class="field-lbl">備註（選填）</label><input type="text" value="${h(d.notes)}" onchange="A.libDraft('notes',this.value)"></div>
+        ${lt === 'video'
+          ? `<div class="field wide"><label class="field-lbl">影片網址</label><input type="url" inputmode="url" maxlength="500" value="${h(d.url)}" placeholder="https://www.youtube.com/watch?v=…" onchange="A.libDraft('url',this.value)"></div>`
+          : lt === 'search'
+            ? `<div class="field wide"><label class="field-lbl">搜尋關鍵字</label><input type="text" maxlength="200" value="${h(d.searchQuery)}" placeholder="例如：Pamela Reif 10 min ab workout" onchange="A.libDraft('searchQuery',this.value)"></div>`
+            : ''}
+        <div class="field wide"><label class="field-lbl">備註（選填）</label><input type="text" maxlength="300" value="${h(d.notes)}" onchange="A.libDraft('notes',this.value)"></div>
         <div class="actions">
-          <button class="btn" style="background:var(--warn)" onclick="A.saveLibraryVideo()">儲存影片</button>
+          <button class="btn" style="background:var(--warn)" ${canSave ? '' : 'disabled'} onclick="A.saveLibraryVideo()">儲存影片</button>
           <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>
         </div>
       </div>

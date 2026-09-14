@@ -222,6 +222,20 @@ def main():
     bad = [f'{w["id"]}/{e["name"]}' for w in workouts["workouts"] for e in w["exercises"]
            if isinstance(e.get("holdSeconds"), int) or isinstance(e.get("reps"), int)]
     check("reps/holdSeconds 一律用 {min,max}", not bad, str(bad[:4]))
+    # 決策紀錄第 33 條：內建動作清單可以被教練在 App 裡改，safetyNote 是改不掉的那一段——
+    # 畫面一律從這個檔案拿。這裡守「每份都有、而且真的講到漏尿／下墜感」。
+    bad = [w["id"] for w in workouts["workouts"]
+           if not w.get("safetyNote") or "漏尿" not in w["safetyNote"] or "下墜感" not in w["safetyNote"]]
+    check("每份 workout 都有固定的安全提醒（第 33 條）", not bad, f"缺：{bad}")
+    basic = next((w for w in workouts["workouts"] if w["id"] == "pelvic-core-basic"), None)
+    adv = next((w for w in workouts["workouts"] if w["id"] == "pelvic-core-advanced"), None)
+    check("進階版的安全提醒指得到基礎版的名稱",
+          bool(basic and adv and basic["name"] in adv.get("safetyNote", "")),
+          "改了 pelvic-core-basic 的名稱要一起改 pelvic-core-advanced 的 safetyNote")
+    # 內建內容的修改版用「同一個 id」存在 Firestore（第 33 條），自訂的 id 一律 c- 開頭。
+    # 內建 id 以 c- 開頭、或動作清單跟影片撞 id，修改版就會蓋錯東西。
+    clash = sorted(i for i in (vids | wkts) if i.startswith("c-")) + sorted(vids & wkts)
+    check("內建 id 不以 c- 開頭、影片跟動作清單不撞 id（第 33 條）", not clash, str(clash))
 
     # B6 決策紀錄第 13 條：週跑量目標由 App 從跑步項目即時加總，資料檔不存那個數字
     # （存了就是「兩個必須互相對應的數字」——教練改項目後它會過時）。
