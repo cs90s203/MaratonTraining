@@ -348,25 +348,43 @@ textarea.note-input {
 .ex-move .link-btn { font-size: 16px; padding: 4px 8px; }
 .ex-move .link-btn:disabled { opacity: .3; }
 .edit-form textarea.ex-notes { min-height: 40px; }
+.ex-qty { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 13px; color: var(--text2); }
+.edit-form .ex-qty .ex-num { width: 48px; padding-left: 4px; padding-right: 4px; text-align: center; }
+.edit-form .ex-qty .ex-unit { width: auto; }
 .ex-perside { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text2); flex: none; }
 .edit-form .ex-perside input { width: auto; }
-/* 新增項目先挑常用項目、簡易表單（決策紀錄第 44 條） */
-.tpl-pick-list { display: flex; flex-direction: column; gap: 6px; }
-.tpl-pick {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left;
-  border: 1.5px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px;
-  padding: 9px 12px; font: inherit; cursor: pointer;
+/* 課表項目卡：名稱是項目庫選單、時間直接改（決策紀錄第 45 條） */
+.item-pick {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; text-align: left;
+  border: 1.5px solid var(--warn); background: var(--warnBg); color: var(--text); border-radius: 8px;
+  padding: 4px 8px; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
 }
-.tpl-pick:hover, .tpl-pick:focus-visible { border-color: var(--warn); }
-.tpl-pick-name { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; max-width: 100%; }
-.tpl-pick-meta { font-size: 12px; color: var(--text2); line-height: 1.45; overflow-wrap: anywhere; }
-.item-src { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13.5px; }
-.item-src > span { min-width: 0; overflow-wrap: anywhere; }
-.item-src .link-btn { flex: none; font-size: 12.5px; }
-.item-includes { font-size: 12px; color: var(--text2); line-height: 1.5; background: var(--card); border-radius: 8px; padding: 7px 10px; overflow-wrap: anywhere; }
-.more-settings { border-top: 1px dashed var(--warn); padding-top: 8px; }
-.more-settings > summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--warn); padding: 4px 0; }
-.more-settings-body { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; }
+.item-pick > span { min-width: 0; overflow-wrap: anywhere; }
+.item-pick svg { width: 14px; height: 14px; flex: none; color: var(--warn); }
+.pick-list { border: 1.5px solid var(--warn); border-radius: 10px; background: var(--card); margin: 6px 0 8px; overflow: hidden; }
+.pick-row {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; border: 0;
+  border-bottom: 1px solid var(--line); background: transparent; color: var(--text); padding: 9px 10px; font: inherit; cursor: pointer;
+}
+.pick-row:hover, .pick-row:focus-visible { background: var(--warnBg); }
+.pick-row.on { background: var(--warnBg); }
+.pick-mark { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--accent2); }
+.pick-mark svg { width: 16px; height: 16px; }
+.pick-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pick-name { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.pick-meta { font-size: 12px; color: var(--text2); line-height: 1.45; overflow-wrap: anywhere; }
+.pick-empty { font-size: 12.5px; color: var(--text3); padding: 10px; line-height: 1.5; border-bottom: 1px solid var(--line); }
+.pick-list .pick-foot { display: block; width: 100%; text-align: left; padding: 9px 10px; font-size: 12.5px; }
+.amt-group { display: inline-flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.amt-edit { display: inline-flex; align-items: center; gap: 4px; }
+.amt-edit input {
+  width: 52px; border: 1.5px solid var(--inpBorder); background: var(--inpBg); color: var(--text);
+  border-radius: 7px; padding: 3px 6px; font: inherit; font-size: 13px; text-align: center;
+}
+.saved-flash { font-size: 12px; font-weight: 700; color: var(--accent2); align-self: center; }
+.coach-locked-note { font-size: 12px; color: var(--text3); margin-top: 10px; }
+.range-pair { display: flex; align-items: center; gap: 4px; }
+.range-pair input { min-width: 0; flex: 1; }
 /* 項目表單的多部影片（決策紀錄第 28 條）：一部一列下拉＋✕，底下「＋ 再加一部影片」 */
 .vref-list { display: flex; flex-direction: column; gap: 6px; }
 .vref-row { display: flex; align-items: center; gap: 8px; }
@@ -705,7 +723,6 @@ button.rec-radio { cursor: pointer; }
 .seg-v-steps { display: flex; flex-direction: column; gap: 4px; border-left: 2px solid var(--line); padding-left: 8px; min-width: 0; }
 
 .seg-editor { gap: 6px; }
-.seg-hint { font-size: 11.5px; color: var(--text3); line-height: 1.5; }
 .seg-list { display: flex; flex-direction: column; gap: 6px; }
 .seg-step { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); }
 .seg-line { display: flex; align-items: center; gap: 6px; min-width: 0; }

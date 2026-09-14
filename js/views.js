@@ -27,6 +27,7 @@ const ICON = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4l14 6-14 6"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+  chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
   help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5"/><path d="M12 17.5h.01"/></svg>',
   alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>',
   grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="19" r="1.8"/><circle cx="15" cy="19" r="1.8"/></svg>',
@@ -258,8 +259,8 @@ function renderDayBody(weekNumber, dayIndex) {
     <textarea class="edit-form daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
   `;
 
-  const editing = App.state.editingItem;
-  const isEditingThisDay = editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex;
+  // 決策紀錄第 45 條：課表上的項目只能「從項目庫換」「改時間」，今天以前的日子不能改
+  const planLocked = PlanData.keyForWeekDay(weekNumber, dayIndex) < PlanData.dayKey(PlanData.today());
 
   if (d.selectOne) {
     html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, true, isExpired)).join(
@@ -268,12 +269,13 @@ function renderDayBody(weekNumber, dayIndex) {
     html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired)).join('');
   }
 
-  if (isEditingThisDay && editing.itemId === 'new') {
-    html += editing.step === 'form'
-      ? renderItemEditForm(weekNumber, dayIndex, null, { prefill: editing.prefill || null, templateName: editing.templateName || '' })
-      : renderTemplatePicker(weekNumber, dayIndex);
+  if (planLocked) {
+    html += `<div class="coach-locked-note">今天以前的日子不能改。</div>`;
   } else {
-    html += `<div class="coach-add-row"><button class="btn coach-add-row" onclick="A.startAddItem(${weekNumber},${dayIndex})">+ 新增項目</button></div>`;
+    const pk = App.state.itemPicker;
+    const addOpen = !!(pk && pk.weekNumber === weekNumber && pk.dayIndex === dayIndex && pk.itemId === 'add');
+    html += `<div class="coach-add-row"><button class="btn coach-add-row" aria-expanded="${addOpen}" onclick="A.toggleItemPicker(${weekNumber},${dayIndex},'add')">＋ 從項目庫加一個</button></div>`;
+    if (addOpen) html += renderLibraryPickList(weekNumber, dayIndex, 'add', null);
   }
 
   if (!isExpired) html += renderDayRecordCard(weekNumber, dayIndex, d, entry, false);
@@ -287,11 +289,13 @@ function renderDayBody(weekNumber, dayIndex) {
 // 所以這裡的連結跟 <details> 不用擋冒泡。
 // opts.dateKey：這張卡是哪一天的——動作清單／影片照日期挑版本（第 33 條：教練改的內容只從改的那天起生效）。
 // opts.coachEdit：教練模式的項目卡傳 { weekNumber, dayIndex }，「查看動作」裡多一顆「編輯這份動作清單」。
+// opts.amountHtml：教練卡把「時長／距離」那格換成可以改的輸入框（第 45 條）。
 function itemPlanParts(item, opts) {
   opts = opts || {};
   const meta = [];
   const metaStr = PlanData.fmtItemMeta(item);
-  if (metaStr) meta.push(metaStr);
+  if (opts.amountHtml) meta.push(opts.amountHtml);
+  else if (metaStr) meta.push(metaStr);
   const hrZone = PlanData.fmtHeartRateZone(item.heartRateZone); // 第 30 條：舊的百分比也顯示成 Zone
   if (hrZone) meta.push(`<span class="zone">${h(hrZone)}${item.intensityDerived ? '（推導）' : ''}</span>`);
   if (item.rpe) meta.push(`RPE ${item.rpe.min}-${item.rpe.max}`);
@@ -514,9 +518,6 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
 
 function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired) {
   const coach = Store.coachMode;
-  const editing = App.state.editingItem;
-  const isEditingThis = coach && editing && editing.weekNumber === weekNumber && editing.dayIndex === dayIndex && editing.itemId === item.id;
-  if (isEditingThis) return renderItemEditForm(weekNumber, dayIndex, item);
   // 從這張卡的「查看動作」打開的動作清單編輯器，就畫在這張卡的位置（第 33 條）
   const le = App.state.libraryEdit;
   if (coach && le && le.origin && le.origin.weekNumber === weekNumber && le.origin.dayIndex === dayIndex && le.origin.itemId === item.id) {
@@ -533,7 +534,13 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   // 不能讓它看起來跟正常同步過的紀錄一樣。
   const unsynced = Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
 
-  const parts = itemPlanParts(item, { dateKey, coachEdit: coach ? { weekNumber, dayIndex } : null });
+  // 決策紀錄第 45 條：教練模式的項目卡沒有編輯表單。名稱是項目庫的選單（點了換成別的常用項目），
+  // 時間（長跑是公里）那格可以直接改；其餘內容在「設定 → 常用項目庫」定義。今天以前的日子全部唯讀。
+  const editable = coach && dateKey >= PlanData.dayKey(PlanData.today());
+  const pk = App.state.itemPicker;
+  const pickerOpen = editable && !!(pk && pk.weekNumber === weekNumber && pk.dayIndex === dayIndex && pk.itemId === item.id);
+  const amountHtml = editable && item.type !== 'rest' ? renderAmountEdit(weekNumber, dayIndex, item) : '';
+  const parts = itemPlanParts(item, { dateKey, coachEdit: coach ? { weekNumber, dayIndex } : null, amountHtml });
 
   // 只有圓圈能打勾（決策紀錄第 29 條）：以前整張卡都能點，點「查看動作」、影片或備註旁邊都會打勾。
   // 未來的日子不能預先打勾（第 31 條）：還沒勾的圓圈停用，已經勾了的照樣能點掉
@@ -545,22 +552,32 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
       ? `A.selectChoice(${weekNumber},${dayIndex},'${jsq(item.id)}')`
       : `A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')`}" aria-pressed="${!!done}" aria-label="${isSelectOne ? '選這個' : '完成'}：${h(item.title)}">${ICON.check}</button>`;
 
-  const coachToolbar = coach ? `
+  // 存成常用：項目庫裡還沒有一模一樣的才出現（改過時間、或出廠課表的項目）；剛存的那張卡寫「已存進項目庫」
+  const inLibrary = coach && !!Store.libraryItemMatching(item);
+  const justSaved = coach && App.state.savedFlash === item.id && inLibrary;
+  const saveBtn = justSaved
+    ? `<span class="saved-flash">已存進項目庫</span>`
+    : (coach && !inLibrary && Store.canSaveItemAsTemplate(item) ? `<button onclick="A.saveItemAsTemplate(${weekNumber},${dayIndex},'${jsq(item.id)}')">存成常用</button>` : '');
+  const coachToolbar = coach && (editable || saveBtn) ? `
     <div class="coach-toolbar">
-      <button onclick="A.startEditItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">${ICON.chevron} 編輯</button>
-      <button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)">↑</button>
-      <button ${itemIndexInDay === itemCountInDay - 1 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',1)">↓</button>
-      <button onclick="A.saveItemAsTemplate(${weekNumber},${dayIndex},'${jsq(item.id)}')">存成常用</button>
-      <button class="danger" ${itemCountInDay <= 1 ? 'disabled' : ''} onclick="A.deleteItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">刪除</button>
+      ${editable ? `<button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)" aria-label="往上移">↑</button>
+      <button ${itemIndexInDay === itemCountInDay - 1 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',1)" aria-label="往下移">↓</button>` : ''}
+      ${saveBtn}
+      ${editable ? `<button class="danger" ${itemCountInDay <= 1 ? 'disabled' : ''} onclick="A.deleteItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">刪除</button>` : ''}
     </div>
   ` : '';
+  const titleText = `${h(item.title)}${item.type === 'race' ? ' 🏁' : ''}`;
+  const titleHtml = editable
+    ? `<button type="button" class="item-pick" aria-expanded="${pickerOpen}" onclick="A.toggleItemPicker(${weekNumber},${dayIndex},'${jsq(item.id)}')"><span>${titleText}</span>${ICON.chevronDown}</button>`
+    : titleText;
 
   return `
     <div class="item ${done ? 'done' : ''} ${isExpired ? 'expired' : ''} ${item.derived ? 'derived' : ''}">
       <div class="item-row">
         ${check}
         <div class="item-body">
-          <div class="item-title">${h(item.title)}${item.type === 'race' ? ' 🏁' : ''}${unsynced ? ' <span style="font-size:10px;font-weight:600;color:var(--warn);background:var(--warnBg);border-radius:5px;padding:1px 5px;vertical-align:2px">尚未同步</span>' : ''}</div>
+          <div class="item-title">${titleHtml}${unsynced ? ' <span style="font-size:10px;font-weight:600;color:var(--warn);background:var(--warnBg);border-radius:5px;padding:1px 5px;vertical-align:2px">尚未同步</span>' : ''}</div>
+          ${pickerOpen ? renderLibraryPickList(weekNumber, dayIndex, item.id, item) : ''}
           ${parts.body}
           ${isSelectOne && chosen ? `<div class="choice-note">✓ 這次選了這個</div>` : ''}
           ${coachToolbar}
@@ -613,7 +630,6 @@ function renderSegmentEditor(segments) {
   return `
         <div class="field wide seg-editor" onchange="A.segUpdateSum(this)">
           <label class="field-lbl">訓練段落（選填）</label>
-          <div class="seg-hint">把當天怎麼跑拆開寫，例如間歇跑：暖身 10 分 → 重複 4 次（400 公尺＋恢復 90 秒）→ 緩和 10 分。上面的時長／距離是整堂課的量，照舊用來算週跑量。</div>
           <div class="seg-list seg-root">${segs.map((sg) => (sg.kind === 'repeat' ? renderSegRepeat(sg) : renderSegStep(sg))).join('')}</div>
           <div class="seg-sum">${(() => { const t = PlanData.segmentTotals(segs); const r1 = (x) => Math.round(x * 10) / 10; const rng = (o, u) => (r1(o.min) === r1(o.max) ? `${r1(o.min)} ${u}` : `${r1(o.min)}–${r1(o.max)} ${u}`); const p = [t.hasKm ? rng(t.km, '公里') : '', t.hasTime ? rng(t.minutes, '分') : ''].filter(Boolean); return p.length ? `段落合計：約 ${p.join('＋')}` : ''; })()}</div>
           <div class="seg-actions">
@@ -626,26 +642,15 @@ function renderSegmentEditor(segments) {
         </div>`;
 }
 
-// 教練模式的項目編輯表單。item 為 null 時是「新增項目」。用 scoped querySelector
-// 讀值（A.saveItemEdit 會找 #item-edit-... 容器內的 [name=...]），不是把每個欄位
-// 塞進 onclick 參數——12 個欄位塞進 inline onclick 字串太脆弱（引號/特殊字元）。
-// opts.prefill：新增項目時從常用項目帶入的內容（複製，決策紀錄第 26 條）；opts.templateName：
-// 帶入的是哪個常用項目。opts.libraryTemplate：在設定頁的常用項目庫編輯範本本身——
-// 同一份表單，存檔按鈕改走 A.saveTemplateEdit，多一個「範本名稱」欄位。
-// 決策紀錄第 44 條：項目的「定義」（類型、心率、RPE、段落、影片、動作）在常用項目庫編；課表這邊
-// 只調這天的數字。所以課表上編輯既有項目、或從常用項目帶入的新項目，是「簡易表單」：上面只有
-// 時長／距離／備註，其餘收進「更多設定」（欄位照樣在 DOM 裡，_readItemForm 照讀）。
-// 常用項目庫本身、課表上「空白項目」沒有來源可以帶，是完整表單。
-function renderItemEditForm(weekNumber, dayIndex, item, opts) {
-  opts = opts || {};
-  const tpl = opts.libraryTemplate || null;
-  const isNew = !item && !tpl;
-  const simple = !tpl && (!isNew || !!opts.prefill);
-  const blank = { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, segments: null, videoRefs: [], videoRef: null, workoutRef: null, notes: '', derived: false };
-  const it = item || (tpl && tpl.item) || opts.prefill || blank;
-  const formId = tpl ? `tpl-edit-${tpl.id}` : `item-edit-${weekNumber}-${dayIndex}-${isNew ? 'new' : it.id}`;
+// 常用項目庫的項目表單（決策紀錄第 26、45 條）：項目的內容只在這裡定義，課表上只能換、改時間。
+// 用 scoped querySelector 讀值（A.saveTemplateEdit 找 #tpl-edit-... 容器內的 [name=...]），
+// 不是把欄位塞進 onclick 參數——特殊字元會拼壞 inline JS。
+// 第 45 條精簡：「範本名稱」跟「標題」合成一個「名稱」；強度說明畫面上沒有地方顯示，表單拿掉（存檔保留原值）。
+function renderTemplateForm(tpl) {
+  const it = tpl.item;
+  const formId = `tpl-edit-${tpl.id}`;
   // 下拉選單：內建＋庫裡的自訂。這個項目現在引用的若是已經從庫裡刪掉的，也要放進選項，
-  // 不然 <select> 找不到對應值會落回「（無）」，教練按儲存就把引用安靜地洗掉了。
+  // 不然 <select> 找不到對應值會落回「（無）」，存檔就把引用安靜地洗掉了。
   // 連這台裝置都查不到的（庫還沒同步到、或文件壞了）也一樣保留成一個選項，存檔才不會洗掉。
   const refOptions = (list, currentId, lookup, label) => {
     const opts2 = list.slice();
@@ -658,16 +663,14 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
       : `${h(label(x))}${String(x.id).startsWith('c-') ? '（自訂）' : ''}${x.__deleted ? '（已從庫中刪除）' : ''}`}</option>`).join('');
   };
   // 影片可以好幾部（第 28 條）：一部一列下拉，「＋ 再加一部影片」從 <template> 複製一列新的進來、
-  // ✕ 拿掉那一列——兩個都直接改 DOM、不重繪（見 A.addVideoRow 的註解）。存檔時 _readItemForm
-  // 讀全部 [name=videoRefs]；<template> 裡那列不在 DOM 樹上，querySelectorAll 讀不到，不會多算一部。
+  // ✕ 拿掉那一列——兩個都直接改 DOM、不重繪（見 A.addVideoRow 的註解）。
   const videoRow = (currentId) => `
             <div class="vref-row">
               <select name="videoRefs"><option value="">（無）</option>${refOptions(Store.allVideos(), currentId, (id) => Store.videoById(id), (v) => v.title)}</select>
               <button type="button" class="link-btn vref-del" onclick="A.removeVideoRow(this)" aria-label="拿掉這部影片">✕</button>
             </div>`;
   const curVideos = PlanData.itemVideoRefs(it);
-  // 心率區間只能選 Zone（第 30 條）。舊資料的「60-70%」換算後預選；換算不了的舊文字保留成一個
-  // 選項（跟 refOptions 同一個理由：不然 <select> 落回「（無）」，存檔就把它安靜洗掉）。
+  // 心率區間只能選 Zone（第 30 條）。舊資料的「60-70%」換算後預選；換算不了的舊文字保留成一個選項。
   const hrCur = PlanData.fmtHeartRateZone(it.heartRateZone);
   const hrOptions = (hrCur && !PlanData.HR_ZONE_OPTIONS.includes(hrCur)
     ? [`<option value="${h(hrCur)}" selected>${h(hrCur)}（舊寫法，請改選）</option>`] : [])
@@ -676,152 +679,89 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
   const [durMin, durMax] = rangeVal(it.duration);
   const [kmMin, kmMax] = rangeVal(it.distanceKm);
   const [rpeMin, rpeMax] = rangeVal(it.rpe);
+  const types = VALID_TYPES.includes(it.type) ? VALID_TYPES : [it.type].concat(VALID_TYPES);
+  const pair = (label, a, b, nameA, nameB, attrs) => `
+          <div class="field"><label class="field-lbl">${label}</label>
+            <div class="range-pair"><input name="${nameA}" type="number" ${attrs} value="${h(a)}"><span>–</span><input name="${nameB}" type="number" ${attrs} value="${h(b)}"></div>
+          </div>`;
 
-  // 決策紀錄第 19 條：derived / intensityDerived 是轉檔時留下的「來源」標記（原課表沒寫、
-  // 是推出來的），不是教練要填的欄位。這裡只把它講清楚；存檔後兩個標記一律清掉——
-  // 教練存過就是確認過。
-  // 「推導值」有三種來源（整天內容、只有時長、A／B 哪一種），措辭不能一概說「原課表沒寫」
-  // ——Phase 2 的重訓原課表有寫，只是時長是補的；細節在各項目的備註裡。
-  const provenance = [
-    it.derived ? '這一項標著<b>推導值</b>——原課表沒寫清楚的部分（整天的內容、時長、或 A／B 哪一種）是轉檔時補上的，細節看備註。' : '',
-    it.intensityDerived ? '心率區間是<b>推導的</b>——原課表沒給這種跑法的心率，「稍快於 Zone 2」取往上一區的 Zone 3。' : '',
-  ].filter(Boolean);
-  const provenanceNote = provenance.length
-    ? `<div class="edit-provenance">${provenance.join('<br>')}<br>你存檔後就當作你確認過了，標題旁的標籤會拿掉。</div>`
-    : '';
-
-  const fTypeTitle = `
-        <div class="row">
-          <div class="field">
-            <label class="field-lbl">類型</label>
-            <select name="type">${(VALID_TYPES.includes(it.type) ? VALID_TYPES : [it.type].concat(VALID_TYPES)).map((t) => `<option value="${t}" ${it.type === t ? 'selected' : ''}>${TYPE_LABELS[t] || t}</option>`).join('')}</select>
-          </div>
-          <div class="field wide">
-            <label class="field-lbl">標題</label>
-            <input name="title" type="text" value="${h(it.title)}" placeholder="例如：Zone 2 跑">
-          </div>
-        </div>`;
-  const fAmount = `
-        <div class="row">
-          <div class="field"><label class="field-lbl">時長下限（分）</label><input name="durationMin" type="number" min="0" value="${h(durMin)}"></div>
-          <div class="field"><label class="field-lbl">時長上限（分）</label><input name="durationMax" type="number" min="0" value="${h(durMax)}"></div>
-          <div class="field"><label class="field-lbl">距離下限（K）</label><input name="distanceMin" type="number" min="0" step="0.1" value="${h(kmMin)}"></div>
-          <div class="field"><label class="field-lbl">距離上限（K）</label><input name="distanceMax" type="number" min="0" step="0.1" value="${h(kmMax)}"></div>
-        </div>`;
-  const fIntensity = `
-        <div class="row">
-          <div class="field"><label class="field-lbl">心率區間</label><select name="heartRateZone"><option value="">（無）</option>${hrOptions}</select></div>
-          <div class="field"><label class="field-lbl">RPE 下限</label><input name="rpeMin" type="number" min="0" max="10" value="${h(rpeMin)}"></div>
-          <div class="field"><label class="field-lbl">RPE 上限</label><input name="rpeMax" type="number" min="0" max="10" value="${h(rpeMax)}"></div>
+  return `
+    <div class="item coach-editing" id="${formId}">
+      <div class="edit-form">
+        <div class="field wide"><label class="field-lbl">名稱</label><input name="title" type="text" maxlength="80" value="${h(tpl.name || it.title)}" placeholder="例如：Zone 2 跑"></div>
+        <div class="field wide"><label class="field-lbl">類型</label>
+          <select name="type">${types.map((t) => `<option value="${t}" ${it.type === t ? 'selected' : ''}>${TYPE_LABELS[t] || t}</option>`).join('')}</select>
         </div>
-        <div class="field wide"><label class="field-lbl">強度說明</label><input name="intensityNote" type="text" value="${h(it.intensityNote || '')}"></div>`;
-  const fRefs = `
+        <div class="row">
+          ${pair('時長（分）', durMin, durMax, 'durationMin', 'durationMax', 'min="0" inputmode="numeric"')}
+          ${pair('距離（K）', kmMin, kmMax, 'distanceMin', 'distanceMax', 'min="0" step="0.1" inputmode="decimal"')}
+        </div>
+        <div class="row">
+          <div class="field"><label class="field-lbl">心率</label><select name="heartRateZone"><option value="">（無）</option>${hrOptions}</select></div>
+          ${pair('RPE', rpeMin, rpeMax, 'rpeMin', 'rpeMax', 'min="0" max="10" inputmode="numeric"')}
+        </div>
+        ${renderSegmentEditor(it.segments)}
         <div class="field wide">
-          <label class="field-lbl">影片參照</label>
+          <label class="field-lbl">影片</label>
           <div class="vref-list">${(curVideos.length ? curVideos : [null]).map(videoRow).join('')}</div>
           <template class="vref-tpl">${videoRow(null)}</template>
           <button type="button" class="link-btn vref-add" onclick="A.addVideoRow('${jsq(formId)}')">＋ 再加一部影片</button>
         </div>
         <div class="field wide">
-          <label class="field-lbl">動作參照</label>
+          <label class="field-lbl">動作清單</label>
           <select name="workoutRef"><option value="">（無）</option>${refOptions(Store.allWorkouts(), it.workoutRef, (id) => Store.workoutById(id), (w) => w.name)}</select>
-        </div>`;
-  const fNotes = `<div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>`;
-  const actions = `
+        </div>
+        <div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>
         <div class="actions">
-          ${tpl
-            ? `<button class="btn" style="background:var(--warn)" onclick="A.saveTemplateEdit('${jsq(tpl.id)}')">儲存範本</button>
-               <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>`
-            : `<button class="btn" style="background:var(--warn)" onclick="A.saveItemEdit(${weekNumber},${dayIndex},'${isNew ? 'new' : jsq(it.id)}')">儲存</button>
-               <button class="btn secondary" onclick="A.cancelEditItem()">取消</button>`}
-        </div>`;
-
-  if (simple) {
-    // 簡易表單的標頭：新增的寫「帶入：常用項目名稱」＋換一個；既有的寫標題・類型
-    const head = isNew
-      ? `<div class="item-src"><span>帶入：<b>${h(opts.templateName || it.title)}</b></span><button type="button" class="link-btn" onclick="A.backToTemplatePicker(${weekNumber},${dayIndex})">換一個</button></div>`
-      : `<div class="item-src"><span><b>${h(it.title)}</b></span></div>`;
-    const includes = itemIncludesText(it);
-    return `
-    <div class="item coach-editing" id="${formId}">
-      <div class="edit-form">
-        ${head}
-        ${includes ? `<div class="item-includes">${includes}</div>` : ''}
-        ${provenanceNote}
-        ${fAmount}
-        ${fNotes}
-        <details class="more-settings">
-          <summary>更多設定（通常不用改）</summary>
-          <div class="more-settings-body">
-            <div class="tpl-hint">這裡改的只影響這一天。要改常用項目本身（之後帶入的預設內容），到「設定 → 常用項目庫」。</div>
-            ${fTypeTitle}
-            ${fIntensity}
-            ${renderSegmentEditor(it.segments)}
-            ${fRefs}
-          </div>
-        </details>
-        ${actions}
-      </div>
-    </div>
-  `;
-  }
-
-  return `
-    <div class="item coach-editing" id="${formId}">
-      <div class="edit-form">
-        ${isNew ? `<div class="item-src"><span><b>空白項目</b>：全部自己填</span><button type="button" class="link-btn" onclick="A.backToTemplatePicker(${weekNumber},${dayIndex})">改從常用項目挑</button></div>` : ''}
-        ${tpl ? `<div class="field wide"><label class="field-lbl">範本名稱（選填，空白就用標題）</label><input name="templateName" type="text" value="${h(tpl.name)}" placeholder="例如：Zone 2 跑（Phase 2）"></div>` : ''}
-        ${provenanceNote}
-        ${fTypeTitle}
-        ${fAmount}
-        ${fIntensity}
-        ${renderSegmentEditor(it.segments)}
-        ${fRefs}
-        ${fNotes}
-        ${actions}
+          <button class="btn" style="background:var(--warn)" onclick="A.saveTemplateEdit('${jsq(tpl.id)}')">儲存</button>
+          <button class="btn secondary" onclick="A.cancelLibraryEdit()">取消</button>
+        </div>
       </div>
     </div>
   `;
 }
 
-// 簡易表單上「這個項目包含什麼」：時長／距離以外、收在「更多設定」裡的內容，一行讀完。
-function itemIncludesText(it) {
-  const bits = [TYPE_LABELS[it.type] || it.type];
-  const hr = PlanData.fmtHeartRateZone(it.heartRateZone);
-  if (hr) bits.push(hr);
-  if (it.rpe && Number.isFinite(it.rpe.min)) bits.push(`RPE ${PlanData.fmtRange(it.rpe, '')}`);
-  const segs = PlanData.itemSegments(it);
-  if (segs.length) bits.push(`${segs.length} 段訓練段落`);
-  const vids = PlanData.itemVideoRefs(it).map((id) => Store.videoById(id)).filter(Boolean);
-  if (vids.length) bits.push(`影片：${vids.map((v) => v.title).join('、')}`);
-  const wo = it.workoutRef ? Store.workoutById(it.workoutRef) : null;
-  if (wo) bits.push(`動作：${wo.name}`);
-  return h(bits.filter(Boolean).join(' · '));
+// 常用項目一行說明：類型 · 時長／距離 · 心率 · N 段訓練段落（項目庫列表、課表上的挑選清單共用）
+function templateMetaText(item) {
+  const segs = PlanData.itemSegments(item);
+  return [TYPE_LABELS[item.type] || item.type, PlanData.fmtItemMeta(item), PlanData.fmtHeartRateZone(item.heartRateZone), segs.length ? `${segs.length} 段訓練段落` : '']
+    .filter(Boolean).join(' · ');
 }
 
-// 「＋ 新增項目」的第一步（第 44 條）：從常用項目挑一個，一次帶入全部設定；沒有合適的才用空白項目。
-function renderTemplatePicker(weekNumber, dayIndex) {
+// 課表上點項目名稱（或「＋ 從項目庫加一個」）打開的清單（第 45 條）。target：項目 id，或 'add'。
+// current：換的是哪個項目——跟它一模一樣的常用項目打勾。
+function renderLibraryPickList(weekNumber, dayIndex, target, current) {
   const templates = Store.libraryList('item');
-  const list = templates.map((t) => {
-    const meta = [itemIncludesText(t.item), h(PlanData.fmtItemMeta(t.item))].filter(Boolean).join(' · ');
-    return `<button type="button" class="tpl-pick" onclick="A.pickTemplateForNewItem(${weekNumber},${dayIndex},'${jsq(t.id)}')">
-        <span class="tpl-pick-name">${h(t.name)}</span>
-        <span class="tpl-pick-meta">${meta}</span>
+  const same = current ? Store.libraryItemMatching(current) : null;
+  const rows = templates.map((t) => {
+    const on = !!(same && same.id === t.id);
+    const action = target === 'add'
+      ? `A.addItemFromLibrary(${weekNumber},${dayIndex},'${jsq(t.id)}')`
+      : `A.swapItemFromLibrary(${weekNumber},${dayIndex},'${jsq(target)}','${jsq(t.id)}')`;
+    return `<button type="button" class="pick-row ${on ? 'on' : ''}" onclick="${action}">
+        <span class="pick-mark">${on ? ICON.check : ''}</span>
+        <span class="pick-text"><span class="pick-name">${h(t.name)}</span><span class="pick-meta">${h(templateMetaText(t.item))}</span></span>
       </button>`;
   }).join('');
   return `
-    <div class="item coach-editing tpl-picker-card">
-      <div class="edit-form">
-        <div class="lib-head">從常用項目挑一個</div>
-        ${templates.length
-          ? `<div class="tpl-pick-list">${list}</div>`
-          : `<div class="tpl-hint">常用項目庫還是空的。可以在課表項目下面按「存成常用」，或到「設定 → 常用項目庫」新增。</div>`}
-        <div class="actions">
-          <button type="button" class="btn secondary" onclick="A.pickTemplateForNewItem(${weekNumber},${dayIndex},'')">空白項目（全部自己填）</button>
-          <button type="button" class="btn secondary" onclick="A.cancelEditItem()">取消</button>
-        </div>
-      </div>
+    <div class="pick-list">
+      ${rows || `<div class="pick-empty">項目庫還沒有項目。在課表項目下面按「存成常用」，或到「設定 → 常用項目庫」新增。</div>`}
+      <button type="button" class="pick-foot link-btn" onclick="A.goTo('settings')">到項目庫新增或修改 ›</button>
     </div>`;
+}
+
+// 課表項目卡上的時間（長跑是公里）輸入框（第 45 條）。有距離沒時長的畫距離；其餘畫時長（沒填也畫，才有地方填）。
+function renderAmountEdit(weekNumber, dayIndex, item) {
+  const box = (name, r, key, unit, step) => `
+    <span class="amt-edit" data-amt="${key}">
+      <input type="number" min="0" ${step ? `step="${step}" inputmode="decimal"` : 'inputmode="numeric"'} value="${r ? h(r.min) : ''}" aria-label="${name}下限" onchange="A.setItemAmount(${weekNumber},${dayIndex},'${jsq(item.id)}',this)">
+      <span>–</span>
+      <input type="number" min="0" ${step ? `step="${step}" inputmode="decimal"` : 'inputmode="numeric"'} value="${r ? h(r.max) : ''}" aria-label="${name}上限" onchange="A.setItemAmount(${weekNumber},${dayIndex},'${jsq(item.id)}',this)">
+      <span>${unit}</span>
+    </span>`;
+  const useKm = !!item.distanceKm && !item.duration;
+  const both = !!item.distanceKm && !!item.duration;
+  return `<span class="amt-group">${useKm ? '' : box('時長', item.duration, 'duration', '分', null)}${useKm || both ? box('距離', item.distanceKm, 'distanceKm', 'K', '0.1') : ''}</span>`;
 }
 
 // 附註欄標題旁的「誰看得到」（決策紀錄第 13a 條：分流靠標題，不靠 placeholder）。
@@ -1568,16 +1508,12 @@ function renderLibraryPanel(state) {
     </div>`;
 
   const items = Store.libraryList('item');
-  const itemMeta = (t) => {
-    const segs = PlanData.itemSegments(t.item);
-    return h([TYPE_LABELS[t.item.type] || t.item.type, PlanData.fmtItemMeta(t.item), segs.length ? `${segs.length} 段訓練段落` : ''].filter(Boolean).join(' · '));
-  };
   const itemRows = items.map((t) => isEditing('item', t.id)
-    ? renderItemEditForm(0, 0, null, { libraryTemplate: t })
-    : row(t, h(t.name), itemMeta(t))).join('');
+    ? renderTemplateForm(t)
+    : row(t, h(t.name), h(templateMetaText(t.item)))).join('');
   // 第 43 條：直接在項目庫新增常用項目（原本只能從課表上某個項目「存成常用」）
   const newItemForm = isEditing('item', 'new')
-    ? renderItemEditForm(0, 0, null, { libraryTemplate: edit.prefill ? { id: 'new', ...edit.prefill } : { id: 'new', name: '', item: { type: 'run', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', segments: null, videoRefs: [], videoRef: null, workoutRef: null, notes: '' } } })
+    ? renderTemplateForm(edit.prefill ? { id: 'new', ...edit.prefill } : { id: 'new', name: '', item: { type: 'run', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', segments: null, videoRefs: [], videoRef: null, workoutRef: null, notes: '' } })
     : `<button class="btn secondary lib-add" onclick="A.startLibraryEdit('item','new')">＋ 新增常用項目</button>`;
 
   // 內建內容（第 33 條）：一列一份，標「內建」／「內建·已修改」，按鈕是「編輯」＋改過才有的「還原內建」
@@ -1636,7 +1572,7 @@ function renderLibraryPanel(state) {
       <div class="card lib-card">
         <div class="lib-group">
           <div class="lib-head">常用項目</div>
-          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。項目的類型、心率、訓練段落、影片、動作在這裡設定好；課表「＋ 新增項目」第一步就是從這裡挑，帶入後只要調時長／距離。帶入是複製一份，之後改範本不會改到已經排好的日子。</div>
+          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。項目的內容只在這裡設定；課表上點項目名稱就能換成這裡的項目，換過去是複製一份，之後改這裡不會改到已經排好的日子。</div>
           ${itemRows || (isEditing('item', 'new') ? '' : '<div class="lib-empty">還沒有常用項目。</div>')}
           ${newItemForm}
         </div>
@@ -1693,6 +1629,8 @@ function renderWorkoutEditor(edit) {
   const d = edit.draft;
   const { head, canSave } = libraryEditorHead(edit, 'workout');
   const n = d.exercises.length;
+  // 份量一行讀起來就是「5 組 × 30 秒」（第 45 條）。以前拆成 組數／算法／秒數下限／上限 四格，
+  // 「30 秒」被填進組數（上限 20）存不進去，看起來像不能同時設時間跟組數。後面那格只有範圍（8–10 次）才填。
   const rows = d.exercises.map((ex, i) => `
     <div class="ex-row">
       <div class="row ex-head">
@@ -1702,11 +1640,16 @@ function renderWorkoutEditor(edit) {
           <button type="button" class="link-btn" ${i === n - 1 ? 'disabled' : ''} onclick="A.moveLibExercise(${i},1)" aria-label="往下移">↓</button>
         </div>
       </div>
-      <div class="row">
-        <div class="field"><label class="field-lbl">組數</label><input type="number" inputmode="numeric" min="1" max="20" value="${h(ex.sets)}" onchange="A.libDraftExercise(${i},'sets',this.value)"></div>
-        <div class="field"><label class="field-lbl">算法</label><select onchange="A.libDraftExercise(${i},'qty',this.value,true)"><option value="reps" ${ex.qty !== 'hold' ? 'selected' : ''}>次數</option><option value="hold" ${ex.qty === 'hold' ? 'selected' : ''}>秒數</option></select></div>
-        <div class="field"><label class="field-lbl">${ex.qty === 'hold' ? '秒數' : '次數'}下限</label><input type="number" inputmode="numeric" min="1" value="${h(ex.min)}" onchange="A.libDraftExercise(${i},'min',this.value)"></div>
-        <div class="field"><label class="field-lbl">上限</label><input type="number" inputmode="numeric" min="1" value="${h(ex.max)}" onchange="A.libDraftExercise(${i},'max',this.value)"></div>
+      <div class="field wide">
+        <label class="field-lbl">份量</label>
+        <div class="ex-qty">
+          <input class="ex-num" type="number" inputmode="numeric" min="1" max="20" value="${h(ex.sets)}" aria-label="組數" onchange="A.libDraftExercise(${i},'sets',this.value)">
+          <span>組 ×</span>
+          <input class="ex-num" type="number" inputmode="numeric" min="1" value="${h(ex.min)}" aria-label="每組${ex.qty === 'hold' ? '秒數' : '次數'}" onchange="A.libDraftExercise(${i},'min',this.value)">
+          <span>–</span>
+          <input class="ex-num" type="number" inputmode="numeric" min="1" value="${h(ex.max)}" placeholder="上限" aria-label="上限（選填）" onchange="A.libDraftExercise(${i},'max',this.value)">
+          <select class="ex-unit" aria-label="次或秒" onchange="A.libDraftExercise(${i},'qty',this.value,true)"><option value="reps" ${ex.qty !== 'hold' ? 'selected' : ''}>次</option><option value="hold" ${ex.qty === 'hold' ? 'selected' : ''}>秒</option></select>
+        </div>
       </div>
       <div class="field wide"><textarea class="ex-notes" rows="2" maxlength="200" placeholder="動作要領／備註（選填，最多 200 字）" onchange="A.libDraftExercise(${i},'notes',this.value)">${h(ex.notes)}</textarea></div>
       <div class="row ex-foot">

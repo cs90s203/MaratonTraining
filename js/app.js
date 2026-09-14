@@ -8,7 +8,8 @@ const App = {
     viewingUserId: null,   // null = 預設看自己；總覽頁「查看別人」用，跟 Store.activeUserId（寫入身分）分開
     overviewPhaseId: null, // 決策紀錄第 22 條：總覽頁「階段目標」卡目前選看哪個階段；null = 目前所在階段
     expandedDay: null,     // {weekNumber,dayIndex}：本週頁手風琴目前展開的那一列；null = 全收
-    editingItem: null,     // 教練模式：{weekNumber,dayIndex,itemId}，itemId==='new' 表示正在新增項目
+    itemPicker: null,      // 決策紀錄第 45 條：教練模式打開的項目庫清單 {weekNumber,dayIndex,itemId|'add'}
+    savedFlash: null,      // 剛按「存成常用」的課表項目 id：那張卡寫「已存進項目庫」
     helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
     modal: null,           // 'safety' | null
     privateNoteOpen: null, // 身體狀況的備註框被手動展開的那一天（dateKey）
@@ -36,7 +37,7 @@ const App = {
     if (page === 'today') page = 'week'; // 舊的入口一律導到本週頁
     this.state.page = page;
     if (page === 'week') this._focusToday();
-    this.state.editingItem = null;
+    this.state.itemPicker = null;
     this.state.libraryEdit = null;
     this.state.modal = null;
     render();
@@ -47,7 +48,7 @@ const App = {
     const e = this.state.expandedDay;
     const same = e && e.weekNumber === weekNumber && e.dayIndex === dayIndex;
     this.state.expandedDay = same ? null : { weekNumber, dayIndex };
-    this.state.editingItem = null;
+    this.state.itemPicker = null;
     this.state.libraryEdit = null; // 第 33 條：從卡片打開的清單編輯器不能跟著跑到別天
     render();
   },
@@ -58,7 +59,7 @@ const App = {
     const loc = PlanData.locateToday();
     this.state.expandedDay = (loc.status === 'in-plan' && loc.weekNumber === weekNumber)
       ? { weekNumber, dayIndex: loc.dayIndex } : null;
-    this.state.editingItem = null;
+    this.state.itemPicker = null;
     this.state.libraryEdit = null;
     render();
   },
@@ -247,7 +248,7 @@ const App = {
       else if (to <= d && d < from) d += 1;
       this.state.expandedDay = { weekNumber, dayIndex: d };
     }
-    this.state.editingItem = null;
+    this.state.itemPicker = null;
     this.state.libraryEdit = null;
     Store.saveWeekOverride(weekNumber, week);
     render();
@@ -304,64 +305,118 @@ const App = {
 
   toggleCoachMode() {
     Store.setCoachMode(!Store.coachMode);
-    this.state.editingItem = null;
+    this.state.itemPicker = null;
     this.state.libraryEdit = null;
     render();
   },
 
-  startEditItem(weekNumber, dayIndex, itemId) {
-    this.state.editingItem = { weekNumber, dayIndex, itemId };
-    this.state.libraryEdit = null; // 同時開兩個表單，一邊的重繪會洗掉另一邊還沒存的字
+  // ── 課表上的項目（決策紀錄第 45 條）─────────────────────────────────────────
+  // 沒有編輯表單：名稱是項目庫的選單（換成別的常用項目）、時間那格直接改、存成常用、上下移、刪除。
+  // 項目的內容（類型、心率、段落、影片、動作、備註）只在常用項目庫定義。今天以前的日子不能改。
+  _planDayLocked(weekNumber, dayIndex) {
+    if (PlanData.keyForWeekDay(weekNumber, dayIndex) < PlanData.dayKey(PlanData.today())) {
+      alert('今天以前的日子不能改。');
+      render();
+      return true;
+    }
+    return false;
+  },
+
+  toggleItemPicker(weekNumber, dayIndex, itemId) {
+    const p = this.state.itemPicker;
+    const same = p && p.weekNumber === weekNumber && p.dayIndex === dayIndex && p.itemId === itemId;
+    this.state.itemPicker = same ? null : { weekNumber, dayIndex, itemId };
+    this.state.savedFlash = null;
     render();
   },
 
-  // 第 44 條：新增項目先挑常用項目（step 'pick'），挑了才進表單（step 'form'）
-  startAddItem(weekNumber, dayIndex) {
-    this.state.editingItem = { weekNumber, dayIndex, itemId: 'new', step: 'pick' };
-    this.state.libraryEdit = null;
+  // 從常用項目庫帶進課表的內容：深拷貝，拿掉「推導值」標記（教練挑的就是確認過的，第 19 條）
+  _itemFromTemplate(tpl, id) {
+    return { ...JSON.parse(JSON.stringify(tpl.item)), id, derived: false, intensityDerived: false };
+  },
+
+  // 換成別的常用項目：id 不變（打勾紀錄照 id 對，換掉不會讓做過的課又變成沒做）
+  swapItemFromLibrary(weekNumber, dayIndex, itemId, templateId) {
+    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    const tpl = Store.libraryList('item').find((t) => t.id === templateId);
+    if (!tpl) { alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return; }
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const day = week.days[dayIndex];
+    const idx = day.items.findIndex((it) => it.id === itemId);
+    if (idx === -1) { this.state.itemPicker = null; render(); return; }
+    day.items[idx] = this._itemFromTemplate(tpl, itemId);
+    // 二擇一是一組：教練動了其中一個就是整組看過了，一起清掉 derived（verify_plan.py B4 守的就是兩個選項對等）
+    if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
+    this.state.itemPicker = null;
+    this.state.savedFlash = null;
+    Store.saveWeekOverride(weekNumber, week);
     render();
   },
 
-  cancelEditItem() {
-    this.state.editingItem = null;
+  addItemFromLibrary(weekNumber, dayIndex, templateId) {
+    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    const tpl = Store.libraryList('item').find((t) => t.id === templateId);
+    if (!tpl) { alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return; }
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const day = week.days[dayIndex];
+    day.items.push(this._itemFromTemplate(tpl, newItemId()));
+    if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
+    this.state.itemPicker = null;
+    this.state.savedFlash = null;
+    Store.saveWeekOverride(weekNumber, week);
+    render();
+  },
+
+  // 時間（長跑是公里）那格改了：el 是改的那個輸入框，同一組兩格一起讀。兩格都空＝沒有這個數字。
+  setItemAmount(weekNumber, dayIndex, itemId, el) {
+    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    const box = el && el.closest('.amt-edit');
+    if (!box) return;
+    const key = box.dataset.amt === 'distanceKm' ? 'distanceKm' : 'duration';
+    const inputs = [...box.querySelectorAll('input')];
+    const [a, b] = inputs.map((x) => x.value.trim());
+    let range = null;
+    if (a !== '' || b !== '') {
+      let lo = Number(a === '' ? b : a), hi = Number(b === '' ? a : b);
+      const cap = key === 'duration' ? 300 : 100;
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || Math.min(lo, hi) < 0 || Math.max(lo, hi) > cap) {
+        alert(key === 'duration' ? '時間要在 0 到 300 分之間。' : '距離要在 0 到 100 公里之間。');
+        render();
+        return;
+      }
+      // 下限改得比上限大：上限跟著改（不是兩個對調）——「20–25」把下限改成 30，接著要改上限成 40，
+      // 對調會先存成 25–30，畫面上的下限變 25，最後變成 25–40。上限改得比下限小時同理，下限跟著改。
+      if (lo > hi) { if (inputs.indexOf(el) === 1) lo = hi; else hi = lo; }
+      range = { min: lo, max: hi };
+    }
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const it = week.days[dayIndex].items.find((x) => x.id === itemId);
+    if (!it) { render(); return; }
+    if (JSON.stringify(it[key] || null) === JSON.stringify(range)) { render(); return; } // 沒變（例如 30–30 寫成 30）
+    it[key] = range;
+    it.derived = false; // 教練動過數字就是確認過（第 19 條）
+    this.state.savedFlash = null;
+    Store.saveWeekOverride(weekNumber, week);
     render();
   },
 
   // ── 常用項目庫（決策紀錄第 26 條）─────────────────────────────────────────────
-  // 課表上的項目「存成常用」：把整套設定（類型、標題、時長、距離、心率、RPE、影片、動作、
-  // 備註）存一份到共用庫。不帶 id／derived——範本不屬於任何一天，帶入時會拿到新的 id。
+  // 課表上的項目「存成常用」（第 26、45 條）：整套設定存一份到共用庫，名稱照標題。
+  // 按鈕只在項目庫還沒有一模一樣的內容時出現（改過時間、或出廠課表的項目），所以不會存出重複的。
   saveItemAsTemplate(weekNumber, dayIndex, itemId) {
     const day = Store.effectiveWeek(weekNumber).days[dayIndex];
     const it = day && day.items.find((x) => x.id === itemId);
     if (!it) return;
-    const same = Store.libraryList('item').some((t) => t.name === it.title);
-    if (same && !confirm(`常用項目裡已經有「${it.title}」，要再存一份嗎？（兩份會並存，名稱可以到設定頁改）`)) return;
+    if (Store.libraryItemMatching(it)) { render(); return; }
     const saved = Store.saveLibraryDoc(null, 'item', { name: it.title, item: it });
     if (!saved) { alert('這個項目的內容不完整，沒辦法存成常用項目。'); return; }
-    alert(`已存成常用項目「${saved.name}」。之後在任何一天按「＋ 新增項目」就能帶入；到「設定」頁的常用項目庫可以改名、改內容或刪除。`);
-  },
-
-  // 新增項目挑了一個常用項目：把它的內容複製進表單（深拷貝，改表單不會動到範本）。
-  // templateId 空字串＝空白項目（完整表單，全部自己填）。
-  pickTemplateForNewItem(weekNumber, dayIndex, templateId) {
-    const tpl = templateId ? Store.libraryList('item').find((t) => t.id === templateId) : null;
-    if (templateId && !tpl) {
-      alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return;
-    }
-    this.state.editingItem = {
-      weekNumber, dayIndex, itemId: 'new', step: 'form',
-      prefill: tpl ? JSON.parse(JSON.stringify(tpl.item)) : null,
-      templateName: tpl ? tpl.name : '',
-    };
+    this.state.savedFlash = itemId;
     render();
   },
 
-  backToTemplatePicker(weekNumber, dayIndex) {
-    this.state.editingItem = { weekNumber, dayIndex, itemId: 'new', step: 'pick' };
-    render();
-  },
 
-  _blankExercise() { return { name: '', sets: 2, qty: 'reps', min: 8, max: 10, perSide: false, notes: '' }; },
+  // 份量不預填（第 45 條）：以前預填「8–10 次」，改成秒的時候 8–10 留著，填 30 會存成「10–30 秒」
+  _blankExercise() { return { name: '', sets: 2, qty: 'reps', min: '', max: '', perSide: false, notes: '' }; },
 
   // 打開動作清單／影片／常用項目的編輯器。
   // 內建的（第 33 條）也從這裡進來：預填「今天看到的版本」（有修改版用修改版，沒有用 JSON），
@@ -414,7 +469,7 @@ const App = {
       // 複本的編輯器排在群組最下面，常常在螢幕外：畫完捲過去一次（afterRender）
       scrollOnce: !!copyOf,
     };
-    this.state.editingItem = null;
+    this.state.itemPicker = null;
     render();
   },
 
@@ -479,7 +534,10 @@ const App = {
   libDraftExercise(i, field, value, rerender) {
     const e = this.state.libraryEdit;
     if (!e || !e.draft || !e.draft.exercises || !e.draft.exercises[i]) return;
-    e.draft.exercises[i][field] = value;
+    const ex = e.draft.exercises[i];
+    // 次 ↔ 秒：原本的數字換了單位就不是同一件事（10 次≠10 秒），清掉重填
+    if (field === 'qty' && ex.qty !== value) { ex.min = ''; ex.max = ''; }
+    ex[field] = value;
     if (rerender) render();
   },
   addLibExercise() {
@@ -583,10 +641,12 @@ const App = {
     const err = this._validateItemFields(fields);
     if (err) { alert(err); return; }
     delete fields.__segError;
-    const root = document.getElementById(formId);
-    const nameEl = root && root.querySelector('[name="templateName"]');
-    const name = nameEl ? nameEl.value.trim() : '';
-    const saved = Store.saveLibraryDoc(isNew ? null : id, 'item', { name: name || fields.title, item: fields });
+    // 第 45 條：「範本名稱」跟「標題」合成一個「名稱」；強度說明畫面上沒有地方顯示、表單拿掉了，保留原本的值
+    const le = this.state.libraryEdit;
+    const src = tpl ? tpl.item : (le && le.prefill ? le.prefill.item : null); // 複製出來的新項目：照來源那份
+    fields.intensityNote = src ? (src.intensityNote || null) : null;
+    delete fields.derived; delete fields.intensityDerived;
+    const saved = Store.saveLibraryDoc(isNew ? null : id, 'item', { name: fields.title, item: fields });
     if (!saved) { alert('內容不完整，沒有存檔。'); return; }
     this.state.libraryEdit = null;
     render();
@@ -803,42 +863,8 @@ const App = {
     if (row) row.remove();
   },
 
-  saveItemEdit(weekNumber, dayIndex, itemIdOrNew) {
-    const isNew = itemIdOrNew === 'new';
-    const formId = `item-edit-${weekNumber}-${dayIndex}-${itemIdOrNew}`;
-    const fields = this._readItemForm(formId);
-    if (!fields) return;
-    const err = this._validateItemFields(fields);
-    if (err) {
-      // 簡易表單的錯誤常常在收起來的「更多設定」裡（段落、RPE），打開才找得到
-      const more = document.getElementById(formId).querySelector('details.more-settings');
-      if (more) more.open = true;
-      alert(err); return;
-    }
-
-    delete fields.__segError;
-    const week = this._cloneEffectiveWeek(weekNumber);
-    const day = week.days[dayIndex];
-    if (isNew) {
-      fields.id = newItemId();
-      day.items.push(fields);
-    } else {
-      const idx = day.items.findIndex((it) => it.id === itemIdOrNew);
-      if (idx === -1) return;
-      fields.id = itemIdOrNew; // id 永遠不變，這是教練模式安全性的核心
-      day.items[idx] = fields;
-    }
-    // 二擇一是一組：兩個選項並排在同一天，教練存了其中一個就是整組看過了——一起
-    // 清掉 derived，不然「推導值」標籤只剩在另一個選項上，兩個對等的選擇顯示不對等
-    // （tools/verify_plan.py B4 對出廠資料守的就是這件事）。intensityDerived 是逐項的
-    // 心率來源標記，不跟著清。
-    if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
-    Store.saveWeekOverride(weekNumber, week);
-    this.state.editingItem = null;
-    render();
-  },
-
   deleteItem(weekNumber, dayIndex, itemId) {
+    if (this._planDayLocked(weekNumber, dayIndex)) return;
     const week = this._cloneEffectiveWeek(weekNumber);
     const day = week.days[dayIndex];
     if (day.items.length <= 1) { alert('這天至少要留一個項目——原規格書的教訓：一天空白會讓畫面壞掉。'); return; }
@@ -865,6 +891,7 @@ const App = {
   },
 
   moveItem(weekNumber, dayIndex, itemId, direction) {
+    if (this._planDayLocked(weekNumber, dayIndex)) return;
     const week = this._cloneEffectiveWeek(weekNumber);
     const day = week.days[dayIndex];
     const idx = day.items.findIndex((it) => it.id === itemId);

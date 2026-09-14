@@ -1008,6 +1008,19 @@ const Store = {
     return null;
   },
 
+  // 決策紀錄第 45 條：課表上的項目跟常用項目庫裡哪一個一模一樣（兩邊都照存進庫的規則整理過再比，
+  // id、推導值標記這些課表才有的欄位不算）。有＝不用再「存成常用」；挑選清單上打勾。
+  libraryItemMatching(item) {
+    const mine = this._cleanLibraryFields('item', { name: '', item });
+    if (!mine) return null;
+    const key = JSON.stringify(mine.item);
+    return this.libraryList('item').find((t) => {
+      const c = this._cleanLibraryFields('item', { name: '', item: t.item });
+      return c && JSON.stringify(c.item) === key;
+    }) || null;
+  },
+  canSaveItemAsTemplate(item) { return !!this._cleanLibraryFields('item', { name: '', item }); },
+
   // id 為 null＝新增。回傳存好的文件（含 id），形狀不合回傳 null。
   saveLibraryDoc(id, kind, fields) {
     const clean = this._cleanLibraryFields(kind, fields);
