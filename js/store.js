@@ -268,9 +268,24 @@ const Store = {
   // 打勾與狀態覆寫互斥（單一真相）：打勾＝回到「照表」，status 清成 null；
   // 反過來 setDayStatus 設了更換項目／自主休息就把勾清空。不然卡片是綠色打勾、
   // 底下卻寫「更換項目」、完成率又不算，三個東西各自有真相。
+  // 決策紀錄第 13b／31 條：未來的日子不能預先打勾完成，只能預先排休息（休息類的項目可以）。
+  // 守在這裡而不是只藏按鈕——v0.10.0 只藏了「完成」按鈕，多項目的勾、二擇一的圓圈、教練模式
+  // 項目卡的勾都還能把未來的日子打成完成，而且打了之後唯一能取消的「完成」按鈕是藏起來的。
+  // **取消**永遠允許：誤觸之後一定要改得回來。
+  isFutureKey(dateKey) {
+    return dateKey > PlanData.dayKey(PlanData.today());
+  },
+  canMarkDoneAhead(dateKey, itemId) {
+    if (!this.isFutureKey(dateKey)) return true;
+    const day = this._dayForKey(dateKey);
+    const it = day && day.items.find((x) => x.id === itemId);
+    return !!(it && it.type === 'rest');
+  },
+
   toggleItemDone(dateKey, itemId) {
     const prev = this.entryFor(this.activeUserId, dateKey);
     const cur = { ...(prev && prev.done) };
+    if (!cur[itemId] && !this.canMarkDoneAhead(dateKey, itemId)) return null;
     cur[itemId] = !cur[itemId];
     return this._writeOwnEntry(dateKey, { done: this._fullDone(dateKey, cur), status: null });
   },
@@ -287,6 +302,8 @@ const Store = {
       // 再點一次同一個選項＝取消選擇，回到「待完成」。
       return this._writeOwnEntry(dateKey, { selectedItemId: null, done: this._fullDone(dateKey, {}), status: null });
     }
+    // 未來的日子只能預先選休息那一邊（第 31 條，見 canMarkDoneAhead）
+    if (!this.canMarkDoneAhead(dateKey, itemId)) return null;
     const chosen = {}; chosen[itemId] = true;
     return this._writeOwnEntry(dateKey, { selectedItemId: itemId, done: this._fullDone(dateKey, chosen), status: null });
   },
@@ -315,7 +332,8 @@ const Store = {
     // 只單向打勾：清掉數字不會取消完成——手滑清掉不該把做完的一天變回沒做，要取消點「完成」。
     const filled = [durationMinutes, distanceKm].some((v) => v != null && v > 0);
     const prev = this.entryFor(this.activeUserId, dateKey);
-    if (filled && entryStatus(prev) === null) {
+    // 還沒到的日子不自動打勾（第 13b／31 條）：畫面上未來的日子本來就沒有數字欄，這裡是第二道
+    if (filled && entryStatus(prev) === null && !this.isFutureKey(dateKey)) {
       const day = this._dayForKey(dateKey);
       const only = day && !day.selectOne && day.items.length === 1 && day.items[0].type !== 'rest' ? day.items[0] : null;
       if (only && !(prev && prev.done && prev.done[only.id])) {
@@ -815,13 +833,16 @@ const Store = {
     if (kind === 'item') {
       const it = fields.item;
       if (!it || !text(it.title, 80) || !it.type) return null;
+      const videoRefs = PlanData.itemVideoRefs(it).slice(0, PlanData.MAX_ITEM_VIDEOS);
       const item = {
         type: it.type, title: text(it.title, 80),
         duration: rng(it.duration, 0, 300), distanceKm: rng(it.distanceKm, 0, 100),
-        heartRateZone: it.heartRateZone ? text(it.heartRateZone, 30) : null,
+        // 第 30 條：存成常用時把舊的「60-70%」順手換成 Zone
+        heartRateZone: PlanData.fmtHeartRateZone(it.heartRateZone) ? text(PlanData.fmtHeartRateZone(it.heartRateZone), 30) : null,
         rpe: rng(it.rpe, 0, 10),
         intensityNote: it.intensityNote ? text(it.intensityNote, 120) : null,
-        videoRef: it.videoRef || null, workoutRef: it.workoutRef || null,
+        // 第 28 條：兩個都寫，videoRef＝第一部（舊版網頁只看得懂這個）
+        videoRefs, videoRef: videoRefs[0] || null, workoutRef: it.workoutRef || null,
         notes: it.notes ? text(it.notes, 500) : null,
       };
       return { name: text(fields.name, 80) || item.title, item };

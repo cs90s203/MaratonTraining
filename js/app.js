@@ -13,6 +13,15 @@ const App = {
     modal: null,           // 'safety' | null
     privateNoteOpen: null, // 身體狀況的備註框被手動展開的那一天（dateKey）
     libraryEdit: null,     // 常用項目庫正在編輯的東西（決策紀錄第 26 條）：{kind, id|'new', draft}
+    openDetails: {},       // 決策紀錄第 29 條：「查看動作」這類 <details> 目前打開的 key。render() 整個換掉 #root，
+                           // 開關狀態只放在 DOM 上的話，任何一次重繪（同步快照、別人改課表）都會把它收起來
+  },
+
+  // <details> 的 ontoggle：只記下來、不重繪（使用者自己點開的，畫面已經是對的）。
+  // render() 產生帶 open 屬性的 <details> 時也會觸發一次 toggle，值一樣，寫回去沒有副作用。
+  setDetailsOpen(key, open) {
+    if (open) this.state.openDetails[key] = true;
+    else delete this.state.openDetails[key];
   },
 
   // 本週頁的預設定位：今天那一週、今天那一列展開。開 App、按「本週」、或切回本週都走這裡。
@@ -461,19 +470,27 @@ const App = {
       if (Number.isNaN(a) || Number.isNaN(b)) return null;
       return { min: Math.min(a, b), max: Math.max(a, b) };
     };
+    // 影片（第 28 條）：每列一個下拉，選「（無）」的列當沒填；重複選同一部只留一次
+    const videoRefs = [];
+    root.querySelectorAll('select[name="videoRefs"]').forEach((el) => {
+      const v = el.value.trim();
+      if (v && !videoRefs.includes(v)) videoRefs.push(v);
+    });
     return {
       type: val('type'),
       title: val('title'),
       duration: range('durationMin', 'durationMax'),
       distanceKm: range('distanceMin', 'distanceMax'),
-      heartRateZone: val('heartRateZone') || null,
+      heartRateZone: PlanData.fmtHeartRateZone(val('heartRateZone')) || null, // 第 30 條：一律存成 Zone
       rpe: range('rpeMin', 'rpeMax'),
       intensityNote: val('intensityNote') || null,
-      videoRef: val('videoRef') || null,
+      // 兩個都寫：videoRef＝第一部，給還開著舊版網頁的裝置看（見 PlanData.itemVideoRefs）
+      videoRefs,
+      videoRef: videoRefs[0] || null,
       workoutRef: val('workoutRef') || null,
       notes: val('notes') || null,
       // 決策紀錄第 19 條：這兩個是轉檔留下的「沒人確認過」標記，不是教練填的欄位。
-      // 教練存過就是確認過——一律清掉，「推導值」「（內插）」標籤跟著消失。
+      // 教練存過就是確認過——一律清掉，「推導值」「（推導）」標籤跟著消失。
       intensityDerived: false,
       derived: false,
     };
@@ -494,7 +511,28 @@ const App = {
     if (k && (k.min < 0 || k.max > 100)) return '距離要在 0-100 公里之間';
     const p = fields.rpe;
     if (p && (p.min < 0 || p.max > 10)) return 'RPE 要在 0-10 之間';
+    if (fields.videoRefs && fields.videoRefs.length > PlanData.MAX_ITEM_VIDEOS) return `一個項目最多 ${PlanData.MAX_ITEM_VIDEOS} 部影片`;
     return null;
+  },
+
+  // 項目表單的「＋ 再加一部影片」／✕（第 28 條）：直接改表單 DOM，不重繪。表單其他欄位
+  // 打到一半的內容不在 state 裡（_readItemForm 存檔時才一次讀），這時候 render() 會把標題、
+  // 時長這些還沒存的字全部洗掉。
+  addVideoRow(formId) {
+    const root = document.getElementById(formId);
+    const list = root && root.querySelector('.vref-list');
+    const tpl = root && root.querySelector('template.vref-tpl');
+    if (!list || !tpl) return;
+    if (list.querySelectorAll('.vref-row').length >= PlanData.MAX_ITEM_VIDEOS) {
+      alert(`一個項目最多 ${PlanData.MAX_ITEM_VIDEOS} 部影片。`);
+      return;
+    }
+    list.appendChild(tpl.content.cloneNode(true));
+  },
+
+  removeVideoRow(btn) {
+    const row = btn && btn.closest('.vref-row');
+    if (row) row.remove();
   },
 
   saveItemEdit(weekNumber, dayIndex, itemIdOrNew) {

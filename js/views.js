@@ -278,31 +278,38 @@ function renderDayBody(weekNumber, dayIndex) {
 }
 
 // 項目的課表說明（時長／心率／RPE、影片、動作清單）——教練模式的項目卡跟當天紀錄卡的
-// 標題區共用同一份，改一處兩邊一起變。連結跟 <details> 都擋掉冒泡：外層可能是可點的選項。
+// 標題區共用同一份，改一處兩邊一起變。外層卡片不可以點（決策紀錄第 29 條：只有圓圈能打勾），
+// 所以這裡的連結跟 <details> 不用擋冒泡。
 function itemPlanParts(item) {
   const meta = [];
   const metaStr = PlanData.fmtItemMeta(item);
   if (metaStr) meta.push(metaStr);
-  if (item.heartRateZone) meta.push(`<span class="zone">${h(item.heartRateZone)}${item.intensityDerived ? '（內插）' : ''}</span>`);
+  const hrZone = PlanData.fmtHeartRateZone(item.heartRateZone); // 第 30 條：舊的百分比也顯示成 Zone
+  if (hrZone) meta.push(`<span class="zone">${h(hrZone)}${item.intensityDerived ? '（推導）' : ''}</span>`);
   if (item.rpe) meta.push(`RPE ${item.rpe.min}-${item.rpe.max}`);
 
+  // 一個項目可以有好幾部影片（第 28 條），每部一個連結。連結上直接寫影片名稱——
+  // 好幾個「看影片」並排會分不出哪個是哪個。查不到的（庫還沒同步到這台）略過不畫。
   const links = [];
-  if (item.videoRef) {
-    const v = Store.videoById(item.videoRef);
+  PlanData.itemVideoRefs(item).forEach((ref) => {
+    const v = Store.videoById(ref);
     // 自訂影片的網址是教練貼的（第 26 條）：只接受 https://，擋掉 javascript: 之類會執行的連結
     if (v && v.linkType === 'video' && v.url && /^https:\/\//i.test(v.url)) {
-      links.push(`<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICON.play} 看影片</a>`);
+      links.push(`<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener">${ICON.play} ${h(v.title || '看影片')}</a>`);
     } else if (v && v.linkType === 'search') {
       const q = encodeURIComponent(v.searchQuery || v.title);
-      links.push(`<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICON.search} 搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</a>`);
+      links.push(`<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${ICON.search} 搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</a>`);
     }
-  }
+  });
   let workoutBlock = '';
   if (item.workoutRef) {
     const wo = Store.workoutById(item.workoutRef);
     if (wo) {
+      // 開關狀態記在 App.state.openDetails（第 29 條），不然任何一次重繪都會把它收起來。
+      // key 用項目 id：出廠跟教練新增的 id 全課表唯一；對調日子時開關狀態跟著內容走。
+      const dKey = `wo:${item.id || item.workoutRef}`;
       workoutBlock = `
-        <details style="margin-top:8px" onclick="event.stopPropagation()">
+        <details style="margin-top:8px" ${App.state.openDetails[dKey] ? 'open' : ''} ontoggle="A.setDetailsOpen('${jsq(dKey)}', this.open)">
           <summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--accent2)">查看動作（${wo.exercises.length}）</summary>
           <div style="margin-top:8px;font-size:13px;color:var(--text2);line-height:1.7">
             ${wo.exercises.map((ex) => {
@@ -366,10 +373,17 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
     if (d.selectOne) {
       const opts = d.items.map((it) => {
         const on = !!(chosen && chosen.id === it.id);
-        const click = isExpired ? '' : `onclick="A.selectChoice(${weekNumber},${dayIndex},'${jsq(it.id)}')"`;
+        // 只有圓圈能選（決策紀錄第 29 條）：以前整張選項卡都能點，點「查看動作」或影片旁邊一點點
+        // 就把這天選掉、算成完成。
+        // 未來的日子只能預先選休息那一邊；已經選了的永遠能點掉（第 31 條，Store.canMarkDoneAhead）
+        const radio = isExpired
+          ? `<span class="rec-radio"></span>`
+          : (on || Store.canMarkDoneAhead(dateKey, it.id))
+            ? `<button type="button" class="rec-radio" onclick="A.selectChoice(${weekNumber},${dayIndex},'${jsq(it.id)}')" aria-pressed="${on}" aria-label="選這個：${h(it.title)}"></button>`
+            : `<button type="button" class="rec-radio" disabled title="還沒到這天，只能預先選休息" aria-label="還沒到這天：${h(it.title)}"></button>`;
         return `
-          <div class="rec-opt ${on ? 'on' : ''} ${dim ? 'dim' : ''}" ${click} role="button" aria-pressed="${on}">
-            <div class="rec-opt-t"><span class="rec-radio"></span><span class="rec-title ${it.derived ? 'derived' : ''}">${h(it.title)}</span></div>
+          <div class="rec-opt ${on ? 'on' : ''} ${dim ? 'dim' : ''}">
+            <div class="rec-opt-t">${radio}<span class="rec-title ${it.derived ? 'derived' : ''}">${h(it.title)}</span></div>
             ${itemPlanParts(it).body}
           </div>`;
       }).join('<span class="rec-or">或</span>');
@@ -381,9 +395,10 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
       const tickable = d.items.length > 1 && !isExpired;
       secs.push(d.items.map((it, i) => {
         const done = !!(entry && entry.done && entry.done[it.id]) && st === null;
-        const tick = tickable
-          ? `<button class="rec-tick ${done ? 'on' : ''}" onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(it.id)}')" aria-pressed="${done}" aria-label="完成：${h(it.title)}">${ICON.check}</button>`
-          : '';
+        const tick = !tickable ? ''
+          : (done || Store.canMarkDoneAhead(dateKey, it.id))
+            ? `<button class="rec-tick ${done ? 'on' : ''}" onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(it.id)}')" aria-pressed="${done}" aria-label="完成：${h(it.title)}">${ICON.check}</button>`
+            : `<button class="rec-tick" disabled title="還沒到這天，不能預先打勾" aria-label="還沒到這天：${h(it.title)}">${ICON.check}</button>`;
         return `
           <div class="rec-line">
             ${tick}
@@ -406,12 +421,14 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   // 換成騎車／游泳的公里沒有意義（週跑量只算跑步）；還沒選類型的舊紀錄照舊可以記公里
   const showKm = showNums && (st === 'substituted' ? (!subType || subType === 'run') : hasRun);
   const showMin = showNums && (st === 'substituted' ? true : hasDuration);
-  // !isFuture：決策紀錄第 13b 條——未來的日子只能預先排休息，不能預先打勾完成。
-  const showDone = withPlan && !isFuture && st === null && !!single;
+  const isDone = derived === 'done';
+  // 決策紀錄第 13b 條：未來的日子不能預先打勾完成，所以不給「完成」——但已經被打成完成的
+  // （誤觸，或 v0.12.0 以前的漏洞留下的）一定要給，不然沒有任何地方能取消（第 31 條）。
+  const showDone = withPlan && st === null && !!single && (!isFuture || isDone);
   const kmVal = entry && entry.actualDistanceKm != null ? entry.actualDistanceKm : '';
   const durVal = entry && entry.actualDurationMinutes != null ? entry.actualDurationMinutes : '';
-  const isDone = derived === 'done';
   const nums = (showKm || showMin || showDone) ? `
+    ${isFuture && isDone ? '<div class="status-hint">這天還沒到，應該是誤觸了——再點一下「照表完成」就能取消。當天就能填公里跟分鐘。</div>' : ''}
     <div class="rec-nums">
       ${showKm ? `<label class="rec-num">實際公里<input type="number" inputmode="decimal" min="0" step="0.1" value="${h(kmVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'distance',this.value)"></label>` : ''}
       ${showMin ? `<label class="rec-num">實際分鐘<input type="number" inputmode="decimal" min="0" value="${h(durVal)}" onchange="A.setActualStats(${weekNumber},${dayIndex},'duration',this.value)"></label>` : ''}
@@ -487,13 +504,18 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
 
   const parts = itemPlanParts(item);
 
-  const clickAttr = isExpired ? '' :
-    (isSelectOne
-      ? `onclick="A.selectChoice(${weekNumber},${dayIndex},'${jsq(item.id)}')"`
-      : `onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')"`);
+  // 只有圓圈能打勾（決策紀錄第 29 條）：以前整張卡都能點，點「查看動作」、影片或備註旁邊都會打勾。
+  // 未來的日子不能預先打勾（第 31 條）：還沒勾的圓圈停用，已經勾了的照樣能點掉
+  const check = isExpired
+    ? `<span class="item-check">${ICON.check}</span>`
+    : !(done || Store.canMarkDoneAhead(dateKey, item.id))
+    ? `<button type="button" class="item-check" disabled title="還沒到這天，不能預先打勾" aria-label="還沒到這天：${h(item.title)}">${ICON.check}</button>`
+    : `<button type="button" class="item-check" onclick="${isSelectOne
+      ? `A.selectChoice(${weekNumber},${dayIndex},'${jsq(item.id)}')`
+      : `A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')`}" aria-pressed="${!!done}" aria-label="${isSelectOne ? '選這個' : '完成'}：${h(item.title)}">${ICON.check}</button>`;
 
   const coachToolbar = coach ? `
-    <div class="coach-toolbar" onclick="event.stopPropagation()">
+    <div class="coach-toolbar">
       <button onclick="A.startEditItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">${ICON.chevron} 編輯</button>
       <button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)">↑</button>
       <button ${itemIndexInDay === itemCountInDay - 1 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',1)">↓</button>
@@ -503,9 +525,9 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   ` : '';
 
   return `
-    <div class="item ${done ? 'done' : ''} ${isExpired ? 'expired' : ''} ${item.derived ? 'derived' : ''}" ${!isExpired ? clickAttr : ''}>
+    <div class="item ${done ? 'done' : ''} ${isExpired ? 'expired' : ''} ${item.derived ? 'derived' : ''}">
       <div class="item-row">
-        <div class="item-check">${ICON.check}</div>
+        ${check}
         <div class="item-body">
           <div class="item-title">${h(item.title)}${item.type === 'race' ? ' 🏁' : ''}${unsynced ? ' <span style="font-size:10px;font-weight:600;color:var(--warn);background:var(--warnBg);border-radius:5px;padding:1px 5px;vertical-align:2px">尚未同步</span>' : ''}</div>
           ${parts.body}
@@ -527,7 +549,7 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
   opts = opts || {};
   const tpl = opts.libraryTemplate || null;
   const isNew = !item && !tpl;
-  const blank = { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, videoRef: null, workoutRef: null, notes: '', derived: false };
+  const blank = { type: 'recovery', title: '', duration: null, distanceKm: null, heartRateZone: '', rpe: null, intensityNote: '', intensityDerived: false, videoRefs: [], videoRef: null, workoutRef: null, notes: '', derived: false };
   const it = item || (tpl && tpl.item) || opts.prefill || blank;
   const formId = tpl ? `tpl-edit-${tpl.id}` : `item-edit-${weekNumber}-${dayIndex}-${isNew ? 'new' : it.id}`;
   // 下拉選單：內建＋庫裡的自訂。這個項目現在引用的若是已經從庫裡刪掉的，也要放進選項，
@@ -553,6 +575,21 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
           </select>
           <div class="tpl-hint">帶入是複製一份：之後改範本，不會改到已經排好的日子。</div>
         </div>` : '';
+  // 影片可以好幾部（第 28 條）：一部一列下拉，「＋ 再加一部影片」從 <template> 複製一列新的進來、
+  // ✕ 拿掉那一列——兩個都直接改 DOM、不重繪（見 A.addVideoRow 的註解）。存檔時 _readItemForm
+  // 讀全部 [name=videoRefs]；<template> 裡那列不在 DOM 樹上，querySelectorAll 讀不到，不會多算一部。
+  const videoRow = (currentId) => `
+            <div class="vref-row">
+              <select name="videoRefs"><option value="">（無）</option>${refOptions(Store.allVideos(), currentId, (id) => Store.videoById(id), (v) => v.title)}</select>
+              <button type="button" class="link-btn vref-del" onclick="A.removeVideoRow(this)" aria-label="拿掉這部影片">✕</button>
+            </div>`;
+  const curVideos = PlanData.itemVideoRefs(it);
+  // 心率區間只能選 Zone（第 30 條）。舊資料的「60-70%」換算後預選；換算不了的舊文字保留成一個
+  // 選項（跟 refOptions 同一個理由：不然 <select> 落回「（無）」，存檔就把它安靜洗掉）。
+  const hrCur = PlanData.fmtHeartRateZone(it.heartRateZone);
+  const hrOptions = (hrCur && !PlanData.HR_ZONE_OPTIONS.includes(hrCur)
+    ? [`<option value="${h(hrCur)}" selected>${h(hrCur)}（舊寫法，請改選）</option>`] : [])
+    .concat(PlanData.HR_ZONE_OPTIONS.map((z) => `<option value="${z}" ${hrCur === z ? 'selected' : ''}>${z}</option>`)).join('');
   const rangeVal = (r) => r ? [r.min, r.max] : ['', ''];
   const [durMin, durMax] = rangeVal(it.duration);
   const [kmMin, kmMax] = rangeVal(it.distanceKm);
@@ -565,7 +602,7 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
   // ——Phase 2 的重訓原課表有寫，只是時長是補的；細節在各項目的備註裡。
   const provenance = [
     it.derived ? '這一項標著<b>推導值</b>——原課表沒寫清楚的部分（整天的內容、時長、或 A／B 哪一種）是轉檔時補上的，細節看備註。' : '',
-    it.intensityDerived ? '心率區間是<b>內插值</b>——原課表沒給這種跑法的心率，取 Zone 2 跟馬拉松配速中間的值。' : '',
+    it.intensityDerived ? '心率區間是<b>推導的</b>——原課表沒給這種跑法的心率，「稍快於 Zone 2」取往上一區的 Zone 3。' : '',
   ].filter(Boolean);
   const provenanceNote = provenance.length
     ? `<div class="edit-provenance">${provenance.join('<br>')}<br>你存檔後就當作你確認過了，標題旁的標籤會拿掉。</div>`
@@ -594,20 +631,20 @@ function renderItemEditForm(weekNumber, dayIndex, item, opts) {
           <div class="field"><label class="field-lbl">距離上限（K）</label><input name="distanceMax" type="number" min="0" step="0.1" value="${h(kmMax)}"></div>
         </div>
         <div class="row">
-          <div class="field"><label class="field-lbl">心率區間</label><input name="heartRateZone" type="text" placeholder="例如 60-70%" value="${h(it.heartRateZone || '')}"></div>
+          <div class="field"><label class="field-lbl">心率區間</label><select name="heartRateZone"><option value="">（無）</option>${hrOptions}</select></div>
           <div class="field"><label class="field-lbl">RPE 下限</label><input name="rpeMin" type="number" min="0" max="10" value="${h(rpeMin)}"></div>
           <div class="field"><label class="field-lbl">RPE 上限</label><input name="rpeMax" type="number" min="0" max="10" value="${h(rpeMax)}"></div>
         </div>
         <div class="field wide"><label class="field-lbl">強度說明</label><input name="intensityNote" type="text" value="${h(it.intensityNote || '')}"></div>
-        <div class="row">
-          <div class="field">
-            <label class="field-lbl">影片參照</label>
-            <select name="videoRef"><option value="">（無）</option>${refOptions(Store.allVideos(), it.videoRef, (id) => Store.videoById(id), (v) => v.title)}</select>
-          </div>
-          <div class="field">
-            <label class="field-lbl">動作參照</label>
-            <select name="workoutRef"><option value="">（無）</option>${refOptions(Store.allWorkouts(), it.workoutRef, (id) => Store.workoutById(id), (w) => w.name)}</select>
-          </div>
+        <div class="field wide">
+          <label class="field-lbl">影片參照</label>
+          <div class="vref-list">${(curVideos.length ? curVideos : [null]).map(videoRow).join('')}</div>
+          <template class="vref-tpl">${videoRow(null)}</template>
+          <button type="button" class="link-btn vref-add" onclick="A.addVideoRow('${jsq(formId)}')">＋ 再加一部影片</button>
+        </div>
+        <div class="field wide">
+          <label class="field-lbl">動作參照</label>
+          <select name="workoutRef"><option value="">（無）</option>${refOptions(Store.allWorkouts(), it.workoutRef, (id) => Store.workoutById(id), (w) => w.name)}</select>
         </div>
         <div class="field wide"><label class="field-lbl">備註</label><textarea name="notes">${h(it.notes || '')}</textarea></div>
         <div class="actions">
@@ -883,7 +920,7 @@ function renderWeekTable(wn, w, order, todayKey) {
     const entry = Store.entryFor(Store.activeUserId, dateKey);
     const planCell = (contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : '') +
       d.items.map((it) => {
-        const meta = [PlanData.fmtItemMeta(it), it.heartRateZone || ''].filter(Boolean).join(' · ');
+        const meta = [PlanData.fmtItemMeta(it), PlanData.fmtHeartRateZone(it.heartRateZone)].filter(Boolean).join(' · ');
         return `<div class="wt-item"><span class="wt-title">${h(it.title)}</span>${meta ? `<span class="wt-meta">${h(meta)}</span>` : ''}</div>`;
       }).join(d.selectOne ? '<div class="wt-or">或</div>' : '');
     const bits = [];
@@ -1119,16 +1156,16 @@ function renderGoalsCard(userId, isSelf, user) {
     </div>`;
 }
 
-// 這個階段第一個「Zone 2 跑」項目的心率／RPE——findZone2Reference 只找 type==='run'
-// 且標題含「Zone 2」的項目（跟 long-run/tempo 的心率區間不一樣，不能混用），找到就停，
+// 這個階段第一個「Zone 2 跑」項目的 RPE／體感——findZone2Reference 只找 type==='run'
+// 且標題含「Zone 2」的項目（跟 long-run/tempo 不一樣，不能混用），找到就停，
 // 純粹當背景參考文字，不是計算依據。用 Store.effectiveWeek 而不是出廠 plan.json，
-// 教練若把這階段的 Zone 2 項目改過（例如改了心率區間），這裡要跟著變。
+// 教練若把這階段的 Zone 2 項目改過（例如改了 RPE），這裡要跟著變。
 function findZone2Reference(phase) {
   for (let wn = phase.weekRange[0]; wn <= phase.weekRange[1]; wn++) {
     const w = Store.effectiveWeek(wn);
     for (const d of w.days) {
       for (const it of d.items) {
-        if (it.type === 'run' && /Zone\s*2/i.test(it.title || '') && it.heartRateZone) return it;
+        if (it.type === 'run' && /Zone\s*2/i.test(it.title || '') && (it.rpe || it.intensityNote)) return it;
       }
     }
   }
@@ -1181,12 +1218,12 @@ function renderPhaseTargetsCard(currentPhase, viewingUserId, isSelf, viewingUser
       <div class="progress-track"><div class="progress-fill ${volPct >= 100 ? 'reached' : ''}" style="width:${volPct}%"></div></div>
     </div>` : '';
 
-  // 這階段的 Zone 2 心率／RPE 區間：配速目標旁邊的背景參考（決策紀錄第 22 條——配速
+  // 這階段 Zone 2 的體感（RPE／強度說明）：配速目標旁邊的背景參考（決策紀錄第 22 條——配速
   // 沒有像跑量那樣的自動天花板可以卡，只能提供這個當安全邊界的提醒，不擋存檔）。
+  // 第 30 條之後心率只寫 Zone，「Zone 2 對應心率 Zone 2」沒有資訊，改成講體感。
   const zone2Ref = findZone2Reference(phase);
-  const zone2Hint = zone2Ref
-    ? `這階段 Zone 2 對應心率 ${h(zone2Ref.heartRateZone)}${zone2Ref.rpe ? `、RPE ${zone2Ref.rpe.min}-${zone2Ref.rpe.max}` : ''}。`
-    : '';
+  const zone2Feel = zone2Ref ? [zone2Ref.rpe ? `RPE ${zone2Ref.rpe.min}-${zone2Ref.rpe.max}` : '', zone2Ref.intensityNote || ''].filter(Boolean).join('、') : '';
+  const zone2Hint = zone2Feel ? `這階段的 Zone 2 體感：${h(zone2Feel)}。` : '';
 
   // 其餘五項：Zone 2 配速＋四個 5K 技術指標，純參考／純目標，不比對實際。
   const otherRows = PHASE_TARGET_META.filter((m) => m.key !== 'volumeKm').map((m) => {

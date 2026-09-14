@@ -126,6 +126,44 @@ const PlanData = (() => {
     return bits.join(' · ');
   }
 
+  // 項目的影片（決策紀錄第 28 條）：新格式 videoRefs 是陣列；舊格式（出廠 plan.json、舊的
+  // 教練覆寫、舊的常用項目）只有單一的 videoRef。新版存檔兩個都寫，videoRef＝第一部——
+  // 給還開著舊版網頁的裝置看得到至少一部。**讀取一律走這裡**，不要直接讀 item.videoRef。
+  // 兩邊對不上時（舊版網頁只改了 videoRef、或有人在 Firebase Console 手改）取聯集、videoRef
+  // 排第一：寧可多顯示一部，也不要安靜地少掉一部。
+  // 心率一律用 Zone 表示（決策紀錄第 30 條）。**顯示一律走 fmtHeartRateZone**，不要直接印
+  // item.heartRateZone：教練改過的週（Firestore planOverrides）跟常用項目裡還存著舊的「60-70%」，
+  // 不做資料遷移，讀的時候換算，下次教練存檔就會存成 Zone。
+  // 換算基準（第 30 條）：最大心率百分比的五區，Zone 1 50-60%、Zone 2 60-70%、Zone 3 70-80%、
+  // Zone 4 80-90%、Zone 5 90-100%。區間上限剛好在邊界上不算進下一區（60-70% 是 Zone 2）；
+  // 跨區就寫成「Zone 2-3」（原本的長跑 65-72%）。
+  const HR_ZONE_OPTIONS = ['Zone 1', 'Zone 1-2', 'Zone 2', 'Zone 2-3', 'Zone 3', 'Zone 3-4', 'Zone 4', 'Zone 4-5', 'Zone 5'];
+  function fmtHeartRateZone(value) {
+    const s = String(value == null ? '' : value).trim();
+    if (!s) return '';
+    const range = (a, b) => { const lo = Math.min(a, b), hi = Math.max(a, b); return lo === hi ? `Zone ${lo}` : `Zone ${lo}-${hi}`; };
+    const z = s.match(/^zone\s*([1-5])(?:\s*[-–~]\s*(?:zone\s*)?([1-5]))?$/i);
+    if (z) return range(Number(z[1]), z[2] ? Number(z[2]) : Number(z[1]));
+    const p = s.match(/^(\d+(?:\.\d+)?)\s*%?\s*(?:[-–~]\s*(\d+(?:\.\d+)?)\s*)?%$/);
+    if (p) {
+      const a = Number(p[1]), b = p[2] != null ? Number(p[2]) : a;
+      const zoneOf = (pct) => Math.min(5, Math.max(1, Math.floor((pct - 50) / 10) + 1));
+      const lo = Math.min(a, b), hi = Math.max(a, b);
+      return range(zoneOf(lo), hi > lo ? zoneOf(hi - 1e-9) : zoneOf(lo));
+    }
+    return s; // 看不懂的舊文字（教練手打的）原樣顯示，不猜
+  }
+
+  const MAX_ITEM_VIDEOS = 10;
+  function itemVideoRefs(item) {
+    const list = [];
+    if (!item) return list;
+    const add = (id) => { if (typeof id === 'string' && id && !list.includes(id)) list.push(id); };
+    add(item.videoRef);
+    if (Array.isArray(item.videoRefs)) item.videoRefs.forEach(add);
+    return list;
+  }
+
   return {
     load,
     get plan() { return plan; },
@@ -143,6 +181,6 @@ const PlanData = (() => {
     get userById() { return userById; },
     parseLocalDate, dayKey, dateForWeekDay, keyForWeekDay, today, locateToday, locateKey,
     isExpired, daysUntilRace, phaseForWeek, week, day, weekdayLabel,
-    fmtRange, fmtItemMeta,
+    fmtRange, fmtItemMeta, itemVideoRefs, MAX_ITEM_VIDEOS, fmtHeartRateZone, HR_ZONE_OPTIONS,
   };
 })();

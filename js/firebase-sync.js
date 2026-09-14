@@ -265,13 +265,19 @@ const Sync = {
     // 第一個快照常常是離線快取，拿快取比較時間戳可能用本機比較舊的欄位蓋掉雲端比較新的。
     unsubLibrary = fbDb.collection('library')
       .onSnapshot({ includeMetadataChanges: true }, (snap) => {
+        const wasDenied = this.libraryDenied;
         this.libraryDenied = false;
+        let removed = false;
+        // docChanges() 不帶參數＝不含「只有 metadata 變」的文件（快取→伺服器確認、寫入中→寫完）
         snap.docChanges().forEach((c) => {
-          if (c.type === 'removed') { delete Store.library[c.doc.id]; return; }
-          Store.mergeRemoteLibrary(c.doc.id, c.doc.data());
+          if (c.type === 'removed') { delete Store.library[c.doc.id]; removed = true; return; }
+          Store.mergeRemoteLibrary(c.doc.id, c.doc.data()); // 這個自己會 notify
         });
         if (!backfilled && !snap.metadata.fromCache) { backfilled = true; this._backfillLibrary(snap); }
-        this._notify();
+        // 決策紀錄第 29 條：只在畫面看得到的東西變了才重繪。以前每個快照都 _notify()——
+        // includeMetadataChanges 讓只有 metadata 變的快照也會進來，開 App 大約一秒後（快取→伺服器）
+        // 整頁無故重畫一次。庫的快照不影響同步膠囊，沒有理由為了 metadata 重繪。
+        if (wasDenied || removed) this._notify();
       }, (err) => this._handleSnapErr(err, 'library'));
   },
 

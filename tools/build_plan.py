@@ -48,16 +48,22 @@ SAFETY = {
 # 裁決：**第二節的項目類型對照表是強度的唯一真相來源**，第三節模板的「心率/強度」欄
 # 只是粗標籤。依據是原文第八節自己寫的操作順序（訓練計畫.md:175）：
 #   「跑步日 → 對照第四節長跑進度表確認距離/時間,用第二節心率區間確認強度」
-# 原文 Phase 1 的「走跑交替」（第二節:32，50-60%）已依使用者指示整個拿掉
-# （決策紀錄第 12 條：「走跑太含糊」），Phase 1 一律是 Zone 2 跑 60-70%。
+# 原文 Phase 1 的「走跑交替」（第二節:32，恢復檔）已依使用者指示整個拿掉
+# （決策紀錄第 12 條：「走跑太含糊」），Phase 1 一律是 Zone 2 跑。
+#
+# 心率一律寫成 Zone（決策紀錄第 30 條，使用者指示）。原文第二節是「佔最大心率」的百分比，
+# 換算照五區：Zone 1 50-60%、Zone 2 60-70%、Zone 3 70-80%、Zone 4 80-90%、Zone 5 90-100%；
+# 上限剛好在邊界上不算進下一區，跨區寫「Zone 2-3」。跟 js/plan-data.js 的 fmtHeartRateZone
+# 同一套規則（那邊負責把 Firestore 裡還沒改的舊百分比換算來顯示）。
+#   恢復 50-60% → Zone 1；Zone 2 60-70% → Zone 2；長跑 65-72% → Zone 2-3；MP 75-80% → Zone 3
 Z = {
-    "recovery": {"hr": "50-60%", "rpe": [2, 3], "feel": "非常輕鬆，像散步", "derived": False},
-    "zone2":    {"hr": "60-70%", "rpe": [4, 5], "feel": "輕鬆對話", "derived": False},
-    "long":     {"hr": "65-72%", "rpe": [5, 6], "feel": "後段稍吃力但仍能斷句對話", "derived": False},
-    "mp":       {"hr": "75-80%", "rpe": [6, 7], "feel": "可以講短句", "derived": False},
+    "recovery": {"hr": "Zone 1", "rpe": [2, 3], "feel": "非常輕鬆，像散步", "derived": False},
+    "zone2":    {"hr": "Zone 2", "rpe": [4, 5], "feel": "輕鬆對話", "derived": False},
+    "long":     {"hr": "Zone 2-3", "rpe": [5, 6], "feel": "後段稍吃力但仍能斷句對話", "derived": False},
+    "mp":       {"hr": "Zone 3", "rpe": [6, 7], "feel": "可以講短句", "derived": False},
     # 第二節沒有「稍快於 Zone 2」這一檔。模板第 73 行寫「中等」、「稍快於 Zone2」，
-    # 落在 Zone 2(60-70%) 與 MP(75-80%) 之間，取 70-75%。這是內插值，標 derived。
-    "tempo":    {"hr": "70-75%", "rpe": [5, 6], "feel": "稍快於 Zone 2，仍能講短句", "derived": True},
+    # 取往上一區的 Zone 3（跟 MP 同一區，靠 RPE 5-6 vs 6-7 區分）。這是推導的，標 derived。
+    "tempo":    {"hr": "Zone 3", "rpe": [5, 6], "feel": "稍快於 Zone 2，仍能講短句", "derived": True},
     "none":     {"hr": None, "rpe": None, "feel": "以動作品質為主", "derived": False},
 }
 
@@ -150,10 +156,10 @@ def form_drill(w):
 def week_p1(w):
     """Phase 1 W1-8 恢復奠基。週四改用產後專門課程（決策紀錄第 3 條）。
 
-    原文這階段的跑步日與 W1-6 長跑都是「走跑交替」（50-60%）。使用者裁定拿掉
-    （決策紀錄第 12 條：走跑太含糊），全部改成 Zone 2 跑 60-70%。
-    W1-6 的長跑跟著用 60-70%，**不**跳到第二節「長跑」的 65-72%——那會比原本高兩級；
-    W7-8 第四節寫「40分鐘 全跑」，才適用 65-72%。verify_plan.py 有斷言綁住這條。
+    原文這階段的跑步日與 W1-6 長跑都是「走跑交替」（Zone 1）。使用者裁定拿掉
+    （決策紀錄第 12 條：走跑太含糊），全部改成 Zone 2 跑。
+    W1-6 的長跑跟著用 Zone 2，**不**跳到第二節「長跑」的 Zone 2-3——那會比原本高兩級；
+    W7-8 第四節寫「40分鐘 全跑」，才適用 Zone 2-3。verify_plan.py 有斷言綁住這條。
     """
     _, lr = LONG_RUN[w]
     if w <= 6:
@@ -162,7 +168,7 @@ def week_p1(w):
                                "若骨盆有下墜感就縮短當天時間，不要硬撐。")
     else:
         long_item = item("long-run", "長跑", "long", dur=lr,
-                         notes="第四節：本階段最後兩週長跑強度進到 65-72%。仍以時間計。")
+                         notes="第四節：本階段最後兩週長跑強度進到 Zone 2-3。仍以時間計。")
     return [
         day(item("recovery", "產後核心/骨盆底啟動", "recovery", dur=[10, 15],
                  workout="pelvic-core-basic",
@@ -231,7 +237,7 @@ def week_p3(w):
                item("rest", "完全休息", "none"),
                notes="看身體狀況，兩邊地位相等。"),
         day(item("long-run", "長跑主軸", "long", km=lr,
-                 notes="可分段插入幾公里 MP 配速（75-80%）。"
+                 notes="可分段插入幾公里 MP 配速（Zone 3）。"
                        "上限 28K——不做到 32K+ 的高強度全馬課表。")),
         day(item("rest", "完全休息", "none")),
     ]
@@ -276,7 +282,7 @@ def week_race(w):
         day(item("rest", "完全休息", "none", derived=d,
                  notes="賽前一天：確認裝備、補給、交通與起跑區。")),
         day(item("race", "東京馬拉松 2027", "long", km=[42.195, 42.195], derived=d,
-                 notes="比賽日。第二節沒有比賽日的心率檔位，此處沿用「長跑」65-72%。"
+                 notes="比賽日。第二節沒有比賽日的心率檔位，此處沿用「長跑」Zone 2-3。"
                        "配速照 Zone 2 起跑，前 10K 寧可慢。")),
     ]
 

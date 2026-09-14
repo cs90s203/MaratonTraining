@@ -14,6 +14,7 @@
 """
 import hashlib
 import json
+import re
 import os
 import sys
 from datetime import date, timedelta
@@ -37,11 +38,15 @@ SAFETY_SHA = {
 }
 
 # 第二節的項目類型 → 心率區間。原文第八節:175 指定強度以第二節為準。
+# 決策紀錄第 30 條：心率一律寫成 Zone（原文百分比照五區換算，見 build_plan.py 的 Z 表）。
 EXPECTED_HR = {
-    "run": None,            # 可能是 Zone 2 跑(60-70%)或輕鬆跑(50-60%)，不硬性綁
-    "long-run": None,       # 分兩段檢查：W1-6 是 60-70%、W7 起 65-72%（見 B2）
-    "tempo": "70-75%",      # 內插值，標 intensityDerived
+    "run": None,            # 可能是 Zone 2 跑或輕鬆跑(Zone 1)，不硬性綁
+    "long-run": None,       # 分兩段檢查：W1-6 是 Zone 2、W7 起 Zone 2-3（見 B2）
+    "tempo": "Zone 3",      # 推導的（「稍快於 Zone 2」取往上一區），標 intensityDerived
 }
+ZONE_RE = re.compile(r"^Zone [1-5](-[1-5])?$")
+# 原文第二節的五個百分比寫法。第 30 條之後資料檔裡一個都不能出現——不管在心率欄還是備註裡。
+HR_PERCENT_STRINGS = ["50-60%", "60-70%", "65-72%", "70-75%", "75-80%"]
 
 fails = []
 checks = []
@@ -104,9 +109,11 @@ def main():
 
     vids = {v["id"] for v in videos["videos"]}
     wkts = {w["id"] for w in workouts["workouts"]}
-    bad = [f'W{a}D{b} → {it["videoRef"]}' for a, b, it in items
-           if it["videoRef"] and it["videoRef"] not in vids]
-    check("videoRef 全部找得到", not bad, str(bad[:5]))
+    # 決策紀錄第 28 條：影片可以是單一 videoRef（舊格式）或 videoRefs 陣列，兩個都要查
+    bad = [f'W{a}D{b} → {ref}' for a, b, it in items
+           for ref in ([it["videoRef"]] if it.get("videoRef") else []) + list(it.get("videoRefs") or [])
+           if ref not in vids]
+    check("videoRef／videoRefs 全部找得到", not bad, str(bad[:5]))
     bad = [f'W{a}D{b} → {it["workoutRef"]}' for a, b, it in items
            if it["workoutRef"] and it["workoutRef"] not in wkts]
     check("workoutRef 全部找得到", not bad, str(bad[:5]))
@@ -156,27 +163,32 @@ def main():
 
     # B2 強度規則：第二節的項目類型表是唯一真相來源（原文第八節:175）
     bad = [f'W{a}D{b} {it["title"]} = {it["heartRateZone"]}' for a, b, it in items
+           if it["heartRateZone"] is not None and not ZONE_RE.match(it["heartRateZone"])]
+    check("心率區間一律是 Zone 格式（第 30 條）", not bad, str(bad[:4]))
+    found = [p for p in HR_PERCENT_STRINGS if p in raw]
+    check("資料檔不含心率百分比（第 30 條）", not found, str(found))
+    bad = [f'W{a}D{b} {it["title"]} = {it["heartRateZone"]}' for a, b, it in items
            if EXPECTED_HR.get(it["type"]) and it["heartRateZone"] != EXPECTED_HR[it["type"]]]
     check("強度符合第二節對照表", not bad, str(bad[:4]))
     # 決策紀錄第 12 條：走跑整個拿掉，Phase 1 一律 Zone 2 跑。W1-6 的長跑原本是走跑
-    # 50-60%，改成 Zone 2 跑之後**只能**進到 60-70%，不可以順手標成第二節「長跑」的
-    # 65-72%（那是連跳兩級，違反第 0 條）；W7-8 原文寫「40分鐘 全跑」才是 65-72%。
+    # Zone 1，改成 Zone 2 跑之後**只能**進到 Zone 2，不可以順手標成第二節「長跑」的
+    # Zone 2-3（那是連跳兩級，違反第 0 條）；W7-8 原文寫「40分鐘 全跑」才是 Zone 2-3。
     bad = [f'W{a}D{b} {it["title"]} = {it["heartRateZone"]}' for a, b, it in items
-           if it["type"] == "long-run" and it["heartRateZone"] != ("60-70%" if a <= 6 else "65-72%")]
-    check("長跑強度：W1-6 60-70%、W7 起 65-72%", not bad, str(bad[:4]))
+           if it["type"] == "long-run" and it["heartRateZone"] != ("Zone 2" if a <= 6 else "Zone 2-3")]
+    check("長跑強度：W1-6 Zone 2、W7 起 Zone 2-3", not bad, str(bad[:4]))
     bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items if it["type"] == "walk-run"]
     check("沒有 walk-run 類型（第 12 條）", not bad, str(bad[:4]))
     bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items
            if "走跑" in (it["title"] or "") or "走跑" in (it["notes"] or "")]
     check("標題與備註不含「走跑」字樣", not bad, str(bad[:4]))
-    # Phase 1 所有跑步類項目都是 Zone 2（不是 50-60% 也不是 65-72%）——W7-8 長跑除外
+    # Phase 1 所有跑步類項目都是 Zone 2（不是 Zone 1 也不是 Zone 2-3）——W7-8 長跑除外
     bad = [f'W{a}D{b} {it["title"]} = {it["heartRateZone"]}' for a, b, it in items
-           if a <= 8 and it["type"] == "run" and it["heartRateZone"] != "60-70%"]
-    check("Phase 1 的 run 一律 60-70%", not bad, str(bad[:4]))
-    # 內插出來的強度必須標記
+           if a <= 8 and it["type"] == "run" and it["heartRateZone"] != "Zone 2"]
+    check("Phase 1 的 run 一律 Zone 2", not bad, str(bad[:4]))
+    # 推導出來的強度必須標記。第 30 條之後 tempo 跟 MP 都是 Zone 3，不能再用心率字串認，改認類型
     bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items
-           if it["heartRateZone"] == "70-75%" and not it["intensityDerived"]]
-    check("內插強度有標 intensityDerived", not bad, str(bad[:4]))
+           if it["type"] == "tempo" and not it["intensityDerived"]]
+    check("推導強度（tempo）有標 intensityDerived", not bad, str(bad[:4]))
 
     # B3 決策紀錄第 4 條：W23-26 原文沒有每日模板，每一筆都要標 derived
     bad = [f'W{a}D{b} {it["title"]}' for a, b, it in items if a >= 23 and not it["derived"]]

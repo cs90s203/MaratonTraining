@@ -7,6 +7,22 @@ function applyTheme() {
 }
 
 let renderDeferred = false;
+
+// 決策紀錄第 31 條：「未來的日子」是 render 當下判斷的——還沒到的日子圓圈停用、「完成」跟數字欄
+// 不畫。iOS 會把主畫面 App 整晚留在記憶體，隔天早上打開，畫面還是昨天畫的：今天的圓圈照樣停用、
+// 點了沒反應，停用的按鈕也不會觸發任何重繪。所以日期一換就重畫：切回 App（visibilitychange）、
+// 頁面從快取恢復（pageshow）、開著跨過午夜（計時器）三個時機都檢查。
+let renderedDayKey = null;
+function renderIfDayChanged() {
+  if (renderedDayKey && renderedDayKey !== PlanData.dayKey(PlanData.today())) render();
+}
+let midnightTimer = null;
+function scheduleMidnightCheck() {
+  clearTimeout(midnightTimer);
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  midnightTimer = setTimeout(() => { renderIfDayChanged(); scheduleMidnightCheck(); }, next - now);
+}
 function isTypingInRoot() {
   const el = document.activeElement;
   if (!el || !document.getElementById('root').contains(el)) return false;
@@ -60,6 +76,7 @@ function render() {
   // 像「按鈕壞了」，使用者連「教練模式」的重試/還原按鈕都不知道還在不在。
   try {
     document.getElementById('root').innerHTML = renderApp(App.state);
+    renderedDayKey = PlanData.dayKey(PlanData.today());
     App.afterRender(); // 本週頁的拖曳把手要在新 DOM 上重新掛（見 app.js）
     resetZoom(); // 每次 #root 被換掉都順手檢查一次；沒放大時這行沒有任何視覺效果
   } catch (e) {
@@ -101,6 +118,10 @@ async function boot() {
   Store.onChange(render);
   Sync.onChange(render);
   Sync.init();
+
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') renderIfDayChanged(); });
+  window.addEventListener('pageshow', renderIfDayChanged);
+  scheduleMidnightCheck();
 
   App._focusToday();
   render();

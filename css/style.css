@@ -133,8 +133,14 @@ button { font: inherit; }
 .item-check {
   flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--inpBorder);
   background: var(--card); display: flex; align-items: center; justify-content: center;
-  cursor: pointer; margin-top: 1px; transition: background .15s, border-color .15s;
+  cursor: pointer; margin-top: 1px; padding: 0; transition: background .15s, border-color .15s;
 }
+span.item-check { cursor: default; }
+/* 未來的日子還沒勾的圓圈（第 31 條）：停用、變淡 */
+.item-check:disabled, .rec-tick:disabled, .rec-radio:disabled { opacity: .4; cursor: not-allowed; }
+/* 決策紀錄第 29 條：只有圓圈能打勾／選。圓圈本身小，用 ::after 往外撐出手指點得到的範圍，不動版面 */
+.item-check, .rec-tick, .rec-radio { position: relative; }
+button.item-check::after, .rec-tick::after, button.rec-radio::after { content: ''; position: absolute; inset: -9px; border-radius: 50%; }
 .item-check svg { width: 14px; height: 14px; stroke: white; opacity: 0; transition: opacity .1s; }
 .item.done .item-check { background: var(--accent); border-color: var(--accent); }
 .item.done .item-check svg { opacity: 1; }
@@ -151,6 +157,7 @@ button { font: inherit; }
 .item-link {
   font-size: 12.5px; font-weight: 600; padding: 5px 10px; border-radius: 8px;
   background: var(--card); border: 1px solid var(--inpBorder); color: var(--accent2); display: inline-flex; gap: 5px; align-items: center;
+  max-width: 100%; overflow-wrap: anywhere; /* 連結上寫影片名稱（第 28 條），長標題在手機上要能換行 */
 }
 
 .choice-or { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--text3); letter-spacing: .06em; margin: -2px 0 8px; }
@@ -317,6 +324,12 @@ textarea.note-input {
 .ex-perside { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text2); flex: none; }
 .edit-form .ex-perside input { width: auto; }
 .tpl-picker { padding-bottom: 10px; border-bottom: 1px dashed var(--warn); }
+/* 項目表單的多部影片（決策紀錄第 28 條）：一部一列下拉＋✕，底下「＋ 再加一部影片」 */
+.vref-list { display: flex; flex-direction: column; gap: 6px; }
+.vref-row { display: flex; align-items: center; gap: 8px; }
+.edit-form .vref-row select { flex: 1; min-width: 0; }
+.link-btn.vref-del { flex: none; color: var(--text3); font-size: 15px; padding: 4px 6px; }
+.link-btn.vref-add { align-self: flex-start; font-size: 12.5px; padding: 4px 0; }
 
 .edit-form { display: flex; flex-direction: column; gap: 10px; }
 .edit-form .row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -401,12 +414,16 @@ textarea.note-input {
 
 .rec-choice { display: flex; align-items: stretch; gap: 8px; }
 .rec-or { align-self: center; flex: none; font-size: 11.5px; font-weight: 700; color: var(--text3); }
-.rec-opt { flex: 1; min-width: 0; border: 1.5px solid var(--inpBorder); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.rec-opt { flex: 1; min-width: 0; border: 1.5px solid var(--inpBorder); border-radius: 12px; padding: 10px 12px; }
 .rec-opt.on { border-color: var(--accent); background: var(--accentBg); }
 .rec-opt.dim { opacity: .6; }
-.rec-opt-t { display: flex; align-items: center; gap: 8px; }
-.rec-radio { flex: none; width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--inpBorder); }
-.rec-opt.on .rec-radio { border: 4.5px solid var(--accent); }
+.rec-opt-t { display: flex; align-items: center; gap: 10px; }
+/* 現在只有這顆圓能按（第 29 條），從 15px 放大到 22px，外圍再用 ::after 撐大點擊範圍 */
+.rec-radio { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--inpBorder); background: var(--card); padding: 0; }
+button.rec-radio { cursor: pointer; }
+/* 選中的樣子用 inset 陰影畫，**不要加粗 border**：::after 的點擊範圍是從 padding box 往外算的，
+   border 一加粗點擊範圍就跟著縮——選中的圓圈剛好是唯一能取消選擇的地方（第 29／31 條）。 */
+.rec-opt.on .rec-radio { border-color: var(--accent); box-shadow: inset 0 0 0 4.5px var(--accent); }
 
 .rec-nums { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
 .rec-num { font-size: 11px; color: var(--text3); font-weight: 600; }
