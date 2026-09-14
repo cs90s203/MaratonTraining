@@ -937,7 +937,7 @@ function renderWeekPage(state) {
       <div class="week-head">
         <button class="navbtn" style="opacity:${canPrev ? 1 : .3}" ${canPrev ? `onclick="A.setWeekView(${wn - 1})"` : 'disabled'}>‹ 上週</button>
         <div style="text-align:center">
-          <button type="button" class="week-title-btn" onclick="A.toggleCoachMode()" aria-pressed="${coach}">第 ${wn} 週</button>
+          <button type="button" class="week-title-btn" onclick="A.weekTitleTap()" aria-pressed="${coach}">第 ${wn} 週</button>
           <div style="font-size:12px;color:var(--text2)">${h(phase.name)}</div>
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>

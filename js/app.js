@@ -334,15 +334,22 @@ const App = {
     return false;
   },
 
-  // 時間的文字點兩下才變輸入框（第 46 條）。自己判斷兩下（400ms 內點同一個），不靠 dblclick——
-  // iOS Safari 對不是連結的元素不一定送 dblclick。第一下不重畫（畫面沒有要變的）。
-  _lastAmountTap: null,
-  amountTap(weekNumber, dayIndex, itemId) {
-    const key = `${weekNumber}-${dayIndex}-${itemId}`;
+  // 點兩下（第 46 條）：課表的時間、「第 X 週」切換教練模式都要點兩下，避免誤觸。
+  // 自己判斷（400ms 內點同一個東西），不靠 dblclick——iOS Safari 對不是連結的元素不一定送 dblclick。
+  // 第一下什麼都不做、不重畫。
+  _lastTap: null,
+  _isDoubleTap(key) {
     const now = Date.now();
-    const last = this._lastAmountTap;
-    if (!(last && last.key === key && now - last.t < 400)) { this._lastAmountTap = { key, t: now }; return; }
-    this._lastAmountTap = null;
+    const last = this._lastTap;
+    if (last && last.key === key && now - last.t < 400) { this._lastTap = null; return true; }
+    this._lastTap = { key, t: now };
+    return false;
+  },
+  weekTitleTap() {
+    if (this._isDoubleTap('week-title')) this.toggleCoachMode();
+  },
+  amountTap(weekNumber, dayIndex, itemId) {
+    if (!this._isDoubleTap(`amt:${weekNumber}-${dayIndex}-${itemId}`)) return;
     if (this._planDayLocked(weekNumber, dayIndex)) return;
     this.state.amountEdit = { weekNumber, dayIndex, itemId };
     this.state.itemPicker = null;
