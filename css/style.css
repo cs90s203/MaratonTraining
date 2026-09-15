@@ -528,10 +528,11 @@ button.rec-radio { cursor: pointer; }
 .rec-private { }
 
 .vol-heading { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.vol-heading-text { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.vol-heading-text { display: inline-flex; align-items: center; gap: 6px 8px; min-width: 0; flex-wrap: wrap; }
 .vol-who { font-size: 12px; font-weight: 700; color: var(--accent2); background: var(--accentBg); border-radius: 6px; padding: 2px 8px; overflow-wrap: anywhere; }
 button.vol-who.pick { border: 0; font: inherit; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
 button.vol-who.pick svg { width: 12px; height: 12px; }
+button.vol-who.pick.viewing { color: var(--warn); background: var(--warnBg); } /* 正在看別人：跟平常的名字分得出來 */
 .view-pick { margin: 0 0 10px; }
 /* 看別人的一天（決策紀錄第 53 條，唯讀） */
 .ro-item { display: flex; gap: 10px; align-items: flex-start; }

@@ -998,10 +998,9 @@ function renderWeekPage(state) {
         </div>
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
-      ${viewingId ? `<div class="banner info view-banner">${ICON.info}<div>正在看 <b>${h(PlanData.userById[viewingId].displayName)}</b> 的紀錄（唯讀）。打勾、改課表要回到自己。<div><button class="btn secondary lib-add" style="margin-top:8px" onclick="A.viewWeekOf(null)">回到自己</button></div></div></div>` : ''}
       ${signedOutBanner}
       ${planBanner}
-      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', who: (PlanData.userById[uid] || {}).displayName || uid, whoMenu: Sync.isSignedIn() ? renderViewPicker(state, uid) : null, title: '跑量', footer: renderWeeklyReviewCard(wn, uid), showSafetyAlert: true })}
+      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', who: (PlanData.userById[uid] || {}).displayName || uid, viewing: !!viewingId, whoMenu: Sync.isSignedIn() ? renderViewPicker(state, uid) : null, title: '跑量', footer: renderWeeklyReviewCard(wn, uid), showSafetyAlert: true })}
       <div class="view-toggle">
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
@@ -1054,10 +1053,11 @@ function renderWeekVolumeCard(vol, opts) {
   // 本週頁頂端是「本週訓練目標」（決策紀錄第 23 條）：跑量變成其中一項，底下接本週回顧。
   // 總覽頁用同一張卡但不帶 heading／footer。
   // opts.who：現在是誰的紀錄（使用者要的：標題前面放名字，才知道目前是誰）。
-  // opts.whoMenu：登入後名字可以點開，選要看誰（第 53 條）；選單本身由 renderViewPicker 畫
+  // opts.whoMenu：登入後名字可以點開，選要看誰（第 53 條）；選單本身由 renderViewPicker 畫。
+  // opts.viewing：正在看別人——使用者要的：原本上方那一整條「正在看…（唯讀）」橫幅精簡後併進這顆名字（v0.24.1）
   const whoChip = !opts.who ? ''
     : opts.whoMenu != null
-      ? `<button type="button" class="vol-who pick" onclick="A.toggleViewMenu()" aria-expanded="${!!App.state.viewMenuOpen}">${h(opts.who)}${ICON.chevronDown}</button>`
+      ? `<button type="button" class="vol-who pick ${opts.viewing ? 'viewing' : ''}" onclick="A.toggleViewMenu()" aria-expanded="${!!App.state.viewMenuOpen}">${opts.viewing ? `正在看 ${h(opts.who)}・唯讀` : h(opts.who)}${ICON.chevronDown}</button>`
       : `<span class="vol-who">${h(opts.who)}</span>`;
   const heading = opts.heading ? `<div class="vol-heading">
     <span class="vol-heading-text">${whoChip}${h(opts.heading)}</span>
@@ -1126,7 +1126,7 @@ function renderViewPicker(state, uid) {
     const on = u.userId === uid;
     return `<button type="button" class="pick-row ${on ? 'on' : ''}" onclick="A.viewWeekOf(${self ? 'null' : `'${jsq(u.userId)}'`})">
         <span class="pick-mark">${on ? ICON.check : ''}</span>
-        <span class="pick-text"><span class="pick-name">${h(u.displayName)}${self ? '（自己）' : ''}</span><span class="pick-meta">${self ? '可以打勾、記紀錄' : '看每天的紀錄（唯讀）'}</span></span>
+        <span class="pick-text"><span class="pick-name">${h(u.displayName)}${self ? '（自己）' : ''}</span><span class="pick-meta">${self ? (uid !== Store.activeUserId ? '回到自己：可以打勾、改課表' : '可以打勾、記紀錄') : '看每天的紀錄（唯讀）'}</span></span>
       </button>`;
   }).join('')}</div>`;
 }
