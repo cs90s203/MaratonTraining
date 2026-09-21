@@ -278,7 +278,7 @@ function renderDayBody(weekNumber, dayIndex, userId) {
     html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, true, isExpired)).join(
       `<div class="choice-or">或</div>`);
   } else {
-    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired)).join('');
+    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired, isRestDay(d))).join('');
   }
 
   if (planLocked) {
@@ -309,19 +309,19 @@ function renderReadOnlyDay(weekNumber, dayIndex, d, entry, uid) {
     return `
       <div class="ro-item ${done ? 'done' : ''}">
         <span class="ro-mark" aria-label="${done ? '完成' : '未勾'}">${done ? ICON.check : ''}</span>
-        <div class="ro-body"><div class="rec-title">${h(it.title)}${it.type === 'race' ? ' 🏁' : ''}</div>${itemPlanParts(it, { dateKey }).body}</div>
+        <div class="ro-body"><div class="rec-title">${h(it.title)}${it.type === 'race' ? ' 🏁' : ''}${isRestDay(d) && it.type === 'recovery' ? '<span class="opt-tag">選做</span>' : ''}</div>${itemPlanParts(it, { dateKey }).body}</div>
       </div>`;
   }).join(d.selectOne ? '<div class="choice-or">或</div>' : '');
   const nums = [];
   if (entry && entry.actualDurationMinutes != null) nums.push(`實際時間 ${entry.actualDurationMinutes} 分`);
   if (entry && entry.actualDistanceKm != null) nums.push(`實際公里 ${entry.actualDistanceKm} km`);
   if (entry && Number.isInteger(entry.effort) && st !== 'rested') nums.push(`體感 ${entry.effort} · ${effortLabel(entry.effort)}`);
-  const isAllRest = d.items.every((it) => it.type === 'rest');
+  const restDay = isRestDay(d);
   return `
     <div class="card rec-card ro-card">
       <div class="rec-sec">${items}</div>
       <div class="rec-sec">
-        <div class="ro-status">${isAllRest && status === 'pending' ? '休息日' : h(dayStatusLabel(status, dateKey) + (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType] ? '·' + SUBSTITUTE_LABELS[entry.substituteType] : ''))}</div>
+        <div class="ro-status">${restDay && status === 'pending' ? '休息日' : h(dayStatusLabel(status, dateKey) + (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType] ? '·' + SUBSTITUTE_LABELS[entry.substituteType] : ''))}</div>
         ${nums.length ? `<div class="ro-nums">${h(nums.join('　'))}</div>` : ''}
         ${entry && entry.actualNote ? `<div class="ro-note"><span class="rec-lbl">附註</span>${h(entry.actualNote)}</div>` : ''}
       </div>
@@ -394,6 +394,7 @@ function itemPlanParts(item, opts) {
     : segLine(sg))).join('')}</div>` : '';
   const body = `
     ${meta.length ? `<div class="item-meta">${meta.join('')}</div>` : ''}
+    ${item.coachNote && !opts.hideCoachNote ? `<div class="item-coach-note"><span class="icn-lbl">教練備註</span>${h(item.coachNote)}</div>` : ''}
     ${segBlock}
     ${item.notes ? `<div class="item-notes">${h(item.notes)}</div>` : ''}
     ${links.length ? `<div class="item-links">${links.join('')}</div>` : ''}
@@ -415,6 +416,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   const subType = entry && SUBSTITUTE_LABELS[entry.substituteType] ? entry.substituteType : null;
   const derived = Store.dayStatus(weekNumber, dayIndex);
   const isAllRest = d.items.every((it) => it.type === 'rest');
+  const restDay = isRestDay(d); // 第 55 條：休息日（可以有選做的恢復運動）
   const hasRestOption = d.selectOne && d.items.some((it) => it.type === 'rest');
   const chosen = d.selectOne && entry && entry.selectedItemId ? d.items.find((it) => it.id === entry.selectedItemId) || null : null;
   const chosenIsRest = !!(chosen && chosen.type === 'rest');
@@ -430,7 +432,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   const unsynced = Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
 
   // 標題右邊的唯讀狀態（第 13b 條：「照表」是文字，不是一顆可以按的 chip）
-  const statusText = isAllRest ? '' :
+  const statusText = isAllRest || (restDay && derived === 'pending') ? '' :
     st === 'substituted' ? `更換項目${subType ? '·' + SUBSTITUTE_LABELS[subType] : ''}` :
     st === 'rested' ? DAY_STATUS_LABELS.rested :
     (derived === 'done' || derived === 'partial') ? `照表 · ${DAY_STATUS_LABELS[derived]}` :
@@ -466,7 +468,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
       const tickable = d.items.length > 1 && !isExpired;
       secs.push(d.items.map((it, i) => {
         const done = !!(entry && entry.done && entry.done[it.id]) && st === null;
-        const tick = !tickable ? ''
+        const tick = !tickable || (restDay && it.type === 'rest') ? ''
           : (done || Store.canMarkDoneAhead(dateKey, it.id))
             ? `<button class="rec-tick ${done ? 'on' : ''}" onclick="A.toggleItem(${weekNumber},${dayIndex},'${jsq(it.id)}')" aria-pressed="${done}" aria-label="完成：${h(it.title)}">${ICON.check}</button>`
             : `<button class="rec-tick" disabled title="還沒到這天，不能預先打勾" aria-label="還沒到這天：${h(it.title)}">${ICON.check}</button>`;
@@ -475,7 +477,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
             ${tick}
             <div class="rec-line-body">
               <div class="rec-plan-head">
-                <span class="rec-title ${dim ? 'dim' : ''} ${it.derived ? 'derived' : ''}">${h(it.title)}${it.type === 'race' ? ' 🏁' : ''}</span>
+                <span class="rec-title ${dim ? 'dim' : ''} ${it.derived ? 'derived' : ''}">${h(it.title)}${it.type === 'race' ? ' 🏁' : ''}${restDay && it.type === 'recovery' ? '<span class="opt-tag">選做</span>' : ''}</span>
                 ${i === 0 ? statusHtml : ''}
               </div>
               ${itemPlanParts(it, { dateKey }).body}
@@ -514,7 +516,7 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
   // ── ② 沒照表？更換項目｜自主休息 ──
   // 純休息日不放（第 13b 條：在休息日給「更換項目」＝App 主動遞出「用訓練取代休息」）。
   // 課表有休息選項的二擇一日不放「自主休息」——除非這天已經是自主休息（舊紀錄），不然取消不了。
-  const chips = isAllRest ? [] : DAY_STATUS_CHIPS.filter(([k]) => !(k === 'rested' && hasRestOption && st !== 'rested'));
+  const chips = restDay ? [] : DAY_STATUS_CHIPS.filter(([k]) => !(k === 'rested' && hasRestOption && st !== 'rested'));
   const alt = chips.length ? `
     <div class="rec-alt">
       <span class="rec-q">沒照表？</span>
@@ -562,7 +564,8 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
     </div>`;
 }
 
-function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired) {
+// restDay：這天是休息日（第 55 條），恢復類項目標「選做」
+function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired, restDay) {
   const coach = Store.coachMode;
   // 從這張卡的「查看動作」打開的動作清單編輯器，就畫在這張卡的位置（第 33 條）
   const le = App.state.libraryEdit;
@@ -590,7 +593,13 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   const amountEditing = editable && !!(ae && ae.weekNumber === weekNumber && ae.dayIndex === dayIndex && ae.itemId === item.id);
   const amountHtml = !editable || item.type === 'rest' ? ''
     : amountEditing ? renderAmountEdit(weekNumber, dayIndex, item) : renderAmountView(weekNumber, dayIndex, item);
-  const parts = itemPlanParts(item, { dateKey, coachEdit: coach ? { weekNumber, dayIndex } : null, amountHtml });
+  // 教練備註（第 54 條）：這天這個項目的一句話，有寫才出現；教練模式按「備註」在卡片裡打
+  const ne = App.state.noteEdit;
+  const noteEditing = editable && !!(ne && ne.weekNumber === weekNumber && ne.dayIndex === dayIndex && ne.itemId === item.id);
+  const parts = itemPlanParts(item, { dateKey, coachEdit: coach ? { weekNumber, dayIndex } : null, amountHtml, hideCoachNote: noteEditing });
+  const noteEditor = noteEditing
+    ? `<textarea class="note-input coach-note-edit" data-note-item="${h(item.id)}" maxlength="200" rows="2" placeholder="給這天這個項目的備註（選填）"
+        onblur="A.saveItemNote(${weekNumber},${dayIndex},'${jsq(item.id)}',this)">${h(item.coachNote || '')}</textarea>` : '';
 
   // 只有圓圈能打勾（決策紀錄第 29 條）：以前整張卡都能點，點「查看動作」、影片或備註旁邊都會打勾。
   // 未來的日子不能預先打勾（第 31 條）：還沒勾的圓圈停用，已經勾了的照樣能點掉
@@ -612,11 +621,12 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
     <div class="coach-toolbar">
       ${editable ? `<button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)" aria-label="往上移">↑</button>
       <button ${itemIndexInDay === itemCountInDay - 1 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',1)" aria-label="往下移">↓</button>` : ''}
+      ${editable && !noteEditing ? `<button onclick="A.startItemNote(${weekNumber},${dayIndex},'${jsq(item.id)}')">${item.coachNote ? '改備註' : '＋ 備註'}</button>` : ''}
       ${saveBtn}
       ${editable ? `<button class="danger" ${itemCountInDay <= 1 ? 'disabled' : ''} onclick="A.deleteItem(${weekNumber},${dayIndex},'${jsq(item.id)}')">刪除</button>` : ''}
     </div>
   ` : '';
-  const titleText = `${h(item.title)}${item.type === 'race' ? ' 🏁' : ''}`;
+  const titleText = `${h(item.title)}${item.type === 'race' ? ' 🏁' : ''}${restDay && item.type === 'recovery' ? '<span class="opt-tag">選做</span>' : ''}`;
   const titleHtml = editable
     ? `<button type="button" class="item-pick" aria-expanded="${pickerOpen}" onclick="A.toggleItemPicker(${weekNumber},${dayIndex},'${jsq(item.id)}')"><span>${titleText}</span>${ICON.chevronDown}</button>`
     : titleText;
@@ -629,6 +639,7 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
           <div class="item-title">${titleHtml}${unsynced ? ' <span style="font-size:10px;font-weight:600;color:var(--warn);background:var(--warnBg);border-radius:5px;padding:1px 5px;vertical-align:2px">尚未同步</span>' : ''}</div>
           ${pickerOpen ? renderLibraryPickList(weekNumber, dayIndex, item.id, item) : ''}
           ${parts.body}
+          ${noteEditor}
           ${isSelectOne && chosen ? `<div class="choice-note">✓ 這次選了這個</div>` : ''}
           ${coachToolbar}
         </div>
@@ -959,10 +970,10 @@ function renderWeekPage(state) {
       <div class="weekday-acc ${isOpen ? 'open' : ''} ${coach && dateKey < todayKeyNow ? 'locked' : ''}" id="day-${wn}-${i}">
         <div class="weekday-row" onclick="A.openDay(${wn},${i})" style="cursor:pointer">
           <div class="weekday-badge ${isToday ? 'today' : ''}">${PlanData.weekdayLabel(i)}<span class="num">${dateLabel.getDate()}</span></div>
-          <div class="weekday-status ${status} ${status === 'pending' && dateKey < todayKeyNow ? 'unfinished' : ''}">${statusIcon}</div>
+          <div class="weekday-status ${status} ${status === 'pending' && dateKey < todayKeyNow && !isRestDay(d) ? 'unfinished' : ''}">${statusIcon}</div>
           <div class="weekday-summary">
             <div class="t">${h(titles)}${contentIndex !== i ? `<span class="swap-tag">對調自${PlanData.weekdayLabel(contentIndex)}</span>` : ''}</div>
-            <div class="sub">${h(dayStatusText(status, entry, dateKey))}${isToday ? ' · 今天' : ''}</div>
+            <div class="sub">${h(dayStatusText(status, entry, dateKey, isRestDay(d)))}${isToday ? ' · 今天' : ''}</div>
           </div>
           <span class="weekday-chevron">${ICON.chevron}</span>
           ${canDrag && !(coach && dateKey < todayKeyNow) ? `<span class="drag-handle" onclick="event.stopPropagation()" aria-label="${coach ? '按住拖到另一天，兩天對調' : '按住拖曳換順序'}">${ICON.grip}</span>` : ''}
@@ -1037,8 +1048,9 @@ function fmtKmRange(t) { return t.min === t.max ? `${t.min}` : `${t.min}–${t.m
 
 // 週視圖列的第二行文字：狀態，更換項目時帶類型（「更換項目·重訓」），有體感就帶上。
 // 過去的日子沒記錄寫「未完成」，今天和未來寫「待完成」（dayStatusLabel）。
-function dayStatusText(status, entry, dateKey) {
-  let s = dayStatusLabel(status, dateKey);
+// restDay：休息日（第 55 條）還沒勾的時候寫「休息日」，不寫「待完成／未完成」
+function dayStatusText(status, entry, dateKey, restDay) {
+  let s = restDay && status === 'pending' ? '休息日' : dayStatusLabel(status, dateKey);
   if (status === 'substituted' && entry && SUBSTITUTE_LABELS[entry.substituteType]) s += '·' + SUBSTITUTE_LABELS[entry.substituteType];
   if (entry && Number.isInteger(entry.effort) && status !== 'rested' && status !== 'expired') s += ` · 體感 ${entry.effort}`;
   return s;

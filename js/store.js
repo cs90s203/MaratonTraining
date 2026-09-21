@@ -84,6 +84,12 @@ const SUBSTITUTE_TYPES = ['run', 'strength', 'core', 'bike', 'swim', 'walk', 'ot
 const RUN_TYPES = ['run', 'long-run', 'tempo', 'interval']; // interval＝間歇跑（決策紀錄第 40 條）
 const LEGACY_RUN_TYPES = ['walk-run'];
 function isRunType(t) { return RUN_TYPES.includes(t) || LEGACY_RUN_TYPES.includes(t); }
+// 決策紀錄第 55 條：休息日也可以排恢復型運動（伸展之類），那天還是休息日——有休息項目、其他都是恢復類、不是二擇一。
+// 恢復類在這種日子是「選做」：不算完成率、不算未完成，做了打勾就好（第 0 條：休息不是失敗）。
+function isRestDay(d) {
+  return !!d && !d.selectOne && Array.isArray(d.items) && d.items.some((it) => it.type === 'rest') &&
+    d.items.every((it) => it.type === 'rest' || it.type === 'recovery');
+}
 
 // 一週的顯示順序：identity＝出廠順序（週一顯示週一的內容...）。決策紀錄第 14 條：
 // 環境因素讓某天跟另一天對調時，用這個排列表示「日曆上的第 i 天，顯示的其實是
@@ -1234,7 +1240,8 @@ const Store = {
       if (stillExists && entry.done && entry.done[chosen]) return 'done';
       return 'pending';
     }
-    const items = d.items;
+    // 休息日排了選做的恢復運動（第 55 條）：看選做的那幾項，休息項目本身不用勾
+    const items = isRestDay(d) && d.items.some((it) => it.type !== 'rest') ? d.items.filter((it) => it.type !== 'rest') : d.items;
     const doneCount = items.filter((it) => entry && entry.done && entry.done[it.id]).length;
     if (doneCount === 0) return 'pending';
     if (doneCount === items.length) return 'done';
@@ -1253,7 +1260,7 @@ const Store = {
     let countable = 0, done = 0;
     for (let i = 0; i < 7; i++) {
       const d = w.days[order[i]]; // 那個日曆格子實際顯示的內容（見 dayStatus 的註解）
-      if (d.items.every((it) => it.type === 'rest')) continue;
+      if (isRestDay(d)) continue; // 休息日（含選做的恢復運動，第 55 條）不算分母
       // 狀態的唯一出口是 dayStatus——這裡不重抄一遍 selectOne／doneCount 的推導。
       const st = this.dayStatus(weekNumber, i, userId);
       if (st === 'expired' || st === 'rested' || st === 'substituted') continue;

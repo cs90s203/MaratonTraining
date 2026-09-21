@@ -11,6 +11,7 @@ const App = {
     itemPicker: null,      // 決策紀錄第 45 條：教練模式打開的項目庫清單 {weekNumber,dayIndex,itemId|'add'}
     savedFlash: null,      // 剛按「存成常用」的課表項目 id：那張卡寫「已存進項目庫」
     amountEdit: null,      // 決策紀錄第 46 條：點兩下正在改時間的課表項目 {weekNumber,dayIndex,itemId}
+    noteEdit: null,        // 決策紀錄第 54 條：正在寫教練備註的課表項目 {weekNumber,dayIndex,itemId}
     libFlash: '',          // 決策紀錄第 52 條：改常用項目之後「已套用到 N 天」的一次性訊息
     viewMenuOpen: false,   // 決策紀錄第 53 條：本週訓練目標前面的名字點開的「要看誰」選單
     helpOpen: { vol: false, effort: false }, // 「？」說明的展開狀態
@@ -43,6 +44,7 @@ const App = {
     if (page === 'week') this._focusToday();
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.libraryEdit = null;
     this.state.modal = null;
     render();
@@ -55,6 +57,7 @@ const App = {
     this.state.expandedDay = same ? null : { weekNumber, dayIndex };
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.libraryEdit = null; // 第 33 條：從卡片打開的清單編輯器不能跟著跑到別天
     render();
   },
@@ -67,6 +70,7 @@ const App = {
       ? { weekNumber, dayIndex: loc.dayIndex } : null;
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.libraryEdit = null;
     render();
   },
@@ -97,6 +101,7 @@ const App = {
     this.state.viewMenuOpen = false;
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.libraryEdit = null;
     if (fromOverview) { this.goTo('week'); return; }
     render();
@@ -210,6 +215,11 @@ const App = {
   _sortable: null,
   afterRender() {
     Store.markPlanSeen();
+    if (this._focusNote) {
+      const ta = [...document.querySelectorAll('.coach-note-edit')].find((x) => x.dataset.noteItem === this._focusNote);
+      this._focusNote = null;
+      if (ta) { ta.focus(); try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (e) { /* 舊瀏覽器 */ } }
+    }
     if (this._focusAmount) {
       const g = [...document.querySelectorAll('.amt-group')].find((x) => x.dataset.amtItem === this._focusAmount);
       this._focusAmount = null;
@@ -296,6 +306,7 @@ const App = {
     }
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.libraryEdit = null;
     Store.saveWeekOverride(weekNumber, week);
     render();
@@ -362,6 +373,7 @@ const App = {
     Store.setCoachMode(!Store.coachMode);
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.libraryEdit = null;
     render();
   },
@@ -397,6 +409,7 @@ const App = {
     if (this._planDayLocked(weekNumber, dayIndex)) return;
     this.state.amountEdit = { weekNumber, dayIndex, itemId };
     this.state.itemPicker = null;
+    this.state.noteEdit = null;
     this._focusAmount = itemId;
     render();
   },
@@ -405,6 +418,29 @@ const App = {
     const next = ev && ev.relatedTarget;
     if (next && group && group.contains(next)) return;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
+    setTimeout(() => render(), 0);
+  },
+
+  // 教練備註（第 54 條）：這天這個項目的一句話。按「＋ 備註」在卡片裡打，離開輸入框就存；清空＝拿掉。
+  startItemNote(weekNumber, dayIndex, itemId) {
+    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    this.state.itemPicker = null;
+    this.state.amountEdit = null;
+    this.state.noteEdit = { weekNumber, dayIndex, itemId };
+    this._focusNote = itemId;
+    render();
+  },
+  saveItemNote(weekNumber, dayIndex, itemId, el) {
+    this.state.noteEdit = null;
+    const text = String((el && el.value) || '').trim().slice(0, 200);
+    const cur = Store.effectiveWeek(weekNumber).days[dayIndex].items.find((x) => x.id === itemId);
+    if (!cur || (cur.coachNote || '') === text || this._planDayLocked(weekNumber, dayIndex)) { setTimeout(() => render(), 0); return; }
+    const week = this._cloneEffectiveWeek(weekNumber);
+    const it = week.days[dayIndex].items.find((x) => x.id === itemId);
+    if (!it) { setTimeout(() => render(), 0); return; }
+    if (text) it.coachNote = text; else delete it.coachNote;
+    Store.saveWeekOverride(weekNumber, week, true);
     setTimeout(() => render(), 0);
   },
 
@@ -477,11 +513,14 @@ const App = {
     const day = week.days[dayIndex];
     const idx = day.items.findIndex((it) => it.id === itemId);
     if (idx === -1) { this.state.itemPicker = null; render(); return; }
+    const keepNote = day.items[idx].coachNote; // 教練備註是給這一天的，換項目也留著（第 54 條）
     day.items[idx] = this._itemFromTemplate(tpl, itemId);
+    if (keepNote) day.items[idx].coachNote = keepNote;
     // 二擇一是一組：教練動了其中一個就是整組看過了，一起清掉 derived（verify_plan.py B4 守的就是兩個選項對等）
     if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.savedFlash = null;
     Store.saveWeekOverride(weekNumber, week);
     render();
@@ -497,6 +536,7 @@ const App = {
     if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     this.state.savedFlash = null;
     Store.saveWeekOverride(weekNumber, week);
     render();
@@ -611,6 +651,7 @@ const App = {
     };
     this.state.itemPicker = null;
     this.state.amountEdit = null;
+    this.state.noteEdit = null;
     render();
   },
 

@@ -54,6 +54,13 @@ python3 tools/serve.py
 
 Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表。不要改成別的號碼。
 
+改完程式先跑測試（node，不用裝任何套件；有任何一項失敗會回傳非 0）：
+
+```bash
+./tests/run.sh                 # 程式行為（store／views／app）
+python3 tools/verify_plan.py   # 課表 JSON
+```
+
 ## 部署
 
 已上線：**https://cs90s203.github.io/MaratonTraining/**（GitHub Pages，`main` 分支 / root）。
@@ -65,7 +72,7 @@ Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表�
 ## 進度
 
 - [x] **CP0** 專案骨架、port 登記、架構與待決事項定案、日期修正
-- [x] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過（現在 54 項）
+- [x] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過（現在 56 項）
 - [x] **CP2** 今日視圖
 - [x] **CP3** 接 Firestore + 離線與失敗狀態
 - [x] **CP4** 週視圖、總覽、使用者切換
@@ -113,5 +120,6 @@ Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表�
 - [x] **v0.22.0** 教練拖曳改成兩天對調（這週也可以）；本週目標跑量自由填；登入後身分固定、不再卡在寫入被拒，見 [決策紀錄第 49–51 條](docs/決策紀錄.md)
 - [x] **v0.23.0** 改常用項目會套用到今天以後用到它的課表（只套改了的地方），見 [決策紀錄第 52 條](docs/決策紀錄.md)
 - [x] **v0.24.0** 唯讀看別人每天的紀錄（本週頁名字選單、總覽入口），見 [決策紀錄第 53 條](docs/決策紀錄.md)
+- [x] **v0.25.0** 教練備註（有寫才出現）；休息日可以排「選做」的恢復運動，不算完成率，見 [決策紀錄第 54、55 條](docs/決策紀錄.md)
 
 完整的規格審查報告（36 條發現）見 CHANGELOG 的 v0.1.0 條目。
