@@ -1261,7 +1261,7 @@ function renderWeekCoachPanel(wn, w, hasOverride, uid) {
   const stale = hasOverride && (w.basePlanVersion || 3) < PlanData.plan.planVersion;
   // 決策紀錄第 57 條：教練在對話裡給的整週課表，這週有的話一鍵排進正在排的那個人（只有教練：會加進常用項目庫）
   const who = h((PlanData.userById[uid] || {}).displayName || uid);
-  // users：這份是排給誰的（例如 9/21 那週整週是給 Annlin、Phoebe 的，Mick 自己那份只改週一）
+  // users：這份是排給誰的，不寫＝誰都可以（v0.26.4：9/21 那週三個人共用一份，不再限定 Annlin、Phoebe）
   const presets = Store.canEditLibrary() ? (PlanData.weekPresets || []).filter((p) => p.weekNumber === wn && (!p.users || p.users.includes(uid))) : [];
   const presetRows = presets.map((p) => `
       <div class="preset-row">
@@ -1929,14 +1929,6 @@ function renderSettingsPage(state) {
         ${Sync.state === 'unauthorized' ? `<div class="banner crit" style="margin-top:12px">${ICON.warn}<div><b>未授權</b>${h(Sync.message)}</div></div>` : ''}
         ${Sync.state === 'wrong-identity' ? `<div class="banner warn" style="margin-top:12px">${ICON.warn}<div>${h(Sync.message)}</div></div>` : ''}
         ${Sync.persistenceDisabled ? `<div class="banner info" style="margin-top:12px">${ICON.info}<div>這台裝置的離線快取沒有啟用（可能是私密瀏覽模式）。離線時請避免關閉分頁，尚未送出的紀錄可能會遺失。</div></div>` : ''}
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">分享連結</div>
-      <div class="share-box">
-        同一個網址分享給對方，對方登入自己的 Google 帳號後會自動選成自己；沒有自動選到（例如沒網路）再到這頁選自己的名字。不需要對方有 GitHub 帳號。<br>
-        目前網址：<code>${h(location.href.split('#')[0])}</code>
       </div>
     </div>
 

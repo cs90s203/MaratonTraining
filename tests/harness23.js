@@ -28,7 +28,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   Sync.user = { email: 'x@example.com' }; Sync.detectedUserId = 'mick';
   Sync.subscribeOtherEntries = () => {}; Sync.subscribeOtherWeekAdjustments = () => {}; Sync.subscribeOtherProfile = () => {};
   const preset = PlanData.weekPresets.find((p) => p.id === '2026-09-21');
-  assert(!!preset && preset.weekNumber === 3 && preset.days.length === 7 && JSON.stringify(preset.users) === JSON.stringify(['Annlin', 'Phoebe']), 'the 9/21 week loads from data/week-presets.json (for Annlin and Phoebe)');
+  assert(!!preset && preset.weekNumber === 3 && preset.days.length === 7 && preset.users == null, 'the 9/21 week loads from data/week-presets.json (no users restriction: she wants it for herself too, not just Annlin/Phoebe)');
   const WN = preset.weekNumber;
   const titles = (uid, di) => Store.effectiveWeek(WN, uid).days[di].items.map((it) => it.title).join('+');
   const expected = preset.days.map((keys) => keys.map((k) => preset.items[k].title).join('+'));
@@ -36,7 +36,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   // 她庫裡原本就有自己的「Zone 2 跑」（帶熱身影片）——要沿用那份
   const myZ2 = Store.saveLibraryDoc(null, 'item', { name: 'Zone 2 跑', item: { type: 'run', title: 'Zone 2 跑', duration: { min: 25, max: 30 }, heartRateZone: 'Zone 2', videoRefs: ['pamela-daily-stretch'], videoRef: 'pamela-daily-stretch' } });
   const libBefore = Store.libraryList('item').length;
-  // 這份整週是給 Annlin、Phoebe 的（她：「以下課表是要給Annlin Phoebe 的」）。Annlin 週一做了原本的課、週二的 Zone 2 跑也打了勾
+  // 這份整週給誰都能排（第一次她只給 Annlin、Phoebe；後來看了自己的畫面說「完全忠實呈現我排的課表」，三個人共用同一份）。Annlin 週一做了原本的課、週二的 Zone 2 跑也打了勾
   const monKey = PlanData.keyForWeekDay(WN, 0), tueKey = PlanData.keyForWeekDay(WN, 1);
   const monOld = Store.effectiveWeek(WN, 'Annlin').days[0].items[0], tueOld = Store.effectiveWeek(WN, 'Annlin').days[1].items[0];
   Store.mergeRemoteEntry('Annlin', monKey, { done: { [monOld.id]: true }, status: null, selectedItemId: null, updatedAt: '2026-09-21T10:00:00.000Z', fieldAt: {} });
@@ -48,9 +48,10 @@ const fn = (name) => vm.runInContext(name, sandbox);
   App.state.page = 'week'; App.state.weekViewNumber = WN;
   App.viewWeekOf('Annlin');
   const panelA = fn('renderWeekCoachPanel')(WN, Store.effectiveWeek(WN, 'Annlin'), false, 'Annlin');
-  assert(panelA.includes('9/21 那週（給 Annlin、Phoebe）') && panelA.includes(`A.applyWeekPreset('2026-09-21')`) && panelA.includes('排進 Annlin 這週') && !panelA.includes('週一改休息'), "planning Annlin: the whole-week button (not Mick's Monday one)");
+  assert(panelA.includes('9/21 那週') && panelA.includes(`A.applyWeekPreset('2026-09-21')`) && panelA.includes('排進 Annlin 這週'), 'planning Annlin: the whole-week button');
+  // 沒有 users 限制：排 Mick 自己的課表時也看得到同一顆按鈕（她看了自己的畫面後說要「完全忠實呈現」）
   const panelM = fn('renderWeekCoachPanel')(WN, Store.effectiveWeek(WN, 'mick'), false, 'mick');
-  assert(panelM.includes('9/21 那週：週一改休息（Mick 自己的）') && panelM.includes(`A.applyWeekPreset('2026-09-21-mick')`) && !panelM.includes(`A.applyWeekPreset('2026-09-21')`), 'planning Mick: only her Monday-rest button');
+  assert(panelM.includes('9/21 那週') && panelM.includes(`A.applyWeekPreset('2026-09-21')`) && panelM.includes('排進 Mick 這週'), 'planning Mick: the same whole-week button (no users restriction)');
   assert(!fn('renderWeekCoachPanel')(WN + 1, Store.effectiveWeek(WN + 1, 'Annlin'), false, 'Annlin').includes('預先排好的課表'), 'other weeks: no button');
 
   // ── 不按確定：什麼都不變 ──
@@ -62,7 +63,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   let msg = '';
   sandbox.confirm = (m) => { msg = m; return true; };
   App.applyWeekPreset('2026-09-21');
-  assert(msg.includes('把「9/21 那週（給 Annlin、Phoebe）」排進 Annlin 第 3 週？') && msg.includes('包含已經過去的日子跟今天'), 'confirm: whose week, and that past days are included');
+  assert(msg.includes('把「9/21 那週」排進 Annlin 第 3 週？') && msg.includes('包含已經過去的日子跟今天'), 'confirm: whose week, and that past days are included');
   assert(msg.includes('常用項目庫會加上：完全休息、盆底肌內核呼吸練習、伸展') && msg.includes('用常用項目庫裡的：Zone 2 跑'), 'confirm: which items get added to the library, which come from it');
   assert(msg.includes(`打過勾的「${monOld.title}」不在新的課表裡`) && !msg.includes(`「${tueOld.title}」不在`), 'confirm: the Monday tick that disappears is named; the kept Zone 2 tick is not');
   assert(expected.every((t, di) => titles('Annlin', di) === t), 'all seven days are exactly as written (Monday included)');
@@ -94,17 +95,18 @@ const fn = (name) => vm.runInContext(name, sandbox);
   assert(!msg.includes('常用項目庫會加上') && msg.includes('排進 Phoebe 第 3 週') && Store.libraryList('item').length === libNow, 'second person: everything comes from the library, nothing added');
   assert(expected.every((t, di) => titles('Phoebe', di) === t) && pushes[pushes.length - 1].uid === 'Phoebe', "Phoebe's week is now the same, in her own plan");
 
-  // ── Mick 自己那週：只把週一（昨天）改成休息，其他天不動（「我這週，改週一，也就是昨天是休息日」）──
+  // ── Mick 自己那週：一開始她只說改週一，後來看了自己的畫面說「修改更新不正確……完全忠實呈現我排的課表」——
+  //   跟 Annlin、Phoebe 同一份，七天全部照排，不是只改週一 ──
   App.viewWeekOf(null);
-  const nBeforeWrongPreset = pushes.length;
-  App.applyWeekPreset('2026-09-21');
-  assert(pushes.length === nBeforeWrongPreset && [0, 1, 2, 3, 4, 5, 6].every((di) => titles('mick', di) === mickBefore[di]), 'the Annlin/Phoebe week cannot be applied to Mick');
+  const libBeforeMick = Store.libraryList('item').length;
   msg = '';
-  App.applyWeekPreset('2026-09-21-mick');
-  const md = PlanData.dateForWeekDay(WN, 0);
-  assert(msg.includes('把「9/21 那週：週一改休息（Mick 自己的）」排進 Mick 第 3 週？') && msg.includes(`週一（${md.getMonth() + 1}/${md.getDate()}）照這份排`) && msg.includes('其他天不動'), 'confirm: only Monday changes, the other days stay');
-  assert(titles('mick', 0) === '完全休息' && [1, 2, 3, 4, 5, 6].every((di) => titles('mick', di) === mickBefore[di]), 'Mick: Monday is now rest, the other six days are exactly as before');
-  assert(fn('isRestOnlyDay')(Store.effectiveWeek(WN, 'mick').days[0]) && fn('dayStatusText')('pending', null, monKey, true) === '休息日', 'her Monday reads 休息日 (not 未完成)');
+  App.applyWeekPreset('2026-09-21');
+  assert(msg.includes('把「9/21 那週」排進 Mick 第 3 週？') && msg.includes('週一到週日七天全部照這份排，包含已經過去的日子跟今天'), 'confirm: all seven days, not just Monday');
+  assert(!msg.includes('常用項目庫會加上') && Store.libraryList('item').length === libBeforeMick, "third person: everything's already in the library, nothing added");
+  assert(expected.every((t, di) => titles('mick', di) === t) && pushes[pushes.length - 1].uid === 'mick', "Mick's own week now matches exactly what she wrote, replacing her old plan");
+  // 週一是「休息＋呼吸＋伸展」，不是單獨的休息日：呼吸跟伸展要打勾、算完成率（第 55 條：「+」是一起做）
+  const mickMon = Store.effectiveWeek(WN, 'mick').days[0];
+  assert(!fn('isRestOnlyDay')(mickMon) && mickMon.items.length === 3, "her Monday is rest + breathing + stretch together, not a rest-only day");
 
   // ── 不是教練：沒有按鈕，也排不了 ──
   Store.activeUserId = 'Annlin';

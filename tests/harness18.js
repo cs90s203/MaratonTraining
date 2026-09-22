@@ -53,6 +53,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
   const settings = fn('renderSettingsPage')({});
   const annRow = settings.split('user-opt').find((x) => x.includes('>Annlin'));
   assert(annRow && annRow.includes('locked') && settings.includes('登入之後固定是登入的帳號'), 'settings shows the others as locked with the reason');
+  assert(!settings.includes('分享連結'), 'settings: no 分享連結 section (removed)');
   Sync.detectedUserId = null; // 判斷不出來（離線）：照舊可以切
   Sync.resubscribe = () => {};
   App.switchIdentity('Annlin');

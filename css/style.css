@@ -300,7 +300,6 @@ textarea.note-input {
   background: var(--card2); border: 1px dashed var(--inpBorder); border-radius: 10px; padding: 12px;
   font-size: 13px; color: var(--text2); line-height: 1.6;
 }
-.share-box code { background: var(--card); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
 
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text2); }
 .empty-state svg { width: 40px; height: 40px; margin-bottom: 10px; opacity: .5; }
