@@ -87,11 +87,12 @@ const SUBSTITUTE_TYPES = ['run', 'strength', 'core', 'bike', 'swim', 'walk', 'ot
 const RUN_TYPES = ['run', 'long-run', 'tempo', 'interval']; // interval＝間歇跑（決策紀錄第 40 條）
 const LEGACY_RUN_TYPES = ['walk-run'];
 function isRunType(t) { return RUN_TYPES.includes(t) || LEGACY_RUN_TYPES.includes(t); }
-// 決策紀錄第 55 條：休息日也可以排恢復型運動（伸展之類），那天還是休息日——有休息項目、其他都是恢復類、不是二擇一。
-// 恢復類在這種日子是「選做」：不算完成率、不算未完成，做了打勾就好（第 0 條：休息不是失敗）。
-function isRestDay(d) {
-  return !!d && !d.selectOne && Array.isArray(d.items) && d.items.some((it) => it.type === 'rest') &&
-    d.items.every((it) => it.type === 'rest' || it.type === 'recovery');
+// 決策紀錄第 55 條：休息日也可以排運動（呼吸、伸展之類）。她：「+ 就是一起、和的意思，不是二選一，也不是或」——
+// 加的運動是要做的，跟平常一樣打勾、算完成率（v0.26.3 以前標「選做」、不算完成率，她說不對）。
+// 不是二擇一的日子裡，休息項目只是標示、不用勾（那天要做的是其他項目）。
+// 只有「整天都是休息」的日子才寫「休息日」、不算完成率（第 0 條：休息不是失敗）。
+function isRestOnlyDay(d) {
+  return !!d && !d.selectOne && Array.isArray(d.items) && d.items.length > 0 && d.items.every((it) => it.type === 'rest');
 }
 
 // 一週的顯示順序：identity＝出廠順序（週一顯示週一的內容...）。決策紀錄第 14 條：
@@ -1047,6 +1048,7 @@ const Store = {
 
   // 照 preset 組出這個人那一週的新內容（不存），順便算出確認畫面要講的事。templates：每個 key 用哪份（{id|null, item}）。
   // - 整週七天全部照她排的換掉，包含已經過去的日子跟今天（她要的：「雖然週一已經過了但還是排」）。
+  //   preset.days 裡寫 null 的那天不動（例如她自己那週只改週一：「我這週，改週一，也就是昨天是休息日」）。
   //   以前明天以後先記過東西的日子（例如先選了休息）會整天不動——結果那天還是原本的「完全休息 或 散步＋伸展」，
   //   她：「你怎麼沒有照我排的課表排？……不要擅自改成或」。現在照排，確認畫面點名哪一天記過什麼、會被換掉。
   // - 同一天原本就有的同一個項目（名稱跟類型一樣）沿用原本的 id：打過的勾照 id 對，換掉整天也不會讓做過的課變成沒做；
@@ -1064,6 +1066,7 @@ const Store = {
     const own = adj && isValidDayOrder(adj.dayOrder) ? adj.dayOrder : IDENTITY_ORDER;
     const today = this.todayKey();
     preset.days.forEach((keys, di) => {
+      if (keys == null) return; // 這天不動
       const old = week.days[di] || { items: [] };
       const used = new Set();
       const items = keys.map((k) => {
@@ -1085,6 +1088,7 @@ const Store = {
     // statuses＝今天跟以後標了自主休息／更換項目的日子：那是她的紀錄，排課改不到，那天照樣顯示那個狀態。
     const lost = [], statuses = [];
     for (let c = 0; c < 7; c++) {
+      if (preset.days[own[c]] == null) continue; // 沒換的日子不用講
       const key = PlanData.keyForWeekDay(wn, c);
       const e = this.entryFor(userId, key);
       if (!e || e.deleted) continue;
@@ -1536,8 +1540,8 @@ const Store = {
       if (stillExists && entry.done && entry.done[chosen]) return 'done';
       return 'pending';
     }
-    // 休息日排了選做的恢復運動（第 55 條）：看選做的那幾項，休息項目本身不用勾
-    const items = isRestDay(d) && d.items.some((it) => it.type !== 'rest') ? d.items.filter((it) => it.type !== 'rest') : d.items;
+    // 休息項目只是標示、不用勾（第 55 條）：有其他項目的話看其他項目（休息＋呼吸＋伸展＝呼吸跟伸展都做完才算完成）
+    const items = d.items.some((it) => it.type !== 'rest') ? d.items.filter((it) => it.type !== 'rest') : d.items;
     const doneCount = items.filter((it) => entry && entry.done && entry.done[it.id]).length;
     if (doneCount === 0) return 'pending';
     if (doneCount === items.length) return 'done';
@@ -1556,7 +1560,7 @@ const Store = {
     let countable = 0, done = 0;
     for (let i = 0; i < 7; i++) {
       const d = w.days[order[i]]; // 那個日曆格子實際顯示的內容（見 dayStatus 的註解）
-      if (isRestDay(d)) continue; // 休息日（含選做的恢復運動，第 55 條）不算分母
+      if (isRestOnlyDay(d)) continue; // 整天都是休息的日子不算分母（休息＋運動的日子照算，第 55 條）
       // 狀態的唯一出口是 dayStatus——這裡不重抄一遍 selectOne／doneCount 的推導。
       const st = this.dayStatus(weekNumber, i, userId);
       if (st === 'expired' || st === 'rested' || st === 'substituted') continue;

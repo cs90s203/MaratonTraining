@@ -1203,6 +1203,7 @@ const App = {
     if (!Sync.isSignedIn()) { render(); alert('要先登入才能排（要用你常用項目庫裡的項目）。'); return; }
     const uid = this.planUserId();
     if (!Store.canEditPlanOf(uid)) { render(); return; }
+    if (preset.users && !preset.users.includes(uid)) { render(); return; } // 這份是排給別人的（畫面上本來就不給按鈕）
     const wn = preset.weekNumber;
     const name = (PlanData.userById[uid] || {}).displayName || uid;
     const { templates, missing, differ } = Store.presetTemplates(preset);
@@ -1217,9 +1218,13 @@ const App = {
     const added = titlesOf(missing);
     const differs = titlesOf(differ);
     const statusName = { rested: '自主休息', substituted: '更換項目' };
+    // 只改其中幾天的（days 裡寫 null 的那天不動）：講清楚改哪幾天
+    const changedDays = [0, 1, 2, 3, 4, 5, 6].filter((di) => preset.days[di] != null);
+    const pastIncluded = changedDays.some((di) => PlanData.keyForWeekDay(wn, di) <= Store.todayKey());
     const lines = [
       `把「${preset.name}」排進 ${name} 第 ${wn} 週？`,
-      '週一到週日七天全部照這份排，包含已經過去的日子跟今天。',
+      changedDays.length === 7 ? '週一到週日七天全部照這份排，包含已經過去的日子跟今天。'
+        : `${changedDays.map(dayLabel).join('、')}照這份排${pastIncluded ? '（包含已經過去的日子）' : ''}，其他天不動。`,
       added.length ? `常用項目庫會加上：${added.join('、')}。` : '',
       reused.length ? `用常用項目庫裡的：${reused.join('、')}。` : '',
       differs.length ? `常用項目庫裡的「${differs.join('」「')}」內容不一樣，這週照這份排（庫裡那份不動）。` : '',

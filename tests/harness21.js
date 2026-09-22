@@ -1,4 +1,4 @@
-// 決策紀錄第 54 條（教練備註）＋第 55 條（休息日可以排選做的恢復運動）
+// 決策紀錄第 54 條（教練備註）＋第 55 條（休息日可以加運動：「+ 就是一起、和的意思，不是二選一，也不是或」）
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path').resolve(__dirname, '..'); // repo 根目錄
@@ -28,7 +28,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   const W = PlanData.locateToday().weekNumber + 1;
   const D = Store.effectiveWeek(W).days.findIndex((d) => !d.selectOne && d.items.some((it) => it.type === 'run'));
   const it = Store.effectiveWeek(W).days[D].items.find((x) => x.type === 'run');
-  const card = () => { const d = Store.effectiveWeek(W).days[D]; const i = d.items.findIndex((x) => x.id === it.id); return fn('renderItemCard')(W, D, d.items[i], i, d.items.length, null, false, false, fn('isRestDay')(d)); };
+  const card = () => { const d = Store.effectiveWeek(W).days[D]; const i = d.items.findIndex((x) => x.id === it.id); return fn('renderItemCard')(W, D, d.items[i], i, d.items.length, null, false, false); };
 
   // ── 第 54 條：教練備註 ──
   let html = card();
@@ -64,33 +64,31 @@ const fn = (name) => vm.runInContext(name, sandbox);
     assert(App.state.noteEdit === null && sandbox.__alerts.length === nA + 1, 'past days: note cannot be written');
   }
 
-  // ── 第 55 條：休息日排恢復運動 ──
-  const isRestDay = fn('isRestDay');
+  // ── 第 55 條：休息日可以加運動，加的是要做的（v0.26.3：她說「+ 就是一起、和的意思，不是二選一，也不是或」）──
+  const isRestOnlyDay = fn('isRestOnlyDay');
   const restRef = PlanData.plan.weeks.flatMap((w) => w.days.map((d, di) => ({ w: w.weekNumber, di, d }))).find((x) => x.w >= W && !x.d.selectOne && x.d.items.length === 1 && x.d.items[0].type === 'rest');
   const RW = restRef.w, RD = restRef.di;
+  const key = PlanData.keyForWeekDay(RW, RD);
+  assert(isRestOnlyDay(Store.effectiveWeek(RW).days[RD]) && fn('dayStatusText')('pending', null, key, true) === '休息日', 'a day that is only rest still says 休息日');
   const stretch = Store.saveLibraryDoc(null, 'item', { name: '伸展', item: { type: 'recovery', title: '伸展', duration: { min: 10, max: 15 } } });
   const beforeRate = Store.weekCompletionRate(RW, 'mick');
   App.addItemFromLibrary(RW, RD, stretch.id);
   const rd = Store.effectiveWeek(RW).days[RD];
-  assert(rd.items.length === 2 && isRestDay(rd), 'rest day + 伸展 is still a rest day');
-  assert(Store.weekCompletionRate(RW, 'mick') === beforeRate, 'optional recovery on a rest day does not change the completion rate');
-  const key = PlanData.keyForWeekDay(RW, RD);
-  assert(Store.dayStatus(RW, RD, 'mick') === 'pending', 'rest day with nothing ticked is pending');
-  const rowText = fn('dayStatusText')('pending', null, key, true);
-  assert(rowText === '休息日', 'week row says 休息日 (not 待完成／未完成)');
+  assert(rd.items.length === 2 && !isRestOnlyDay(rd), 'rest + 伸展 is a day with something to do (not a plain rest day)');
+  assert(Store.dayStatus(RW, RD, 'mick') === 'pending' && fn('dayStatusText')('pending', null, key, isRestOnlyDay(rd)) === '待完成', 'nothing ticked yet: 待完成 like any other day (not 休息日)');
+  Store.isFutureKey = () => false; // 當成那天已經到了（未來的日子本來就不能先勾運動）
   const recCard = fn('renderDayRecordCard')(RW, RD, rd, null, true);
   const restItem = rd.items.find((x) => x.type === 'rest'), strItem = rd.items.find((x) => x.type === 'recovery');
-  assert(recCard.includes('選做') && !recCard.includes(`A.toggleItem(${RW},${RD},'${restItem.id}')`) && recCard.includes('伸展'), 'record card: 伸展 marked 選做, the rest item has no tick');
-  assert(!recCard.includes('更換項目') && !recCard.includes('自主休息'), 'no 更換項目／自主休息 chips on a rest day');
-  const coachCard = fn('renderItemCard')(RW, RD, strItem, 1, 2, null, false, false, true);
-  assert(coachCard.includes('選做'), 'coach card also marks 選做');
-  // 真的做了伸展（當天打勾）→ 已完成，但完成率還是不算這天
-  Store.isFutureKey = () => false;
+  assert(!recCard.includes('選做') && !recCard.includes(`A.toggleItem(${RW},${RD},'${restItem.id}')`) && recCard.includes(`A.toggleItem(${RW},${RD},'${strItem.id}')`), 'record card: no 選做; 伸展 has a tick, the rest item is just a label');
+  const coachCard = fn('renderItemCard')(RW, RD, strItem, 1, 2, null, false, false);
+  const coachRest = fn('renderItemCard')(RW, RD, restItem, 0, 2, null, false, false);
+  assert(!coachCard.includes('選做') && !coachRest.includes('A.toggleItem('), 'coach cards: no 選做, the rest item has no tick');
+  // 做了伸展（當天打勾）→ 已完成，而且算進完成率（這天是要做事的）
   Store.toggleItemDone(key, strItem.id);
-  assert(Store.dayStatus(RW, RD, 'mick') === 'done' && Store.weekCompletionRate(RW, 'mick') === beforeRate, 'ticking 伸展 shows done; completion rate unaffected');
-  // 休息日加了非恢復類（例如跑步）就不是休息日了
+  assert(Store.dayStatus(RW, RD, 'mick') === 'done' && Store.weekCompletionRate(RW, 'mick') > (beforeRate || 0), 'ticking 伸展 shows done and counts toward the completion rate');
+  // 加跑步：一樣是一般的日子
   const runTpl = Store.saveLibraryDoc(null, 'item', { name: '輕鬆跑', item: { type: 'run', title: '輕鬆跑', duration: { min: 20, max: 20 } } });
   App.addItemFromLibrary(RW, RD, runTpl.id);
-  assert(!isRestDay(Store.effectiveWeek(RW).days[RD]), 'adding a run turns it into a normal training day');
-  assert(!isRestDay({ selectOne: true, items: [{ type: 'rest' }, { type: 'recovery' }] }), 'rest-or-walk (二擇一) days keep their own rules');
+  assert(!isRestOnlyDay(Store.effectiveWeek(RW).days[RD]) && Store.dayStatus(RW, RD, 'mick') === 'partial', 'rest + 伸展 + 跑步: the run still needs its own tick');
+  assert(!isRestOnlyDay({ selectOne: true, items: [{ type: 'rest' }, { type: 'recovery' }] }), 'rest-or-walk (二擇一) days keep their own rules');
 })();

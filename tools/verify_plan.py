@@ -313,9 +313,11 @@ def main():
     bad = [p.get("id") for p in presets
            if not isinstance(p.get("weekNumber"), int) or not 1 <= p["weekNumber"] <= len(weeks)
            or not p.get("name") or not isinstance(p.get("days"), list) or len(p["days"]) != 7
-           or any(not isinstance(d, list) or not d for d in p["days"])]
-    check("預排課表：週次合法、剛好 7 天、每天至少一項", not bad, str(bad))
-    bad = [f'{p["id"]} → {k}' for p in presets for d in p.get("days", []) for k in d if k not in p.get("items", {})]
+           or any(d is not None and (not isinstance(d, list) or not d) for d in p["days"])
+           or all(d is None for d in p["days"])]
+    # null＝那天不動（例如她自己那週只改週一）；至少要改一天
+    check("預排課表：週次合法、剛好 7 天、要改的每天至少一項", not bad, str(bad))
+    bad = [f'{p["id"]} → {k}' for p in presets for d in p.get("days", []) if d for k in d if k not in p.get("items", {})]
     check("預排課表：每天列的項目都有定義", not bad, str(bad[:5]))
     bad = [f'{p["id"]}/{k}' for p in presets for k, it in p.get("items", {}).items()
            if not it.get("title") or it.get("type") not in VALID_TYPES]
@@ -325,6 +327,9 @@ def main():
     check("預排課表：影片 id 都在 videos.json", not bad, str(bad[:5]))
     ids = [p.get("id") for p in presets]
     check("預排課表：id 不重複", len(ids) == len(set(ids)), str(ids))
+    user_ids = {u["userId"] for u in load("data/users.json")["users"]}
+    bad = [f'{p["id"]} → {u}' for p in presets for u in (p.get("users") or []) if u not in user_ids]
+    check("預排課表：users 都在 users.json", not bad, str(bad))
     # 跟 B 段同一條：跑步類要有時長或距離，不然預計跑量少算它（審查抓到：間歇跑沒寫時間）
     bad = [f'{p["id"]}/{k}' for p in presets for k, it in p.get("items", {}).items()
            if it.get("type") in RUN_TYPES and not it.get("duration") and not it.get("distanceKm")]
