@@ -1638,7 +1638,7 @@ function renderLongRunTrend(userId) {
       actual: entry && entry.actualDistanceKm != null ? entry.actualDistanceKm : null,
     });
   }
-  if (points.length === 0) return `<div class="empty-state">${ICON.chart}<div>Phase 1 以時間計，還沒有公里數資料</div></div>`;
+  if (points.length === 0) return `<div class="empty-state">${ICON.chart}<div>恢復奠基期以時間計，還沒有公里數資料</div></div>`;
 
   const w = 500, ht = 140, pad = 24;
   const maxKm = Math.max(...points.map((p) => Math.max(p.planned, p.actual || 0)), 5);
@@ -1843,7 +1843,7 @@ function renderWorkoutEditor(edit) {
         ${edit.origin ? `<div class="lib-head">編輯動作清單${edit.builtin ? ' <span class="lib-tag">內建</span>' : ''}</div>` : ''}
         ${head}
         ${edit.safetyNote ? `<div class="wo-safety locked">固定的安全提醒（不能改）：${h(edit.safetyNote)}</div>` : ''}
-        <div class="field wide"><label class="field-lbl">動作清單名稱</label><input type="text" maxlength="80" value="${h(d.name)}" placeholder="例如：產後核心（Phase 2 版）" onchange="A.libDraft('name',this.value)"></div>
+        <div class="field wide"><label class="field-lbl">動作清單名稱</label><input type="text" maxlength="80" value="${h(d.name)}" placeholder="例如：產後核心（基礎期版）" onchange="A.libDraft('name',this.value)"></div>
         <div class="field wide"><label class="field-lbl">負荷說明（選填，會顯示在每天的「查看動作」最上面）</label><textarea rows="2" maxlength="200" placeholder="例如：全程徒手，做到有感覺就停" onchange="A.libDraft('loadGuidance',this.value)">${h(d.loadGuidance)}</textarea></div>
         ${rows}
         <button class="btn secondary lib-add" onclick="A.addLibExercise()">＋ 新增一個動作</button>

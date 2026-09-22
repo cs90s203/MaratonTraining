@@ -116,10 +116,31 @@ def main():
     check("videoRef／videoRefs 全部找得到", not bad, str(bad[:5]))
     # 決策紀錄第 60 條：影片的 notes 會顯示在課表卡的影片按鈕下面，是寫給跑者看的說明——
     # 不能空著，也不能混進寫給自己的出處（v0.26.6 的 notes 寫了「決策紀錄第 57 條」「YouTube：原始標題」）
-    DEV_WORDS = ["決策紀錄", ".json", "Phase ", "YouTube：", "在對話裡給的"]
+    # 決策紀錄第 61 條：出廠課表的備註、查看動作的文字也一樣是給跑者看的（v0.26.8 以前寫著「原計畫第六節」
+    # 「Phase 1」「pelvic-core-advanced」這種寫給自己的東西）。出處寫在 tools/build_plan.py 的註解跟決策紀錄。
+    DEV_RE = re.compile(r"決策紀錄|\.json|Phase|YouTube：|在對話裡給的|原計畫|原文|第\s*[一二三四五六七八九十0-9]+\s*[節條]|模板|pelvic-core|strength-[ab]|basic|advanced")
     bad = [v["id"] for v in videos["videos"]
-           if not (v.get("notes") or "").strip() or any(w in v["notes"] for w in DEV_WORDS) or len(v["notes"]) > 300]
+           if not (v.get("notes") or "").strip() or DEV_RE.search(v["notes"]) or len(v["notes"]) > 300]
     check("內建影片都有寫給跑者看的說明（不空、不含出處、最多 300 字）", not bad, str(bad[:5]))
+    shown = []  # (哪裡, 文字)：畫面上會出現的出廠文字
+    for w in weeks:
+        for di, d in enumerate(w["days"]):
+            shown.append((f'W{w["weekNumber"]}D{di} dayNotes', d.get("dayNotes")))
+            for it in d["items"]:
+                shown += [(f'W{w["weekNumber"]}D{di} {it["title"]}', it.get(k)) for k in ("title", "notes", "intensityNote")]
+                for sg in it.get("segments") or []:
+                    shown += [(f'W{w["weekNumber"]}D{di} 段落', st.get("note")) for st in [sg] + list(sg.get("steps") or [])]
+    # 預排課表（第 57 條）排進去之後一樣顯示在課表卡上
+    for pr in load("data/week-presets.json").get("presets", []):
+        for key, it in (pr.get("items") or {}).items():
+            shown += [(f'預排 {pr.get("id")}/{key}', it.get(k)) for k in ("title", "notes", "intensityNote")]
+            for sg in it.get("segments") or []:
+                shown += [(f'預排 {pr.get("id")}/{key} 段落', st.get("note")) for st in [sg] + list(sg.get("steps") or [])]
+    for wo in workouts["workouts"]:
+        shown += [(f'{wo["id"]} {k}', wo.get(k)) for k in ("name", "loadGuidance", "derivedNote", "safetyNote")]
+        shown += [(f'{wo["id"]} {ex["name"]}', ex.get("notes")) for ex in wo["exercises"]]
+    bad = [f"{where}：{t[:24]}" for where, t in shown if t and DEV_RE.search(t)]
+    check("出廠課表跟動作清單的文字不含寫給自己的出處（原計畫、Phase、內部 id…）", not bad, str(bad[:4]))
     bad = [f'W{a}D{b} → {it["workoutRef"]}' for a, b, it in items
            if it["workoutRef"] and it["workoutRef"] not in wkts]
     check("workoutRef 全部找得到", not bad, str(bad[:5]))

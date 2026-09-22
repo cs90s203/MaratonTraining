@@ -179,8 +179,9 @@ def week_p1(w):
                          notes="這階段的「長跑」以時間而非距離計，全程維持 Zone 2。"
                                "若骨盆有下墜感就縮短當天時間，不要硬撐。")
     else:
+        # 出處：第四節 W7-8「40分鐘 全跑」才進 Zone 2-3
         long_item = item("long-run", "長跑", "long", dur=lr,
-                         notes="第四節：本階段最後兩週長跑強度進到 Zone 2-3。仍以時間計。")
+                         notes="這個階段最後兩週，長跑強度可以進到 Zone 2-3。一樣以時間計。")
     return [
         day(item("recovery", "產後核心/骨盆底啟動", "recovery", dur=[10, 15],
                  workout="pelvic-core-basic",
@@ -189,11 +190,14 @@ def week_p1(w):
                  notes="心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。"
                        "Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。")),
         day(item("strength", "重量訓練 A（下肢＋核心）", "none", dur=[30, 30],
-                 workout="strength-a", notes="Phase 1 全部用徒手或極輕負荷，不追求痠痛感。")),
+                 workout="strength-a",  # 出處：第五節末「Phase 1 全部用徒手或極輕負荷」
+                 notes="這個階段全部徒手或用極輕的重量，重點是動作品質跟核心連結，不追求痠痛感。")),
         day(item("recovery", "產後骨盆底／腹直肌專門課程", "recovery", dur=[10, 15],
                  video="fitnessblender-postpartum",
-                 notes="原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，"
-                       "Phase 2 之後再換。")),
+                 # 出處：第六節——Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2（醫生放行後）再換
+                 # 審查抓到：寫「到基礎期再換成一般影片」，但基礎期這一格沒有排影片，跑者可能自己多加一支（第 0 條）
+                 notes="產後初期先用專門的產後課程重建骨盆底跟核心。醫生放行一般運動強度之前，"
+                       "先不要換成一般的居家訓練影片。")),
         day(item("run", "Zone 2 跑", "zone2", dur=[20, 30],
                  notes="逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。")),
         day(long_item),
@@ -212,16 +216,17 @@ def week_p2(w):
                  workout="pelvic-core-advanced")),
         day(item("run", "Zone 2 跑", "zone2", dur=[30, 40])),
         day(item("strength", "重量訓練 A（下肢主導）", "none", dur=[30, 30],
-                 workout="strength-a", derived=True,
-                 notes="Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）")),
+                 workout="strength-a", derived=True,  # 時長 30 分沿用 Phase 1（原文未給），所以標 derived
+                 notes="從這個階段開始可以加輕的啞鈴。時間 30 分鐘是比照恢復奠基期排的。")),
         day(item("form-drill", "跑姿訓練日", "zone2", dur=[15, 20], notes=form_drill(w)[0], segments=form_drill(w)[1]),
             item("recovery", "核心", "recovery", dur=[10, 10], workout="pelvic-core-advanced",
-                 notes="10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。")),
+                 notes="10 分鐘版：從「查看動作」裡挑 3 項做就好。")),
         day(item("strength", "重量訓練 B（全身／上肢＋核心）", "none", dur=[30, 30],
-                 workout="strength-b", derived=True, notes="（時長 30 分沿用 Phase 1，原文未給）")),
+                 workout="strength-b", derived=True,  # 時長 30 分沿用 Phase 1（原文未給），所以標 derived
+                 notes="時間 30 分鐘是比照恢復奠基期排的。")),  # 第 9 條：標 derived 要寫明哪裡是推導的
         day(item("long-run", "長跑", "long", km=lr,
-                 notes="第四節為準：逐週遞增，本階段上限 16K。"
-                       "（模板另寫「上限約 16-18K」，衝突時以第四節為準。）")),
+                 # 第四節為準：本階段上限 16K（模板另寫「上限約 16-18K」，衝突時以第四節為準）
+                 notes="每兩週拉長一次，這個階段最長到 16K。")),
         choice(item("rest", "完全休息", "none"),
                item("recovery", "瑜珈／伸展", "recovery", dur=[20, 20], video="pamela-abs-yoga")),
     ]
@@ -233,7 +238,7 @@ def week_p3(w):
     return [
         day(item("recovery", "核心＋骨盆底維持", "recovery", dur=[10, 10],
                  workout="pelvic-core-advanced",
-                 notes="10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。")),
+                 notes="10 分鐘版：從「查看動作」裡挑 3 項做就好。")),
         day(item("run", "Zone 2 跑", "zone2", dur=[40, 50])),
         # 原文:72 只寫「重量訓練(維持,強度不加量)」，沒指定 A 或 B。
         # 逕自解成 A 會讓訓練 B 在最後 10 週整份消失，所以做成選擇題並標 derived。
@@ -241,10 +246,10 @@ def week_p3(w):
                     workout="strength-a", derived=True),
                item("strength", "重量訓練 B（維持）", "none", dur=[30, 30],
                     workout="strength-b", derived=True),
-               notes="原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。"),
+               notes="這個階段重訓只維持：重量、組數都不再往上加。每週挑 A 或 B 其中一份做，下週換另一份。"),
         day(item("form-drill", "跑姿訓練", "zone2", dur=[15, 20], notes=form_drill(w)[0], segments=form_drill(w)[1]),
             item("tempo", "節奏跑", "tempo", dur=[10, 15],
-                 notes="原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。")),
+                 notes="比 Zone 2 稍快一點，量少就好；這個階段才開始有節奏跑。")),  # 原文「稍快於 Zone 2」
         choice(item("run", "輕鬆跑", "recovery", dur=[30, 30]),
                item("rest", "完全休息", "none"),
                notes="看身體狀況，兩邊地位相等。"),
@@ -287,15 +292,15 @@ def week_race(w):
         day(item("run", "輕鬆跑", "recovery", dur=[20, 30], derived=d)),
         day(item("recovery", "核心／骨盆底（極輕）", "recovery", dur=[10, 10],
                  workout="pelvic-core-basic", derived=d,
-                 notes="賽週用 basic 版，不要用 advanced。")),
+                 notes="賽週做這份輕的就好，不要換回前幾週那份比較難的。")),  # basic＝pelvic-core-basic
         day(item("run", "喚醒跑", "zone2", km=[3, 5], derived=d,
-                 notes="第四節：賽週 3-5K 喚醒跑。含 2-3 段稍快的段落找感覺，不累積疲勞。")),
+                 notes="賽週的喚醒跑 3-5K，中間放 2-3 段稍快的找感覺，不要累積疲勞。")),  # 出處：第四節
         day(item("rest", "完全休息", "none", derived=d)),
         day(item("rest", "完全休息", "none", derived=d,
                  notes="賽前一天：確認裝備、補給、交通與起跑區。")),
         day(item("race", "東京馬拉松 2027", "long", km=[42.195, 42.195], derived=d,
-                 notes="比賽日。第二節沒有比賽日的心率檔位，此處沿用「長跑」Zone 2-3。"
-                       "配速照 Zone 2 起跑，前 10K 寧可慢。")),
+                 # 第二節沒有比賽日的心率檔位，沿用「長跑」Zone 2-3（決策紀錄第 6 條）
+                 notes="比賽日。心率照長跑的 Zone 2-3；用 Zone 2 的配速起跑，前 10K 寧可慢。")),
     ]
 
 
