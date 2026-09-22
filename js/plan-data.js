@@ -241,6 +241,34 @@ const PlanData = (() => {
     return list;
   }
 
+  // 決策紀錄第 62 條：已經存下來的課表（每人每週一份、舊的共用覆寫）是整週的複本，裡面還是 v0.26.9 以前的出廠備註。
+  // 顯示時，備註跟舊字**一字不差**才換成新說法（plan.json 的 legacy.notes，由 tools/build_plan.py 產生）；她自己寫的不動。
+  // 只管畫面，資料不改：不寫雲端、不影響比對（常用項目、複製課表都照存著的內容比）。
+  const hasOwn = (o, k) => !!o && typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
+  function displayNote(text) {
+    const m = plan && plan.legacy && plan.legacy.notes;
+    return hasOwn(m, text) ? m[text] : text;
+  }
+  // 改版前的產後課程複本：影片照新版換成兩支。三個條件都要成立（舊備註、沒連著常用項目、影片還是原本那一支）——
+  // 教練之後透過常用項目庫換過影片的（備註可能沒跟著變），照她換的顯示，不會被蓋掉。
+  function displayVideoRefs(item) {
+    const refs = itemVideoRefs(item);
+    const m = plan && plan.legacy && plan.legacy.videoRefsByNote;
+    const rule = item && !item.templateId && hasOwn(m, item.notes) ? m[item.notes] : null;
+    return rule && JSON.stringify(refs) === JSON.stringify(rule.from) ? rule.to.slice() : refs;
+  }
+  // 畫面上看到的那個項目（備註、影片照新版）。「存成常用」、項目庫的「一模一樣」、複製課表的比對都用它——
+  // 不然舊複本看起來跟出廠一樣，存成常用卻存進舊字、比對又說不一樣（審查抓到）。
+  function displayItem(item) {
+    if (!item) return item;
+    const notes = displayNote(item.notes);
+    const refs = displayVideoRefs(item);
+    if (notes === item.notes && JSON.stringify(refs) === JSON.stringify(itemVideoRefs(item))) return item;
+    const out = { ...item, notes };
+    if (refs.length > 1) { out.videoRefs = refs; out.videoRef = refs[0]; } // 第 28 條：兩個都寫
+    return out;
+  }
+
   return {
     load,
     get plan() { return plan; },
@@ -259,7 +287,7 @@ const PlanData = (() => {
     get userById() { return userById; },
     parseLocalDate, dayKey, dateForWeekDay, keyForWeekDay, today, locateToday, locateKey,
     isExpired, daysUntilRace, phaseForWeek, week, day, weekdayLabel,
-    fmtRange, fmtItemMeta, itemVideoRefs, MAX_ITEM_VIDEOS, fmtHeartRateZone, HR_ZONE_OPTIONS,
+    fmtRange, fmtItemMeta, itemVideoRefs, displayNote, displayVideoRefs, displayItem, MAX_ITEM_VIDEOS, fmtHeartRateZone, HR_ZONE_OPTIONS,
     SEGMENT_KINDS, SEGMENT_UNITS, SEGMENT_LIMITS, SEGMENT_UNIT_CAPS, cleanSegments, itemSegments, fmtSegmentAmount, segmentTotals,
   };
 })();

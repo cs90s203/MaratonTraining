@@ -260,14 +260,14 @@ function renderDayBody(weekNumber, dayIndex, userId) {
   }
 
   if (viewingOther && !coach) {
-    if (d.dayNotes) html += `<div class="banner info">${ICON.info}<div>${h(d.dayNotes)}</div></div>`;
+    if (d.dayNotes) html += `<div class="banner info">${ICON.info}<div>${h(PlanData.displayNote(d.dayNotes))}</div></div>`;
     html += renderReadOnlyDay(weekNumber, dayIndex, d, entry, uid);
     html += `</div>`;
     return html;
   }
 
   if (!coach) {
-    if (d.dayNotes) html += `<div class="banner info">${ICON.info}<div>${h(d.dayNotes)}</div></div>`;
+    if (d.dayNotes) html += `<div class="banner info">${ICON.info}<div>${h(PlanData.displayNote(d.dayNotes))}</div></div>`;
     html += renderDayRecordCard(weekNumber, dayIndex, d, entry, true);
     html += `</div>`;
     return html;
@@ -280,7 +280,7 @@ function renderDayBody(weekNumber, dayIndex, userId) {
         這天是「二擇一」
       </label>
     </div>
-    <textarea class="note-input daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
+    <textarea class="note-input daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(PlanData.displayNote(d.dayNotes) || '')}</textarea>
   `;
 
   // 決策紀錄第 59 條：課表上的項目只能「從項目庫換」「改時間」，過去、現在、未來的日子一視同仁——
@@ -356,7 +356,7 @@ function itemPlanParts(item, opts) {
   // 好幾個「看影片」並排會分不出哪個是哪個。查不到的（庫還沒同步到這台）略過不畫。
   // 決策紀錄第 60 條：影片的說明（notes）顯示在它的按鈕下面——以前只在設定頁的編輯表單看得到，練習當下看不到。
   const links = [];
-  PlanData.itemVideoRefs(item).forEach((ref) => {
+  PlanData.displayVideoRefs(item).forEach((ref) => { // 存下來的舊複本照新版顯示（第 62 條）
     const v = Store.videoFor(ref, opts.dateKey);
     let link = '';
     // 自訂影片的網址是教練貼的（第 26 條）：只接受 https://，擋掉 javascript: 之類會執行的連結
@@ -406,7 +406,7 @@ function itemPlanParts(item, opts) {
     ${meta.length ? `<div class="item-meta">${meta.join('')}</div>` : ''}
     ${item.coachNote && !opts.hideCoachNote ? `<div class="item-coach-note"><span class="icn-lbl">教練備註</span>${h(item.coachNote)}</div>` : ''}
     ${segBlock}
-    ${item.notes ? `<div class="item-notes">${h(item.notes)}</div>` : ''}
+    ${item.notes ? `<div class="item-notes">${h(PlanData.displayNote(item.notes))}</div>` : ''}
     ${links.length ? `<div class="item-links">${links.join('')}</div>` : ''}
     ${workoutBlock}`;
   return { meta, links, workoutBlock, body };
@@ -626,11 +626,12 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
       : `A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')`}" aria-pressed="${!!done}" aria-label="${isSelectOne ? '選這個' : '完成'}：${h(item.title)}">${ICON.check}</button>`;
 
   // 存成常用：項目庫裡還沒有一模一樣的才出現（改過時間、或出廠課表的項目）；剛存的那張卡寫「已存進項目庫」
-  const inLibrary = coach && libEdit && !!Store.libraryItemMatching(item);
+  const shownItem = PlanData.displayItem(item); // 存下來的舊複本照畫面上的樣子比、照畫面上的樣子存（第 62 條）
+  const inLibrary = coach && libEdit && !!Store.libraryItemMatching(shownItem);
   const justSaved = coach && libEdit && App.state.savedFlash === item.id && inLibrary;
   const saveBtn = justSaved
     ? `<span class="saved-flash">已存進項目庫</span>`
-    : (coach && libEdit && !inLibrary && Store.canSaveItemAsTemplate(item) ? `<button onclick="A.saveItemAsTemplate(${weekNumber},${dayIndex},'${jsq(item.id)}')">存成常用</button>` : '');
+    : (coach && libEdit && !inLibrary && Store.canSaveItemAsTemplate(shownItem) ? `<button onclick="A.saveItemAsTemplate(${weekNumber},${dayIndex},'${jsq(item.id)}')">存成常用</button>` : '');
   const coachToolbar = coach && (editable || saveBtn) ? `
     <div class="coach-toolbar">
       ${editable ? `<button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)" aria-label="往上移">↑</button>
@@ -812,7 +813,7 @@ function templateMetaText(item) {
 // current：換的是哪個項目——跟它一模一樣的常用項目打勾。
 function renderLibraryPickList(weekNumber, dayIndex, target, current) {
   const templates = Store.libraryList('item');
-  const same = current ? Store.libraryItemMatching(current) : null;
+  const same = current ? Store.libraryItemMatching(PlanData.displayItem(current)) : null;
   const rows = templates.map((t) => {
     const on = !!(same && same.id === t.id);
     const action = target === 'add'

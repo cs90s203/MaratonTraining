@@ -116,12 +116,13 @@ function stableJson(x) {
 // 一天的課表內容拿來比「有沒有變」：推導值標記、連到哪個常用項目這些畫面上看不到的不算；dayIndex 是位置不是內容
 function dayCompareKey(d) {
   if (!d) return 'null';
+  // 照畫面上看到的比（第 62 條）：存下來的舊複本跟出廠內容看起來一樣，就不算「不一樣」
   const items = (d.items || []).map((it) => {
-    const c = { ...it };
+    const c = { ...PlanData.displayItem(it) };
     delete c.derived; delete c.intensityDerived; delete c.templateId;
     return c;
   });
-  return stableJson({ items, selectOne: !!d.selectOne, dayNotes: d.dayNotes || null });
+  return stableJson({ items, selectOne: !!d.selectOne, dayNotes: PlanData.displayNote(d.dayNotes) || null });
 }
 
 function nowIso() { return new Date().toISOString(); }

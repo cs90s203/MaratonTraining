@@ -69,7 +69,7 @@ Z = {
 
 
 def item(type_, title, zone="none", dur=None, km=None, video=None, workout=None,
-         notes=None, derived=False, segments=None):
+         notes=None, derived=False, segments=None, videos=None):
     """一個訓練項目。dur/km 都是 [min, max] 或 None——原計畫幾乎全是區間，
     壓成單一數字等於在轉檔時偷偷替使用者做訓練決策。"""
     z = Z[zone]
@@ -82,11 +82,12 @@ def item(type_, title, zone="none", dur=None, km=None, video=None, workout=None,
         "rpe": {"min": z["rpe"][0], "max": z["rpe"][1]} if z["rpe"] else None,
         "intensityNote": z["feel"],
         "intensityDerived": z["derived"],
-        "videoRef": video,
+        "videoRef": videos[0] if videos else video,
         "workoutRef": workout,
         "notes": notes,
         "derived": derived,
         **({"segments": segments} if segments else {}),
+        **({"videoRefs": videos} if videos else {}),  # 好幾部影片（第 28 條）
     }
 
 
@@ -193,11 +194,14 @@ def week_p1(w):
                  workout="strength-a",  # 出處：第五節末「Phase 1 全部用徒手或極輕負荷」
                  notes="這個階段全部徒手或用極輕的重量，重點是動作品質跟核心連結，不追求痠痛感。")),
         day(item("recovery", "產後骨盆底／腹直肌專門課程", "recovery", dur=[10, 15],
-                 video="fitnessblender-postpartum",
+                 videos=["fitnessblender-postpartum", "fitnessblender-postnatal-equipment"],  # 決策紀錄第 62 條
                  # 出處：第六節——Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2（醫生放行後）再換
                  # 審查抓到：寫「到基礎期再換成一般影片」，但基礎期這一格沒有排影片，跑者可能自己多加一支（第 0 條）
-                 notes="產後初期先用專門的產後課程重建骨盆底跟核心。醫生放行一般運動強度之前，"
-                       "先不要換成一般的居家訓練影片。")),
+                 # 兩支影片是二選一，不是兩支都做——兩支加起來 49 分鐘，課表寫 10–15 分（第 0 條）。
+                 # 影片 19／30 分鐘比課表長：時間照課表、做到時間就停（審查抓到；要做完整支由教練改時間，決策紀錄第 62 條）
+                 notes="產後初期先用專門的產後課程重建骨盆底跟核心：下面兩支影片挑一支做（沒器材、有器材），"
+                       "時間照課表的 10–15 分鐘，做到時間就停，影片不用做完。"
+                       "醫生放行一般運動強度之前，先不要換成一般的居家訓練影片。")),
         day(item("run", "Zone 2 跑", "zone2", dur=[20, 30],
                  notes="逐週拉長時間，心率不變。Zone 2 上限先抓保守一點。")),
         day(long_item),
@@ -323,6 +327,49 @@ PHASES = [
 ]
 
 
+# --- 舊說法對照（決策紀錄第 62 條）--------------------------------------------------------
+# v0.26.9 把出廠備註改成寫給跑者看的（第 61 條），但已經存下來的課表（users/*/planWeeks、舊的 planOverrides）
+# 裡是整週的複本，還是舊字。App 顯示時：備註跟下面的舊字**一字不差**才換成新說法（她自己寫的備註不會被動到）。
+# 值一定要是現在出廠課表裡的字——tools/verify_plan.py 會查，改了上面的備註忘了改這裡就擋下。
+LEGACY_NOTES = {
+    "Phase 1 全部用徒手或極輕負荷，不追求痠痛感。":
+        "這個階段全部徒手或用極輕的重量，重點是動作品質跟核心連結，不追求痠痛感。",
+    "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。":
+        "產後初期先用專門的產後課程重建骨盆底跟核心：下面兩支影片挑一支做（沒器材、有器材），時間照課表的 10–15 分鐘，做到時間就停，影片不用做完。醫生放行一般運動強度之前，先不要換成一般的居家訓練影片。",
+    # v0.26.9（上線約一個半小時）的說法：那段時間存下來的週也帶著它
+    "產後初期先用專門的產後課程重建骨盆底跟核心。醫生放行一般運動強度之前，先不要換成一般的居家訓練影片。":
+        "產後初期先用專門的產後課程重建骨盆底跟核心：下面兩支影片挑一支做（沒器材、有器材），時間照課表的 10–15 分鐘，做到時間就停，影片不用做完。醫生放行一般運動強度之前，先不要換成一般的居家訓練影片。",
+    "第四節：本階段最後兩週長跑強度進到 Zone 2-3。仍以時間計。":
+        "這個階段最後兩週，長跑強度可以進到 Zone 2-3。一樣以時間計。",
+    "Phase 2 開始可加輕啞鈴。（時長 30 分沿用 Phase 1，原文未給）":
+        "從這個階段開始可以加輕的啞鈴。時間 30 分鐘是比照恢復奠基期排的。",
+    "10 分鐘版：從 pelvic-core-advanced 挑 3 項即可。":
+        "10 分鐘版：從「查看動作」裡挑 3 項做就好。",
+    "（時長 30 分沿用 Phase 1，原文未給）":
+        "時間 30 分鐘是比照恢復奠基期排的。",
+    "第四節為準：逐週遞增，本階段上限 16K。（模板另寫「上限約 16-18K」，衝突時以第四節為準。）":
+        "每兩週拉長一次，這個階段最長到 16K。",
+    "原文只寫「重量訓練(維持,強度不加量)」未指定 A/B。建議兩者輪替。":
+        "這個階段重訓只維持：重量、組數都不再往上加。每週挑 A 或 B 其中一份做，下週換另一份。",
+    "原文寫「稍快於 Zone 2」。量少即可，Phase 3 才出現。":
+        "比 Zone 2 稍快一點，量少就好；這個階段才開始有節奏跑。",
+    "賽週用 basic 版，不要用 advanced。":
+        "賽週做這份輕的就好，不要換回前幾週那份比較難的。",
+    "第四節：賽週 3-5K 喚醒跑。含 2-3 段稍快的段落找感覺，不累積疲勞。":
+        "賽週的喚醒跑 3-5K，中間放 2-3 段稍快的找感覺，不要累積疲勞。",
+    "比賽日。第二節沒有比賽日的心率檔位，此處沿用「長跑」Zone 2-3。配速照 Zone 2 起跑，前 10K 寧可慢。":
+        "比賽日。心率照長跑的 Zone 2-3；用 Zone 2 的配速起跑，前 10K 寧可慢。",
+}
+# 改版前的產後課程複本：影片換成兩支（她：「兩個都要」）。三個條件都要成立才換（審查抓到只看備註太寬）：
+# 備註是舊字、沒有連著常用項目（templateId）、影片還是原本那一支（from）——教練之後透過常用項目庫換過影片的，
+# 備註可能沒變（套用常用項目只改改了的欄位），不能被這裡蓋掉。
+_FB_REFS = {"from": ["fitnessblender-postpartum"], "to": ["fitnessblender-postpartum", "fitnessblender-postnatal-equipment"]}
+LEGACY_VIDEO_REFS_BY_NOTE = {
+    "原計畫第六節：Pamela Reif 沒有產後專門系列，最初期建議用專門課程，Phase 2 之後再換。": _FB_REFS,
+    "產後初期先用專門的產後課程重建骨盆底跟核心。醫生放行一般運動強度之前，先不要換成一般的居家訓練影片。": _FB_REFS,
+}
+
+
 def build():
     weeks = []
     for ph in PHASES:
@@ -367,6 +414,8 @@ def build():
                   "跑步項目即時加總（只有時長的項目用 timeBasedRunPaceMinPerKm 換算），"
                   "教練模式改了項目目標就跟著變，不會有兩個必須互相對應的數字。"),
         "phases": [{k: v for k, v in ph.items() if k != "builder"} for ph in PHASES],
+        # 決策紀錄第 62 條：存下來的舊複本顯示時用（js/plan-data.js 的 displayNote／displayVideoRefs）
+        "legacy": {"notes": LEGACY_NOTES, "videoRefsByNote": LEGACY_VIDEO_REFS_BY_NOTE},
         "weeks": weeks,
     }
 

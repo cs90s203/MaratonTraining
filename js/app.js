@@ -598,8 +598,9 @@ const App = {
   saveItemAsTemplate(weekNumber, dayIndex, itemId) {
     if (!this._libraryAllowed()) return;
     const day = Store.effectiveWeek(weekNumber, this.planUserId()).days[dayIndex];
-    const it = day && day.items.find((x) => x.id === itemId);
-    if (!it) return;
+    const found = day && day.items.find((x) => x.id === itemId);
+    if (!found) return;
+    const it = PlanData.displayItem(found); // 存畫面上看到的（舊複本照新版的備註、影片，第 62 條）
     if (Store.libraryItemMatching(it)) { render(); return; }
     const saved = Store.saveLibraryDoc(null, 'item', { name: it.title, item: it });
     if (!saved) { alert('這個項目的內容不完整，沒辦法存成常用項目。'); return; }

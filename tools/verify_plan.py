@@ -141,6 +141,33 @@ def main():
         shown += [(f'{wo["id"]} {ex["name"]}', ex.get("notes")) for ex in wo["exercises"]]
     bad = [f"{where}：{t[:24]}" for where, t in shown if t and DEV_RE.search(t)]
     check("出廠課表跟動作清單的文字不含寫給自己的出處（原計畫、Phase、內部 id…）", not bad, str(bad[:4]))
+    # 決策紀錄第 62 條：舊說法對照表（存下來的舊複本顯示時換成新說法）。新說法一定要是現在出廠課表裡的字、
+    # 舊說法一定已經不在出廠課表裡——改了 build_plan.py 的備註忘了改 LEGACY_NOTES 就擋下。
+    legacy = plan.get("legacy") or {}
+    cur_texts = {it.get("notes") for _, _, it in items} | {d.get("dayNotes") for _, d in days_all}
+    lnotes = legacy.get("notes") or {}
+    bad = [k[:20] for k, v in lnotes.items() if k in cur_texts or v not in cur_texts]
+    lrefs = legacy.get("videoRefsByNote") or {}
+    refs_of = lambda it: ([it["videoRef"]] if it.get("videoRef") else []) + [r for r in (it.get("videoRefs") or []) if r != it.get("videoRef")]
+    bad += [f"影片對照：{k[:20]}" for k, rule in lrefs.items()
+            if k not in lnotes or not rule.get("from") or not rule.get("to")
+            or any(r not in vids for r in rule["from"] + rule["to"])
+            or not any(it.get("notes") == lnotes[k] for _, _, it in items)
+            or any(refs_of(it) != rule["to"] for _, _, it in items if it.get("notes") == lnotes[k])]
+    check("舊說法對照表跟現在的出廠課表對得上（第 62 條）", bool(lnotes) and bool(lrefs) and not bad, str(bad[:4]))
+    # 上一版（git HEAD）出廠課表裡的每一則備註：現在還在用，或已經收進舊說法對照表——
+    # 改了出廠備註卻忘了把舊字收進來，存下來的複本就會一直顯示舊字（審查抓到：v0.26.9 的說法漏收）。
+    # 在 commit 前跑才有意義；沒有 git 就略過並註明。
+    try:
+        import subprocess
+        prev = json.loads(subprocess.run(["git", "show", "HEAD:data/plan.json"], cwd=ROOT, capture_output=True,
+                                         text=True, check=True).stdout)
+        prev_texts = {it.get("notes") for w in prev["weeks"] for d in w["days"] for it in d["items"]} | \
+                     {d.get("dayNotes") for w in prev["weeks"] for d in w["days"]}
+        bad = [t[:24] for t in prev_texts if t and t not in cur_texts and t not in lnotes]
+        check("上一版的出廠備註都還在用、或收進舊說法對照表（第 62 條）", not bad, str(bad[:4]))
+    except Exception as e:  # noqa: BLE001
+        check("上一版的出廠備註都還在用、或收進舊說法對照表（第 62 條）", True, f"略過：{e}")
     bad = [f'W{a}D{b} → {it["workoutRef"]}' for a, b, it in items
            if it["workoutRef"] and it["workoutRef"] not in wkts]
     check("workoutRef 全部找得到", not bad, str(bad[:5]))

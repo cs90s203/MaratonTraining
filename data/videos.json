@@ -1,15 +1,25 @@
 {
-  "_note": "linkType 決定 UI 行為：video=直接開連結；search=開 YouTube 搜尋該關鍵字；none=只顯示文字不給按鈕。url 一律為 null，除非是人工貼進來的真實網址——不要生成 YouTube 網址，規格書第 93 行。 notes 會顯示在課表卡的影片按鈕下面，寫給跑者看（器材、動作怎麼安排、強度、要注意的地方），不寫出處或決策紀錄編號（tools/verify_plan.py 會查）。title 用 YouTube 標題的簡化版。",
+  "_note": "linkType 決定 UI 行為：video=直接開連結；search=開 YouTube 搜尋該關鍵字；none=只顯示文字不給按鈕。url 一律為 null，除非是人工貼進來的真實網址——不要生成 YouTube 網址，規格書第 93 行。 notes 會顯示在課表卡的影片按鈕下面，寫給跑者看（器材、動作怎麼安排、強度、要注意的地方），不寫出處或決策紀錄編號（tools/verify_plan.py 會查）。title 用 YouTube 標題的簡化版；使用者指定的名字優先（決策紀錄第 62 條：Fitness Blender (no equipment)／(equipment)）。",
   "videos": [
     {
       "id": "fitnessblender-postpartum",
-      "title": "Postpartum Core and Pelvic Floor Recovery Series",
+      "title": "Fitness Blender (no equipment)",
       "creator": "Fitness Blender",
       "category": "postpartum-core",
-      "linkType": "search",
-      "searchQuery": "Fitness Blender Postpartum Core and Pelvic Floor Recovery",
-      "url": null,
-      "notes": "恢復奠基期用的產後專門課程。這個連結是 YouTube 搜尋，沒有指定哪一支：從搜尋結果挑一支 Fitness Blender 的產後（Postnatal／Postpartum）影片來做。"
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=rCv7Tx8l_y4",
+      "notes": "不需要器材，墊子就好。動作慢、低衝擊的產後皮拉提斯，約 19 分鐘：骨盆前後傾、骨盆傾斜加抬臀、支撐式伸腿、大腿內外側抬腿、單邊鳥狗式、腿部內外旋、改良式橋式、腿部畫圈、支撐式小幅捲腹。作者建議產後 6–8 週、醫生同意之後再開始；會痛、漏尿或有下墜感就停。"
+    },
+    {
+      "id": "fitnessblender-postnatal-equipment",
+      "title": "Fitness Blender (equipment)",
+      "creator": "Fitness Blender",
+      "category": "postpartum-core",
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=wMHODqY4k08",
+      "notes": "約 30 分鐘，要墊子、一顆小球（夾著用），彈力帶可有可無。先做四足跪姿呼吸、骨盆底啟動暖身，再做三組循環（每個動作 45 秒、休息 15 秒，每組兩輪）：側棒式抬腿、臀橋、跪姿後踢、鳥狗式、跪姿臀推夾球、熊爬撐、改良式棒式，最後伸展放鬆。重點是跟著呼吸、感覺骨盆底在出力。會痛、漏尿或有下墜感就停。"
     },
     {
       "id": "pamela-booty-low-impact",

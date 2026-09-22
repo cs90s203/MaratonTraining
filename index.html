@@ -6,21 +6,21 @@
      Safari 分頁裡從 iOS 10 起不擋雙指縮放；主畫面 App 模式能不能雙指縮放要實測。 -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>東京馬拉松 2027 訓練追蹤</title>
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=0.26.9">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=0.26.10">
 <!-- iOS「加入主畫面」不理會 manifest.webmanifest，一定要靠這個 tag（babylog 的教訓，
      見 ~/Documents/Projects/babylog/index.html 同樣的註解）。icons/ 底下所有尺寸都是
      tools/make_icons.py 從使用者給的設計圖產生的（母版 icons/icon-1024.png）；換圖重跑那支腳本。 -->
-<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png?v=0.26.9">
-<link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png?v=0.26.9">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=0.26.9">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png?v=0.26.10">
+<link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png?v=0.26.10">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=0.26.10">
 <meta name="theme-color" content="#1F4D3D">
-<link rel="manifest" href="manifest.webmanifest?v=0.26.9">
+<link rel="manifest" href="manifest.webmanifest?v=0.26.10">
 <!-- APP_VERSION：跟 CHANGELOG.md 的版本號一起 bump。這個查詢字串是唯一逼瀏覽器
      （與 GitHub Pages 的 CDN）在下次載入時抓新版本的方法——伺服器沒送 Cache-Control
      header，URL 不變的話手機可能「重新整理」了還在跑幾週前的 JS（babylog 曾經栽在
      這件事上一次，見它的 index.html 同一段註解與 CHANGELOG 的事故記錄）。 -->
-<script>window.APP_VERSION = '0.26.9';</script>
-<link rel="stylesheet" href="css/style.css?v=0.26.9">
+<script>window.APP_VERSION = '0.26.10';</script>
+<link rel="stylesheet" href="css/style.css?v=0.26.10">
 <script>
 // 在第一次畫面繪製前就把 data-theme 設到 <html> 上，避免載入中先閃一下錯的主題色。
 (function () {
@@ -51,12 +51,12 @@
      app.js 不掛，其他功能不受影響；「還原順序」不靠它。 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js"></script>
 
-<script src="js/plan-data.js?v=0.26.9"></script>
-<script src="js/store.js?v=0.26.9"></script>
-<script src="js/firebase-config.js?v=0.26.9"></script>
-<script src="js/firebase-sync.js?v=0.26.9"></script>
-<script src="js/views.js?v=0.26.9"></script>
-<script src="js/app.js?v=0.26.9"></script>
-<script src="js/main.js?v=0.26.9"></script>
+<script src="js/plan-data.js?v=0.26.10"></script>
+<script src="js/store.js?v=0.26.10"></script>
+<script src="js/firebase-config.js?v=0.26.10"></script>
+<script src="js/firebase-sync.js?v=0.26.10"></script>
+<script src="js/views.js?v=0.26.10"></script>
+<script src="js/app.js?v=0.26.10"></script>
+<script src="js/main.js?v=0.26.10"></script>
 </body>
 </html>
