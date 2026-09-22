@@ -80,6 +80,66 @@
       "searchQuery": null,
       "url": null,
       "notes": "動作細節見 workouts.json 的 pelvic-core-basic。"
+    },
+    {
+      "id": "mady-full-body-stretch-15",
+      "title": "伸展",
+      "creator": "Mady Morrison",
+      "category": "mobility",
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=g_tea8ZNk5A&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=4",
+      "notes": "YouTube：15 Min. Full Body Stretch | Daily Routine for Flexibility, Mobility & Relaxation | DAY 7（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+    },
+    {
+      "id": "pamela-booty-no-jumps-10",
+      "title": "腿臀",
+      "creator": "Pamela Reif",
+      "category": "glutes",
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=WGnCC4udvlw&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=2",
+      "notes": "YouTube：10 MIN BOOTY WORKOUT - training for a bubble butt, NO JUMPS / No Equipment（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+    },
+    {
+      "id": "pamela-boobs-back-10",
+      "title": "臀背",
+      "creator": "Pamela Reif",
+      "category": "back",
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=xCOjXzJA5IM&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=5",
+      "notes": "YouTube：10 MIN BOOBS & BACK - tighten your chest + improve your posture / No Equipment（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+    },
+    {
+      "id": "lilly-hip-dips-10",
+      "title": "臀核心",
+      "creator": "Lilly Sabri",
+      "category": "glutes",
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=N1axQ7Kejos&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=3",
+      "notes": "YouTube：HIP DIPS WORKOUT | Side Butt Exercises | 10 min Home Workout（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+    },
+    {
+      "id": "pamela-beginner-abs-10",
+      "title": "核心",
+      "creator": "Pamela Reif",
+      "category": "core",
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=1f8yoFFdkcY&t=69s",
+      "notes": "YouTube：10 MIN BEGINNER AB WORKOUT // No Equipment（連結從 1:09 開始）（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+    },
+    {
+      "id": "pamela-only-back-10",
+      "title": "背",
+      "creator": "Pamela Reif",
+      "category": "back",
+      "linkType": "video",
+      "searchQuery": null,
+      "url": "https://www.youtube.com/watch?v=x0UKQEG-mi4&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=9",
+      "notes": "YouTube：10 MIN ONLY BACK - Bodyweight Workout, on the floor - maximum focus on back muscles（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
     }
   ]
 }

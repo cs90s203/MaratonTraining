@@ -107,7 +107,7 @@ function renderApp(state) {
   const dr = PlanData.daysUntilRace();
   const raceLine = dr > 0 ? `距離比賽還有 ${dr} 天` : dr === 0 ? '今天是比賽日！' : `已完賽 ${-dr} 天`;
   return `
-    ${Store.coachMode && !(state.page === 'week' && state.viewingUserId && state.viewingUserId !== Store.activeUserId) ? `<div class="coach-banner">🛠 教練模式——這裡改的是所有人共用的課表，不是你自己的紀錄</div>` : ''}
+    ${renderCoachBanner(state)}
     <div class="topbar">
       <div class="topbar-inner">
         <div class="topbar-title">東京馬拉松 2027
@@ -123,6 +123,17 @@ function renderApp(state) {
     ${renderBottomNav(state)}
     ${renderModal(state)}
   `;
+}
+
+// 教練模式最上面那一條（決策紀錄第 56 條：每個人一份課表）。本週頁寫清楚改的是誰的課表；
+// 看別人的紀錄（唯讀）時不畫，其他頁只寫「教練模式」。
+function renderCoachBanner(state) {
+  if (!Store.coachMode) return '';
+  if (state.page !== 'week') return `<div class="coach-banner">🛠 教練模式</div>`;
+  const uid = App.planUserId();
+  if (!Store.canEditPlanOf(uid)) return '';
+  const u = PlanData.userById[uid];
+  return `<div class="coach-banner">🛠 教練模式——這裡改的是 ${h(u ? u.displayName : uid)} 的課表</div>`;
 }
 
 // 全域彈窗。目前只有安全提醒（週視圖標題旁的「！」）。決策紀錄第 10 條：那四段文字
@@ -217,20 +228,21 @@ function renderPage(state) {
 // （見 renderDayRecordCard）。教練模式：項目卡另外畫（有編輯工具列，塞不進合併的卡片），
 // 紀錄卡畫在下面、不重畫標題。本週回顧不在這裡——第 23 條搬到頂端的本週訓練目標卡。
 // userId：決策紀錄第 53 條，看別人的紀錄時是那個人（唯讀）；沒給＝自己。
+// 第 56 條：每個人一份課表。教練模式而且能改這個人的課表（本人、或教練排別人的）＝排課的畫面。
 function renderDayBody(weekNumber, dayIndex, userId) {
   const uid = userId || Store.activeUserId;
   const viewingOther = uid !== Store.activeUserId;
-  const w = Store.effectiveWeek(weekNumber);
-  // dayIndex 是日曆格子；教練模式下 effectiveDayOrder 一律回傳出廠順序，所以這裡
-  // 同時是「要編輯的出廠天」（coach 專用的按鈕都掛在這條路徑上，見下方 coachToolbar）。
-  // 非教練模式時若這天被對調過（決策紀錄第 14 條），這裡顯示的就是對調後的內容。
-  const order = Store.effectiveDayOrder(weekNumber, uid);
+  const coach = Store.coachMode && Store.canEditPlanOf(uid);
+  const w = Store.effectiveWeek(weekNumber, uid);
+  // dayIndex 是日曆格子；排課時一律用出廠順序，所以這裡同時是「要編輯的出廠天」
+  // （coach 專用的按鈕都掛在這條路徑上，見下方 coachToolbar）。
+  // 不是排課時若這天被對調過（決策紀錄第 14 條），這裡顯示的就是對調後的內容。
+  const order = coach ? IDENTITY_ORDER : Store.effectiveDayOrder(weekNumber, uid);
   const contentIndex = order[dayIndex];
   const d = w.days[contentIndex];
   const dateKey = PlanData.keyForWeekDay(weekNumber, dayIndex);
   const isExpired = PlanData.isExpired(weekNumber, dayIndex);
   const entry = Store.entryFor(uid, dateKey);
-  const coach = Store.coachMode && !viewingOther;
 
   let html = `<div class="section day-body">`;
 
@@ -247,7 +259,7 @@ function renderDayBody(weekNumber, dayIndex, userId) {
     }
   }
 
-  if (viewingOther) {
+  if (viewingOther && !coach) {
     if (d.dayNotes) html += `<div class="banner info">${ICON.info}<div>${h(d.dayNotes)}</div></div>`;
     html += renderReadOnlyDay(weekNumber, dayIndex, d, entry, uid);
     html += `</div>`;
@@ -275,10 +287,10 @@ function renderDayBody(weekNumber, dayIndex, userId) {
   const planLocked = PlanData.keyForWeekDay(weekNumber, dayIndex) < PlanData.dayKey(PlanData.today());
 
   if (d.selectOne) {
-    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, true, isExpired)).join(
+    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, true, isExpired, false, uid)).join(
       `<div class="choice-or">或</div>`);
   } else {
-    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired, isRestDay(d))).join('');
+    html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired, isRestDay(d), uid)).join('');
   }
 
   if (planLocked) {
@@ -565,8 +577,11 @@ function renderDayRecordCard(weekNumber, dayIndex, d, entry, withPlan) {
 }
 
 // restDay：這天是休息日（第 55 條），恢復類項目標「選做」
-function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired, restDay) {
+// planUid：這是誰的課表（第 56 條，教練排別人的課表時是那個人）；不給＝自己
+function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInDay, entry, isSelectOne, isExpired, restDay, planUid) {
   const coach = Store.coachMode;
+  const ownPlan = !planUid || planUid === Store.activeUserId; // 別人的課表：勾是她的紀錄，這裡只顯示、不能點
+  const libEdit = Store.canEditLibrary(); // 存成常用、編輯動作清單：只有教練（第 56 條）
   // 從這張卡的「查看動作」打開的動作清單編輯器，就畫在這張卡的位置（第 33 條）
   const le = App.state.libraryEdit;
   if (coach && le && le.origin && le.origin.weekNumber === weekNumber && le.origin.dayIndex === dayIndex && le.origin.itemId === item.id) {
@@ -581,7 +596,7 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   // 樂觀寫入被 Firestore 拒絕時不回滾這個打勾（見決策紀錄第 0 條：不該因為權限問題
   // 懲罰使用者剛完成的動作），但要讓使用者看得出「這筆沒有真的存到雲端」，
   // 不能讓它看起來跟正常同步過的紀錄一樣。
-  const unsynced = Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
+  const unsynced = ownPlan && Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
 
   // 決策紀錄第 45 條：教練模式的項目卡沒有編輯表單。名稱是項目庫的選單（點了換成別的常用項目），
   // 時間（長跑是公里）那格可以直接改；其餘內容在「設定 → 常用項目庫」定義。今天以前的日子全部唯讀。
@@ -596,14 +611,14 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   // 教練備註（第 54 條）：這天這個項目的一句話，有寫才出現；教練模式按「備註」在卡片裡打
   const ne = App.state.noteEdit;
   const noteEditing = editable && !!(ne && ne.weekNumber === weekNumber && ne.dayIndex === dayIndex && ne.itemId === item.id);
-  const parts = itemPlanParts(item, { dateKey, coachEdit: coach ? { weekNumber, dayIndex } : null, amountHtml, hideCoachNote: noteEditing });
+  const parts = itemPlanParts(item, { dateKey, coachEdit: coach && libEdit ? { weekNumber, dayIndex } : null, amountHtml, hideCoachNote: noteEditing });
   const noteEditor = noteEditing
     ? `<textarea class="note-input coach-note-edit" data-note-item="${h(item.id)}" maxlength="200" rows="2" placeholder="給這天這個項目的備註（選填）"
         onblur="A.saveItemNote(${weekNumber},${dayIndex},'${jsq(item.id)}',this)">${h(item.coachNote || '')}</textarea>` : '';
 
   // 只有圓圈能打勾（決策紀錄第 29 條）：以前整張卡都能點，點「查看動作」、影片或備註旁邊都會打勾。
   // 未來的日子不能預先打勾（第 31 條）：還沒勾的圓圈停用，已經勾了的照樣能點掉
-  const check = isExpired
+  const check = isExpired || !ownPlan
     ? `<span class="item-check">${ICON.check}</span>`
     : !(done || Store.canMarkDoneAhead(dateKey, item.id))
     ? `<button type="button" class="item-check" disabled title="還沒到這天，不能預先打勾" aria-label="還沒到這天：${h(item.title)}">${ICON.check}</button>`
@@ -612,11 +627,11 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
       : `A.toggleItem(${weekNumber},${dayIndex},'${jsq(item.id)}')`}" aria-pressed="${!!done}" aria-label="${isSelectOne ? '選這個' : '完成'}：${h(item.title)}">${ICON.check}</button>`;
 
   // 存成常用：項目庫裡還沒有一模一樣的才出現（改過時間、或出廠課表的項目）；剛存的那張卡寫「已存進項目庫」
-  const inLibrary = coach && !!Store.libraryItemMatching(item);
-  const justSaved = coach && App.state.savedFlash === item.id && inLibrary;
+  const inLibrary = coach && libEdit && !!Store.libraryItemMatching(item);
+  const justSaved = coach && libEdit && App.state.savedFlash === item.id && inLibrary;
   const saveBtn = justSaved
     ? `<span class="saved-flash">已存進項目庫</span>`
-    : (coach && !inLibrary && Store.canSaveItemAsTemplate(item) ? `<button onclick="A.saveItemAsTemplate(${weekNumber},${dayIndex},'${jsq(item.id)}')">存成常用</button>` : '');
+    : (coach && libEdit && !inLibrary && Store.canSaveItemAsTemplate(item) ? `<button onclick="A.saveItemAsTemplate(${weekNumber},${dayIndex},'${jsq(item.id)}')">存成常用</button>` : '');
   const coachToolbar = coach && (editable || saveBtn) ? `
     <div class="coach-toolbar">
       ${editable ? `<button ${itemIndexInDay === 0 ? 'disabled' : ''} onclick="A.moveItem(${weekNumber},${dayIndex},'${jsq(item.id)}',-1)" aria-label="往上移">↑</button>
@@ -746,10 +761,10 @@ function renderTemplateForm(tpl) {
             <div class="range-pair"><input name="${nameA}" type="number" ${attrs} value="${h(a)}"><span>–</span><input name="${nameB}" type="number" ${attrs} value="${h(b)}"></div>
           </div>`;
 
-  // 第 52 條：存檔會套用到今天以後用到它的課表，先講清楚範圍
-  const usage = tpl.id === 'new' ? null : Store.templateUsage(tpl.id, it).length;
+  // 第 52 條：存檔會套用到今天以後用到它的課表，先講清楚範圍（第 56 條：三個人的課表都套，同一天只算一次）
+  const usage = tpl.id === 'new' ? null : Store.templateUsageDays(tpl.id, it);
   const usageLine = usage == null ? ''
-    : `<div class="tpl-usage">${usage ? `存檔後，今天起用到這個項目的 <b>${usage}</b> 天會跟著改（只改這次改的地方；某天單獨改過的時間不動；今天以前的日子不動）。` : '課表裡今天以後還沒有用到這個項目。'}</div>`;
+    : `<div class="tpl-usage">${usage ? `存檔後，三個人課表裡今天起用到這個項目的 <b>${usage}</b> 天會跟著改（只改這次改的地方；某天單獨改過的時間不動；今天以前的日子不動）。` : '三個人的課表裡今天以後還沒有用到這個項目。'}</div>`;
   return `
     <div class="item coach-editing" id="${formId}">
       <div class="edit-form">
@@ -809,10 +824,15 @@ function renderLibraryPickList(weekNumber, dayIndex, target, current) {
         <span class="pick-text"><span class="pick-name">${h(t.name)}</span><span class="pick-meta">${h(templateMetaText(t.item))}</span></span>
       </button>`;
   }).join('');
+  // 第 56 條：常用項目庫只有教練能改——其他人只能從這裡挑，不給「到項目庫新增或修改」
+  const lib = Store.canEditLibrary();
+  const coachU = Store.coachUser();
+  const empty = lib ? '項目庫還沒有項目。在課表項目下面按「存成常用」，或到「設定 → 常用項目庫」新增。'
+    : `項目庫還沒有項目（常用項目庫由 ${h(coachU ? coachU.displayName : '教練')} 管理）。`;
   return `
     <div class="pick-list">
-      ${rows || `<div class="pick-empty">項目庫還沒有項目。在課表項目下面按「存成常用」，或到「設定 → 常用項目庫」新增。</div>`}
-      <button type="button" class="pick-foot link-btn" onclick="A.goTo('settings')">到項目庫新增或修改 ›</button>
+      ${rows || `<div class="pick-empty">${empty}</div>`}
+      ${lib ? `<button type="button" class="pick-foot link-btn" onclick="A.goTo('settings')">到項目庫新增或修改 ›</button>` : ''}
     </div>`;
 }
 
@@ -887,7 +907,7 @@ function renderWeeklyReviewCard(weekNumber, userId) {
   const uid = userId || Store.activeUserId;
   const self = uid === Store.activeUserId; // 看別人（第 53 條）：身體狀況讀不到、降量也不能幫他標
   let flaggedDays = 0, overDays = 0;
-  const w = Store.effectiveWeek(weekNumber);
+  const w = Store.effectiveWeek(weekNumber, uid);
   const order = Store.effectiveDayOrder(weekNumber, uid);
   for (let i = 0; i < 7; i++) {
     const key = PlanData.keyForWeekDay(weekNumber, i);
@@ -927,17 +947,19 @@ function renderWeeklyReviewCard(weekNumber, userId) {
 // ── 頁面 2：週視圖 ───────────────────────────────────────────────────────────
 function renderWeekPage(state) {
   const wn = state.weekViewNumber;
-  const w = Store.effectiveWeek(wn);
   const phase = PlanData.phaseForWeek(wn);
-  // 決策紀錄第 53 條：「在看誰」跟「我是誰」分開。看別人時整頁唯讀：畫那個人的紀錄，改課表的工具收起來
+  // 決策紀錄第 53 條：「在看誰」跟「我是誰」分開。看別人時整頁唯讀：畫那個人的紀錄，改課表的工具收起來。
+  // 第 56 條：每個人一份課表。教練模式下能改這個人的課表（本人、或教練排別人的）＝排課的畫面，改的是她那份。
   const viewingId = state.viewingUserId && state.viewingUserId !== Store.activeUserId && PlanData.userById[state.viewingUserId] ? state.viewingUserId : null;
   const uid = viewingId || Store.activeUserId;
   if (viewingId) {
     Sync.subscribeOtherEntries(viewingId, () => window.render && window.render());
     Sync.subscribeOtherWeekAdjustments(viewingId, () => window.render && window.render());
   }
-  const coach = Store.coachMode && !viewingId;
-  const hasOverride = !!Store.planOverrides[wn];
+  const coach = Store.coachMode && Store.canEditPlanOf(uid);
+  const w = Store.effectiveWeek(wn, uid);
+  const src = Store.planSource(wn, uid);
+  const hasOverride = src === 'own' || src === 'legacy';
   const loc = PlanData.locateToday();
   const todayKey = loc.status === 'in-plan' ? loc.key : null;
   // 計畫開始前／結束後 todayKey 是 null，但「過去的日子寫未完成」要用真的今天比
@@ -945,15 +967,15 @@ function renderWeekPage(state) {
 
   const table = Store.weekViewMode === 'table';
   const vol = Store.weekVolume(wn, uid);
-  const order = Store.effectiveDayOrder(wn, uid);
+  // 排課時一律照課表原本的順序（見 renderDayBody）；她自己對調過的順序在下面的提示講
+  const order = coach ? IDENTITY_ORDER : Store.effectiveDayOrder(wn, uid);
   const expanded = state.expandedDay && state.expandedDay.weekNumber === wn ? state.expandedDay.dayIndex : -1;
 
-  // 拖曳換順序（第 18 條）：教練模式下 effectiveDayOrder 一律回傳出廠順序，拖了也不會生效，
-  // 所以不畫把手；SortableJS 沒載到（離線、CDN 被擋）也不畫，免得把手看起來像壞了。
-  // 決策紀錄第 50 條（取代第 43 條的「只限還沒開始的週」）：教練模式拖到另一天上放開＝兩天的共用課表直接對調
-  // （所有人一起變），這週也可以；今天以前的日子鎖住（沒有把手、也不能當落點）。
-  // 一般模式拖的照舊是自己的本週順序（第 14、18 條）。
-  const canDrag = !table && typeof Sortable !== 'undefined' && !viewingId;
+  // SortableJS 沒載到（離線、CDN 被擋）不畫把手，免得把手看起來像壞了。
+  // 決策紀錄第 50 條（取代第 43 條的「只限還沒開始的週」）：教練模式拖到另一天上放開＝正在排的那個人的兩天課表
+  // 直接對調（第 56 條），這週也可以；今天以前的日子鎖住（沒有把手、也不能當落點）。
+  // 一般模式拖的照舊是自己的本週順序（第 14、18 條）；看別人的紀錄（唯讀）不能拖。
+  const canDrag = !table && typeof Sortable !== 'undefined' && (coach || !viewingId);
 
   // 手風琴（決策紀錄第 17 條）：一次只展開一列，展開的列身就是原本「今日」頁的內容。
   const rows = order.map((contentIndex, i) => {
@@ -995,7 +1017,8 @@ function renderWeekPage(state) {
   // 以前只有右上角一顆「點擊登入以同步」，看不出「現在看到的內容不完整」，這裡講清楚。
   // 等 Firebase 回報過一次登入狀態才顯示（已登入的人開 App 時不閃一下、也不把今天那列擠到頂欄底下）。
   // 記憶體裡還留著共用內容（登出之前讀到的）就不能說「出廠課表」，改說「可能不是最新的」。
-  const hasSharedInMemory = Object.keys(Store.planOverrides).length > 0 || Object.keys(Store.library).length > 0;
+  const hasSharedInMemory = Object.keys(Store.planOverrides).length > 0 || Object.keys(Store.library).length > 0 ||
+    Object.values(Store.planWeeks).some((m) => Object.keys(m || {}).length > 0);
   const signedOutBanner = Sync.authResolved && !Sync.isSignedIn() && Sync.state !== 'signing-in' ? `
     <div class="banner info">${ICON.info}<div><b>${hasSharedInMemory ? '還沒登入，看到的課表可能不是最新的' : '還沒登入，看到的是出廠課表'}</b>教練改過的內容、自訂的影片跟動作清單要登入後才看得到。
       <div><button class="btn secondary lib-add" style="margin-top:8px" onclick="A.signIn()">使用 Google 帳號登入</button></div></div></div>` : '';
@@ -1010,25 +1033,42 @@ function renderWeekPage(state) {
         <button class="navbtn" style="opacity:${canNext ? 1 : .3}" ${canNext ? `onclick="A.setWeekView(${wn + 1})"` : 'disabled'}>下週 ›</button>
       </div>
       ${signedOutBanner}
+      ${coach && Sync.isSignedIn() && Sync.planWeeksDenied ? renderPlanRulesBanner() : ''}
       ${planBanner}
-      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', who: (PlanData.userById[uid] || {}).displayName || uid, viewing: !!viewingId, whoMenu: Sync.isSignedIn() ? renderViewPicker(state, uid) : null, title: '跑量', footer: renderWeeklyReviewCard(wn, uid), showSafetyAlert: true })}
+      ${renderWeekVolumeCard(vol, { heading: '本週訓練目標', who: (PlanData.userById[uid] || {}).displayName || uid, viewing: !!viewingId && !coach, whoMenu: Sync.isSignedIn() ? renderViewPicker(state, uid) : null, title: '跑量', footer: renderWeeklyReviewCard(wn, uid), showSafetyAlert: true })}
       <div class="view-toggle">
         <button class="${table ? '' : 'active'}" onclick="A.setWeekViewMode('cards')">卡片</button>
         <button class="${table ? 'active' : ''}" onclick="A.setWeekViewMode('table')">表格（課表｜實際）</button>
       </div>
       ${table ? renderWeekTable(wn, w, order, todayKey, uid) : `<div class="card" ${canDrag ? `data-daylist="${wn}" data-coach="${coach ? 1 : 0}"` : ''}>${rows}</div>`}
-      ${viewingId ? '' : (!coach ? renderDayOrderHint(wn, order, canDrag) : renderCoachDragHint(canDrag))}
-      ${coach ? renderWeekCoachPanel(wn, w, hasOverride, vol) : ''}
+      ${coach ? renderCoachDragHint(canDrag, uid, wn) : (viewingId ? '' : renderDayOrderHint(wn, order, canDrag))}
+      ${coach ? renderWeekCoachPanel(wn, w, hasOverride, uid) : ''}
     </div>
   `;
 }
 
-// 決策紀錄第 14、18 條：環境因素讓這週某天跟另一天對調，課表項目不變，只是重新標籤。
-// 對調本身靠拖曳列上的把手；這裡只剩一行提示，跟對調過之後的「已對調＋還原」。
-// 教練模式開著時整行不顯示（那個模式下 effectiveDayOrder 一律回傳出廠順序）。
-function renderCoachDragHint(canDrag) {
-  if (!canDrag) return '';
-  return `<div class="day-order-hint"><span>教練模式：按住 ⋮⋮ 拖到另一天上放開，兩天的課表直接對調（<b>所有人的共用課表</b>）。今天以前的日子不能動。</span></div>`;
+// 每人一份課表的規則還沒發布（firebase-sync.js 的 planWeeksDenied）：讀不到自己那份、改的存不進去
+function renderPlanRulesBanner() {
+  const c = Store.coachUser();
+  const fix = Store.canEditLibrary()
+    ? '請把 firestore.rules.local 整份重新貼到 Firebase Console 發布。'
+    : `請 ${h(c ? c.displayName : '教練')} 發布新的規則。`;
+  return `<div class="banner warn">${ICON.warn}<div><b>課表的新規則還沒發布，現在改的課表存不進去</b>${fix}
+    <div><button class="btn secondary lib-add" style="margin-top:8px" onclick="A.retrySync()">發布好了，重新讀取</button></div></div></div>`;
+}
+
+// 教練模式（排課）：拖曳對調的提示，講清楚改的是誰的課表（第 56 條）。
+// 她自己對調過這週的順序（第 14 條）也講一下：排課畫面照課表原本的順序，她那邊看到的日子會不一樣。
+function renderCoachDragHint(canDrag, uid, wn) {
+  const name = h((PlanData.userById[uid] || {}).displayName || uid);
+  const adj = Store.weekAdjustmentFor(wn, uid);
+  const own = adj && isValidDayOrder(adj.dayOrder) ? adj.dayOrder : null;
+  const swapped = own ? own.map((v, i) => (v !== i ? `週${PlanData.weekdayLabel(i)}做週${PlanData.weekdayLabel(v)}的課` : null)).filter(Boolean) : [];
+  const lines = [];
+  if (canDrag) lines.push(`教練模式：按住 ⋮⋮ 拖到另一天上放開，兩天的課表直接對調（<b>${name} 的課表</b>）。今天以前的日子不能動。`);
+  if (swapped.length) lines.push(`${name} 這週自己換過順序（${h(swapped.join('、'))}），這裡照課表原本的順序排。`);
+  if (!lines.length) return '';
+  return `<div class="day-order-hint coach-hints">${lines.map((l) => `<span>${l}</span>`).join('')}</div>`;
 }
 
 function renderDayOrderHint(wn, order, canDrag) {
@@ -1131,16 +1171,45 @@ function renderWeekVolumeCard(vol, opts) {
   `;
 }
 
-// 決策紀錄第 53 條：本週訓練目標前面的名字點開＝選要看誰的紀錄（自己可以打勾；別人唯讀）
+// 決策紀錄第 53 條：本週訓練目標前面的名字點開＝選要看誰的紀錄（自己可以打勾；別人唯讀）。
+// 第 56 條：教練模式下是「正在排誰的課表」——教練每個人都能排；其他人只能排自己的，選別人是唯讀看紀錄。
+// 教練排某個人的課表時，下面多一段「複製別人的課表過來」。
 function renderViewPicker(state, uid) {
-  return `<div class="pick-list view-pick">${PlanData.users.map((u) => {
-    const self = u.userId === Store.activeUserId;
+  const me = Store.activeUserId;
+  const rows = PlanData.users.map((u) => {
+    const self = u.userId === me;
     const on = u.userId === uid;
+    const plan = Store.coachMode && Store.canEditPlanOf(u.userId);
+    const meta = plan ? (self ? '排自己的課表' : `排 ${u.displayName} 的課表`)
+      : (self ? (uid !== me ? '回到自己：可以打勾、改課表' : '可以打勾、記紀錄') : '看每天的紀錄（唯讀）');
     return `<button type="button" class="pick-row ${on ? 'on' : ''}" onclick="A.viewWeekOf(${self ? 'null' : `'${jsq(u.userId)}'`})">
         <span class="pick-mark">${on ? ICON.check : ''}</span>
-        <span class="pick-text"><span class="pick-name">${h(u.displayName)}${self ? '（自己）' : ''}</span><span class="pick-meta">${self ? (uid !== Store.activeUserId ? '回到自己：可以打勾、改課表' : '可以打勾、記紀錄') : '看每天的紀錄（唯讀）'}</span></span>
+        <span class="pick-text"><span class="pick-name">${h(u.displayName)}${self ? '（自己）' : ''}</span><span class="pick-meta">${h(meta)}</span></span>
       </button>`;
-  }).join('')}</div>`;
+  }).join('');
+  const copy = Store.coachMode && Store.isCoach(me) ? renderCopyPlanRows(state, uid) : '';
+  return `<div class="pick-list view-pick">${rows}${copy}</div>`;
+}
+
+// 複製別人的課表給正在排的這個人（第 56 條，只有教練）：「這一週」＝畫面上這一週，「今天以後」＝到比賽為止；
+// 都從明天開始。按了先跳確認（會改幾天、她自己改過的幾天會被蓋掉、她自己對調過的週跳過），確認才複製。
+function renderCopyPlanRows(state, target) {
+  const tomorrow = Store._dayAfter(Store.todayKey());
+  const wn = state.weekViewNumber;
+  if (PlanData.keyForWeekDay(PlanData.plan.totalWeeks, 6) < tomorrow) return ''; // 計畫結束了
+  const weekHasFuture = PlanData.keyForWeekDay(wn, 6) >= tomorrow;
+  const sources = PlanData.users.filter((u) => u.userId !== target);
+  const toName = h((PlanData.userById[target] || {}).displayName || target);
+  return `
+    <div class="copy-sec">
+      <div class="copy-head">把別人的課表複製給 ${toName}（明天起）</div>
+      ${sources.map((u) => `
+        <div class="copy-row">
+          <span class="copy-name">${h(u.displayName)} 的</span>
+          <button type="button" class="copy-btn" ${weekHasFuture ? '' : 'disabled title="這一週沒有明天以後的日子"'} onclick="A.copyPlanFrom('${jsq(u.userId)}','week')">這一週</button>
+          <button type="button" class="copy-btn" onclick="A.copyPlanFrom('${jsq(u.userId)}','future')">今天以後</button>
+        </div>`).join('')}
+    </div>`;
 }
 
 // 表格模式：課表｜實際 並排，模仿舊 Notion 課表那張表——給回顧用；手機上打勾用卡片模式。
@@ -1184,15 +1253,24 @@ function renderWeekTable(wn, w, order, todayKey, userId) {
 
 // 本週課表設定（教練模式）。決策紀錄第 49 條：「目標跑量」是教練自己訂的數字（不連動、不限制、不影響進度條）；
 // 「預計跑量」＝課表加總，唯讀。以前只有一組「週跑量目標」而且只能往下調，被課表加總卡死。
-function renderWeekCoachPanel(wn, w, hasOverride, vol) {
-  const goal = vol.goal;
-  // planOnly：純課表加總，不看任何人的 entries。planOverrides 是三人共用的一份文件，
-  // 「課表加總」這個字眼講的是課表本身，不能取決於「誰的手機正在看這頁」。
-  const auto = Store.weekTargetAuto(wn, Store.activeUserId, { planOnly: true });
+// uid：正在排的那個人（第 56 條），這裡的設定都是她那份課表的。
+function renderWeekCoachPanel(wn, w, hasOverride, uid) {
+  const goal = Store.weekVolume(wn, uid).goal;
+  // planOnly：純課表加總，不看她的打勾紀錄、休息、對調——「預計跑量」講的是課表本身
+  const auto = Store.weekTargetAuto(wn, uid, { planOnly: true });
   const stale = hasOverride && (w.basePlanVersion || 3) < PlanData.plan.planVersion;
+  // 決策紀錄第 57 條：教練在對話裡給的整週課表，這週有的話一鍵排進正在排的那個人（只有教練：會加進常用項目庫）
+  const who = h((PlanData.userById[uid] || {}).displayName || uid);
+  const presets = Store.canEditLibrary() ? (PlanData.weekPresets || []).filter((p) => p.weekNumber === wn) : [];
+  const presetRows = presets.map((p) => `
+      <div class="preset-row">
+        <div class="preset-text"><span class="preset-lbl">預先排好的課表</span>${h(p.name)}</div>
+        <button class="btn" style="background:var(--warn);width:auto;padding:8px 14px;font-size:13px" onclick="A.applyWeekPreset('${jsq(p.id)}')">排進 ${who} 這週</button>
+      </div>`).join('');
   return `
     <div class="card" style="margin-top:12px;border-color:var(--warn)">
       <div style="font-weight:700;font-size:12.5px;color:var(--warn);margin-bottom:10px">🛠 本週課表設定</div>
+      ${presetRows}
       ${stale ? `<div class="banner warn" style="margin-bottom:10px">${ICON.warn}<div><b>這週的調整是基於舊版出廠課表（v${w.basePlanVersion || 3}）</b>出廠課表已更新到 v${PlanData.plan.planVersion}（例如走跑改成 Zone 2 跑），這週不會自動跟上。要套用新版請按下面「還原本週為出廠預設值」再重新調整。</div></div>` : ''}
       <div class="edit-form">
         <div class="row">
@@ -1219,7 +1297,7 @@ function renderWeekCoachPanel(wn, w, hasOverride, vol) {
       </div>
       ${hasOverride ? `
         <div class="actions" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--warn)">
-          <button class="btn danger" style="width:auto;padding:8px 14px;font-size:13px" onclick="A.resetWeekOverride(${wn})">還原本週為出廠預設值</button>
+          <button class="btn danger" style="width:auto;padding:8px 14px;font-size:13px" onclick="A.resetPlanWeek(${wn})">還原本週為出廠預設值</button>
         </div>
         <div style="font-size:11.5px;color:var(--text3);margin-top:6px">這週已經被教練模式改過。</div>
       ` : `<div style="font-size:11.5px;color:var(--text3);margin-top:10px">這週目前是出廠預設值。</div>`}
@@ -1352,12 +1430,11 @@ function renderOverviewPage(state) {
 }
 
 // 訓練目標（users/{userId}/profile/goals）：比賽目標一句 + 自訂目標清單。
-// 自己的隨時可以編輯；教練模式開著時也能編輯別人的（決策紀錄第 15 條：跟教練模式改
-// 課表同一套「白名單內任何人都能做」哲學，不限定某一人是教練）。目標不會改變任何一天
-// 的課表內容（第 0 條）。
+// 自己的隨時可以編輯；別人的只有教練（Mick）在教練模式能編輯（決策紀錄第 56 條，取代第 15 條「三人皆可」）。
+// 目標不會改變任何一天的課表內容（第 0 條）。
 function renderGoalsCard(userId, isSelf, user) {
   const g = Store.goalsFor(userId) || { raceGoal: '', items: [] };
-  const editable = isSelf || Store.coachMode;
+  const editable = isSelf || (Store.coachMode && Store.canEditGoalsOf(userId));
   if (!editable) {
     const title = `${h(user ? user.displayName : userId)} 的目標`;
     const empty = !g.raceGoal && !g.items.length;
@@ -1397,11 +1474,11 @@ function renderGoalsCard(userId, isSelf, user) {
 
 // 這個階段第一個「Zone 2 跑」項目的 RPE／體感——findZone2Reference 只找 type==='run'
 // 且標題含「Zone 2」的項目（跟 long-run/tempo 不一樣，不能混用），找到就停，
-// 純粹當背景參考文字，不是計算依據。用 Store.effectiveWeek 而不是出廠 plan.json，
-// 教練若把這階段的 Zone 2 項目改過（例如改了 RPE），這裡要跟著變。
-function findZone2Reference(phase) {
+// 純粹當背景參考文字，不是計算依據。用 Store.effectiveWeek（userId 那個人的課表，第 56 條）
+// 而不是出廠 plan.json，教練若把這階段的 Zone 2 項目改過（例如改了 RPE），這裡要跟著變。
+function findZone2Reference(phase, userId) {
   for (let wn = phase.weekRange[0]; wn <= phase.weekRange[1]; wn++) {
-    const w = Store.effectiveWeek(wn);
+    const w = Store.effectiveWeek(wn, userId);
     for (const d of w.days) {
       for (const it of d.items) {
         if (it.type === 'run' && /Zone\s*2/i.test(it.title || '') && (it.rpe || it.intensityNote)) return it;
@@ -1412,7 +1489,7 @@ function findZone2Reference(phase) {
 }
 
 // 階段性目標（決策紀錄第 22 條）：Zone 2 配速、跑量、5K 技術指標（Cadence/VO/GCT/步幅）
-// 依訓練階段各自設定。跟訓練目標卡同一套編輯權限（isSelf || 教練模式）。只有跑量目標
+// 依訓練階段各自設定。跟訓練目標卡同一套編輯權限（自己的，或教練在教練模式）。只有跑量目標
 // 有「累積實際 vs 目標」的比對（沿用 weekVolume 的算法加總），其餘五項純參考不追蹤實際——
 // 這是這一版刻意的範圍（配速／技術指標要不要比對實際留到之後再討論）。
 // 六個欄位一次存（一顆按鈕，讀整份表單），不是六次個別寫入——跟教練模式的項目編輯表單
@@ -1422,7 +1499,7 @@ function renderPhaseTargetsCard(currentPhase, viewingUserId, isSelf, viewingUser
   const shownPhaseId = (state.overviewPhaseId && phases.some((p) => p.phaseId === state.overviewPhaseId))
     ? state.overviewPhaseId : currentPhase.phaseId;
   const phase = phases.find((p) => p.phaseId === shownPhaseId) || currentPhase;
-  const editable = isSelf || Store.coachMode;
+  const editable = isSelf || (Store.coachMode && Store.canEditGoalsOf(viewingUserId));
   const targets = Store.phaseTargetsFor(viewingUserId)[phase.phaseId] || {};
 
   const phaseSelect = `
@@ -1454,7 +1531,7 @@ function renderPhaseTargetsCard(currentPhase, viewingUserId, isSelf, viewingUser
   // 這階段 Zone 2 的體感（RPE／強度說明）：配速目標旁邊的背景參考（決策紀錄第 22 條——配速
   // 沒有像跑量那樣的自動天花板可以卡，只能提供這個當安全邊界的提醒，不擋存檔）。
   // 第 30 條之後心率只寫 Zone，「Zone 2 對應心率 Zone 2」沒有資訊，改成講體感。
-  const zone2Ref = findZone2Reference(phase);
+  const zone2Ref = findZone2Reference(phase, viewingUserId);
   const zone2Feel = zone2Ref ? [zone2Ref.rpe ? `RPE ${zone2Ref.rpe.min}-${zone2Ref.rpe.max}` : '', zone2Ref.intensityNote || ''].filter(Boolean).join('、') : '';
   const zone2Hint = zone2Feel ? `這階段的 Zone 2 體感：${h(zone2Feel)}。` : '';
 
@@ -1544,7 +1621,7 @@ function renderVolumeOverview(wn, userId) {
 function renderLongRunTrend(userId) {
   const points = [];
   for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) {
-    const w = Store.effectiveWeek(wn);
+    const w = Store.effectiveWeek(wn, userId); // 那個人自己的課表（第 56 條）
     const longIdx = w.days.findIndex((d) => !d.selectOne && d.items.some((it) => it.type === 'long-run' || it.type === 'race'));
     if (longIdx === -1) continue;
     const item = w.days[longIdx].items.find((it) => it.type === 'long-run' || it.type === 'race');
@@ -1587,11 +1664,11 @@ function renderLongRunTrend(userId) {
 
 // ── 頁面 4：使用者切換 / 分享設定 ────────────────────────────────────────────
 // ── 常用項目庫（決策紀錄第 26 條）─────────────────────────────────────────────
-// 教練模式開著時出現在設定頁。三區：
+// 教練（Mick）開教練模式時出現在設定頁（第 56 條：只有教練能改，改了會套用到三個人的課表）。三區：
 //   常用項目——從課表上任何一個項目按「存成常用」而來；這裡改名、改內容、刪除
 //   動作清單——內建 4 份（data/workouts.json）＋自訂的；都能改，改動從今天起生效（第 33 條）
 //   影片——內建 8 支（data/videos.json）＋自訂的；同上
-// 帶入是複製：改範本不會改到已經排好的日子（使用者選的是複製式）。
+// 改常用項目會套用到今天以後用到它的課表（第 52 條）。
 function renderLibraryPanel(state) {
   const edit = state.libraryEdit;
   const banners = [
@@ -1675,7 +1752,7 @@ function renderLibraryPanel(state) {
       <div class="card lib-card">
         <div class="lib-group">
           <div class="lib-head">常用項目</div>
-          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。項目的內容只在這裡設定；課表上點項目名稱就能換成這裡的項目。改這裡會套用到今天以後用到它的日子，今天以前的日子不動。</div>
+          <div class="lib-note">可以直接在這裡新增（跑步項目的訓練段落、間歇範本都在表單裡），或在「本週」教練模式的項目下面按「存成常用」。「複製」會做一份一樣的，改一改就是新的項目。項目的內容只在這裡設定；課表上點項目名稱就能換成這裡的項目。改這裡會套用到三個人今天以後用到它的日子，今天以前的日子不動。</div>
           ${itemRows || (isEditing('item', 'new') ? '' : '<div class="lib-empty">還沒有常用項目。</div>')}
           ${newItemForm}
         </div>
@@ -1709,8 +1786,8 @@ function libraryEditorHead(edit, kind) {
   const what = kind === 'workout' ? '動作清單' : '影片';
   const lines = [];
   const scope = u.total === 0
-    ? `課表裡目前沒有用到這份${what}；之後排進課表的日子會用存檔後的內容。`
-    : `存檔後，今天（${todayLabel}）起用到它的 <b>${u.upcoming}</b> 天會換成新內容${u.total > u.upcoming ? `；今天以前的 ${u.total - u.upcoming} 天維持原樣` : ''}。`;
+    ? `三個人的課表裡目前沒有用到這份${what}；之後排進課表的日子會用存檔後的內容。`
+    : `存檔後，三個人課表裡今天（${todayLabel}）起用到它的 <b>${u.upcoming}</b> 天會換成新內容${u.total > u.upcoming ? `；今天以前的 ${u.total - u.upcoming} 天維持原樣` : ''}。`;
   lines.push(`${edit.builtin ? `這是<b>內建</b>的${what}。` : ''}${scope}`);
   let canSave = true;
   if (edit.builtin && !Sync.isSignedIn()) {
@@ -1867,12 +1944,14 @@ function renderSettingsPage(state) {
       <div class="coach-toggle-row">
         <div>
           <div style="font-weight:700;font-size:14px">編輯課表內容</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px">開啟後可以在「本週」直接調整項目、順序、二擇一，改的是所有人共用的課表。</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">${Store.canEditLibrary()
+            ? '開啟後可以在「本週」排三個人的課表（本週訓練目標前面的名字選要排誰），常用項目庫也在下面。每個人一份課表，改誰的只變誰的。'
+            : '開啟後可以在「本週」直接調整你自己的課表（項目、順序、二擇一）。別人的課表只能看。'}</div>
         </div>
         <label class="switch"><input type="checkbox" ${Store.coachMode ? 'checked' : ''} onchange="A.toggleCoachMode()"><span class="slider"></span></label>
       </div>
     </div>
-    ${Store.coachMode ? renderLibraryPanel(state) : ''}
+    ${Store.coachMode && Store.canEditLibrary() ? renderLibraryPanel(state) : ''}
 
     <div class="section">
       <div class="section-title">外觀</div>

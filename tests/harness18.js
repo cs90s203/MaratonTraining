@@ -23,7 +23,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
 (async () => {
   await sandbox.PlanData.load();
   const { PlanData, Store, App, Sync } = sandbox;
-  Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushPlanOverride = () => {};
+  Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushPlanWeek = () => {};
 
   // ── 第 49 條：週目標跑量 ──
   Store.coachMode = true;
@@ -34,7 +34,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
   assert(vol.goal && vol.goal.min === auto.max + 10 && vol.goal.max === auto.max + 15, `goal above the plan total is kept as typed (${JSON.stringify(vol.goal)})`);
   assert(vol.target.min === Store.weekTargetAuto(W, 'mick').min && vol.target.max === Store.weekTargetAuto(W, 'mick').max, 'target (預計) stays the plan total, not clamped or replaced by the goal');
   assert(!sandbox.__alerts.some((m) => m.includes('不能高於課表加總')), 'no "cannot exceed plan" refusal');
-  const panel = fn('renderWeekCoachPanel')(W, Store.effectiveWeek(W), true, vol);
+  const panel = fn('renderWeekCoachPanel')(W, Store.effectiveWeek(W, 'mick'), true, 'mick');
   assert(panel.includes('目標跑量（K）') && panel.includes(`value="${auto.max + 10}"`) && panel.includes('預計跑量') && panel.includes('清除目標') && !panel.includes('只能往下調') && !/placeholder="\d/.test(panel), 'coach panel: free 目標跑量 inputs + read-only 預計跑量, no ceiling text or plan placeholders');
   const card = fn('renderWeekVolumeCard')(vol, { heading: '本週訓練目標', title: '跑量' });
   assert(card.includes(`目標跑量 ${auto.max + 10}–${auto.max + 15} km`) && card.includes(`/ ${auto.min === auto.max ? auto.min : `${auto.min}–${auto.max}`} km`), 'week card: bar still actual / 預計, plus a 目標跑量 line');

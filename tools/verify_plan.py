@@ -306,6 +306,30 @@ def main():
            if it["type"] in RUN_TYPES and not it["duration"] and not it["distanceKm"]]
     check("跑步類項目都有時長或距離（目標加總的前提）", not bad, str(bad[:4]))
 
+    # ══ C. 預先排好的整週課表（決策紀錄第 57 條，data/week-presets.json）═══════════════
+    # 教練在對話裡給的課表，App 裡一鍵排進某個人的那一週——寫錯一個 key 或影片 id，按下去才會壞，這裡先擋
+    presets_path = os.path.join(ROOT, "data/week-presets.json")
+    presets = load("data/week-presets.json")["presets"] if os.path.exists(presets_path) else []
+    bad = [p.get("id") for p in presets
+           if not isinstance(p.get("weekNumber"), int) or not 1 <= p["weekNumber"] <= len(weeks)
+           or not p.get("name") or not isinstance(p.get("days"), list) or len(p["days"]) != 7
+           or any(not isinstance(d, list) or not d for d in p["days"])]
+    check("預排課表：週次合法、剛好 7 天、每天至少一項", not bad, str(bad))
+    bad = [f'{p["id"]} → {k}' for p in presets for d in p.get("days", []) for k in d if k not in p.get("items", {})]
+    check("預排課表：每天列的項目都有定義", not bad, str(bad[:5]))
+    bad = [f'{p["id"]}/{k}' for p in presets for k, it in p.get("items", {}).items()
+           if not it.get("title") or it.get("type") not in VALID_TYPES]
+    check("預排課表：項目都有名稱、類型合法", not bad, str(bad[:5]))
+    bad = [f'{p["id"]}/{k} → {ref}' for p in presets for k, it in p.get("items", {}).items()
+           for ref in list(it.get("videoRefs") or []) if ref not in vids]
+    check("預排課表：影片 id 都在 videos.json", not bad, str(bad[:5]))
+    ids = [p.get("id") for p in presets]
+    check("預排課表：id 不重複", len(ids) == len(set(ids)), str(ids))
+    # 跟 B 段同一條：跑步類要有時長或距離，不然預計跑量少算它（審查抓到：間歇跑沒寫時間）
+    bad = [f'{p["id"]}/{k}' for p in presets for k, it in p.get("items", {}).items()
+           if it.get("type") in RUN_TYPES and not it.get("duration") and not it.get("distanceKm")]
+    check("預排課表：跑步類項目都有時長或距離", not bad, str(bad[:5]))
+
     # ── 輸出 ──
     width = max(len(n) for n, _, _ in checks)
     for name, ok, detail in checks:

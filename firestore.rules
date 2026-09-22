@@ -38,14 +38,19 @@ service cloud.firestore {
       );
     }
 
-    // 顯示名稱等個人設定 + 訓練目標（profile/goals）：白名單內都看得到。
-    // 寫入：白名單內任何人都能寫，不限本人——決策紀錄第 15 條，教練模式下可以幫別人
-    // 設訓練目標，跟 planOverrides 同一套「三人皆可、不限定一人是教練」哲學。
-    // 這個集合目前只放 goals（比賽目標＋自訂清單），不放身體狀況等敏感資料——
-    // 那些走 private/ 子集合（下面），isSelf 才能寫。
+    // 教練（決策紀錄第 56 條）：排三個人的課表、改常用項目庫、幫別人設目標。
+    // ⚠️ 要跟 data/users.json 裡 coach:true 的那個 userId 一樣（tests/harness22.js 會比對兩邊）。
+    // 寫成 isSelf('mick') 而不是再寫一次 email：email 對照只留 isSelf() 一個地方。
+    function isCoach() {
+      return isSelf('mick');
+    }
+
+    // 訓練目標（profile/goals）、階段目標（profile/phaseTargets）：白名單內都看得到。
+    // 寫入：本人，或教練幫忙設（第 56 條，取代第 15 條「白名單內任何人都能寫」）。
+    // 這個集合不放身體狀況等敏感資料——那些走 private/ 子集合（下面），isSelf 才能寫。
     match /users/{userId}/profile/{doc} {
       allow read:  if isMember();
-      allow write: if isMember();
+      allow write: if isSelf(userId) || isCoach();
     }
 
     // 完成紀錄（status / 實際時長 / 距離）：白名單內都看得到，只有本人能寫。
@@ -68,18 +73,26 @@ service cloud.firestore {
       allow write: if isSelf(userId);
     }
 
-    // 教練模式：課表內容的共用覆寫層（一份文件＝一整週）。跟上面「個人紀錄」不同，
-    // 這是白名單內任何人都能改的共用資源——決策：三個使用者都能切換教練模式編輯課表。
-    // 出廠預設值（data/plan.json）維持 git 版控、不受影響；這裡只存「被改過的週」，
-    // 沒被改過的週前端會自己退回讀 plan.json。
-    match /planOverrides/{weekNumber} {
-      allow read, write: if isMember();
+    // 課表：每個人一份（決策紀錄第 56 條，一份文件＝這個人的一整週）。白名單內都看得到
+    // （總覽算完成率、唯讀看別人的紀錄要用）；本人跟教練能改。
+    // 出廠預設值（data/plan.json）維持 git 版控、不受影響；這裡只存「被改過的週」。
+    match /users/{userId}/planWeeks/{week} {
+      allow read:  if isMember();
+      allow write: if isSelf(userId) || isCoach();
     }
 
-    // 常用項目庫（決策紀錄第 26 條）：教練模式存的常用項目、自訂動作清單、自訂影片。
-    // 跟 planOverrides 同一套：白名單內任何人都能讀寫，不限定誰是教練。
+    // v0.25 以前三人共用的那一份課表：第 56 條之後唯讀。新版 App 在某人某週還沒有自己那份時讀它；
+    // 還開著舊版的手機去改會被拒（畫面會出現「寫入被拒」），不會悄悄改到沒人讀的地方。
+    match /planOverrides/{weekNumber} {
+      allow read:  if isMember();
+      allow write: if false;
+    }
+
+    // 常用項目庫（決策紀錄第 26 條）：常用項目、自訂動作清單、自訂影片。白名單內都讀得到（挑項目用），
+    // 只有教練能改——改了會套用到三個人的課表（第 52、56 條）。
     match /library/{docId} {
-      allow read, write: if isMember();
+      allow read:  if isMember();
+      allow write: if isCoach();
     }
 
     // 其餘一律拒絕。

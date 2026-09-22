@@ -122,6 +122,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
   const S2 = ctx2.Sync;
   S2.user = { email: 'x@example.com' };
   S2._detachListeners = () => {}; S2._attachListeners = () => {}; S2._detachLibrary = () => {}; S2._attachLibrary = () => {}; S2._backfillLocal = () => {};
+  S2._detachPlanWeeks = () => {}; S2._attachPlanWeeks = () => {};
   S2.state = 'write-denied'; S2.failedWrites = new Set(['entries:2026-09-14', 'private:2026-09-14', 'library:c-1']);
   S2.resubscribe(true);
   assert(!S2.failedWrites.has('entries:2026-09-14') && !S2.failedWrites.has('private:2026-09-14') && S2.failedWrites.has('library:c-1'), 'identity change drops only the previous identity own-write failures');
@@ -162,7 +163,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
 
   // ── 13. 預設的人在這台同步過（別人的雲端資料）→ 絕對不搬 ──
   const dev = {};
-  const ctx4 = { ...sandbox, localStorage: { getItem: (k) => (k in dev ? dev[k] : null), setItem: (k, v) => { dev[k] = String(v); }, removeItem: (k) => { delete dev[k]; } }, alert: () => {} };
+  const ctx4 = { ...sandbox, setTimeout, clearTimeout, localStorage: { getItem: (k) => (k in dev ? dev[k] : null), setItem: (k, v) => { dev[k] = String(v); }, removeItem: (k) => { delete dev[k]; } }, alert: () => {} };
   ctx4.window = ctx4;
   vm.createContext(ctx4);
   for (const f of ['js/plan-data.js', 'js/firebase-sync.js', 'js/store.js']) vm.runInContext(fs.readFileSync(path + '/' + f, 'utf8'), ctx4, { filename: f });

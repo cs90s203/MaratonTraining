@@ -23,7 +23,7 @@ const J = (x) => JSON.stringify(x);
   await sandbox.PlanData.load();
   const { PlanData, Store, App } = sandbox;
   Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushLibrary = () => {};
-  const pushed = []; Store._cloudPushPlanOverride = (wn) => pushed.push(wn);
+  const pushed = []; Store._cloudPushPlanWeek = (uid, wn) => pushed.push(wn);
   Store.coachMode = true;
   const today = PlanData.dayKey(PlanData.today());
   const z2 = () => { const out = []; PlanData.plan.weeks.forEach((w) => Store.effectiveWeek(w.weekNumber).days.forEach((d, di) => d.items.forEach((it) => { if (it.title === 'Zone 2 跑') out.push({ wn: w.weekNumber, di, key: PlanData.keyForWeekDay(w.weekNumber, di), it }); }))); return out; };
@@ -35,13 +35,16 @@ const J = (x) => JSON.stringify(x);
   const src = future[0].it;
   const t = Store.saveLibraryDoc(null, 'item', { name: 'Zone 2 跑', item: src });
   const oldItem = JSON.parse(JSON.stringify(t.item));
-  assert(Store.templateUsage(t.id, t.item).length === future.length, `usage counts every Zone 2 跑 from today on (${future.length})`);
+  // 第 56 條：三個人的課表都算；畫面上講的天數同一天只算一次
+  assert(Store.templateUsageDays(t.id, t.item) === future.length && Store.templateUsage(t.id, t.item).length === future.length * PlanData.users.length, `usage counts every Zone 2 跑 from today on (${future.length} days, in all ${PlanData.users.length} plans)`);
   const edited = Store.saveLibraryDoc(t.id, 'item', { name: 'Zone 2 跑', item: { ...t.item, videoRefs: [vid], videoRef: vid } });
   const n = App._applyTemplateToPlan(t.id, oldItem, edited.item);
   const after = z2();
   const fut2 = after.filter((x) => x.key >= today), past2 = after.filter((x) => x.key < today);
   assert(n === future.length && fut2.every((x) => PlanData.itemVideoRefs(x.it).includes(vid) && x.it.templateId === t.id), `added video applied to all ${n} Zone 2 跑 days from today`);
   assert(past2.every((x) => !PlanData.itemVideoRefs(x.it).includes(vid) && !x.it.templateId), 'days before today untouched');
+  const inPlan = (uid) => { const x = future[0]; return Store.effectiveWeek(x.wn, uid).days[x.di].items.find((it) => it.id === x.it.id); };
+  assert(['Annlin', 'Phoebe'].every((uid) => PlanData.itemVideoRefs(inPlan(uid)).includes(vid) && inPlan(uid).templateId === t.id), 'library change reaches Annlin and Phoebe too (each in her own plan)');
   const notesBefore = J(future.map((x) => [x.it.notes, x.it.duration]));
   assert(J(fut2.map((x) => [x.it.notes, x.it.duration])) === notesBefore, 'each day keeps its own notes and time (only the changed field was applied)');
 
@@ -94,5 +97,5 @@ const J = (x) => JSON.stringify(x);
 
   // 表單上講清楚範圍
   const form = vm.runInContext('renderTemplateForm', sandbox)({ id: t.id, name: 'Zone 2 跑', item: edited.item });
-  assert(form.includes('存檔後，今天起用到這個項目的') && form.includes(`<b>${future.length}</b>`), 'library form tells how many days from today will follow');
+  assert(form.includes('存檔後，三個人課表裡今天起用到這個項目的') && form.includes(`<b>${future.length}</b>`), 'library form tells how many days from today will follow (all three plans, each day once)');
 })();

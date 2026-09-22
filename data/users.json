@@ -1,7 +1,7 @@
 {
-  "_note": "userId 是「人」的識別碼，不是裝置代碼——同一人在手機/電腦上必須共用同一個 userId，否則決策紀錄第 1 條承諾的多裝置同步會從根本失效（決策紀錄相關發現：規格審查 major #18）。這份清單是唯一入口：App 端只能從這裡選，不能自由輸入，避免兩人選到同一個 id 互相覆蓋彼此的紀錄。加人＝在這裡加一筆、加 firestore.rules.local 的 isMember() 白名單與 ownerEmail() 對照，重新發布規則，不用重新部署（純資料檔，靜態 bundle 進前端）。",
+  "_note": "userId 是「人」的識別碼，不是裝置代碼——同一人在手機/電腦上必須共用同一個 userId，否則決策紀錄第 1 條承諾的多裝置同步會從根本失效（決策紀錄相關發現：規格審查 major #18）。這份清單是唯一入口：App 端只能從這裡選，不能自由輸入，避免兩人選到同一個 id 互相覆蓋彼此的紀錄。加人＝在這裡加一筆、加 firestore.rules.local 的 isMember() 白名單與 isSelf() 對照，重新發布規則，不用重新部署（純資料檔，靜態 bundle 進前端）。coach:true＝教練（決策紀錄第 56 條）：排三個人的課表、改常用項目庫、設別人的目標；只能有一個，而且要跟 firestore.rules 的 isCoach() 同一個人（tests/harness22.js 會比對）。換教練＝兩邊一起改、重新發布規則。",
   "users": [
-    { "userId": "mick", "displayName": "Mick" },
+    { "userId": "mick", "displayName": "Mick", "coach": true },
     { "userId": "Annlin", "displayName": "Annlin" },
     { "userId": "Phoebe", "displayName": "Phoebe" }
   ]

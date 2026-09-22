@@ -135,12 +135,15 @@ function assert(c, m) { console.log((c ? 'PASS' : 'FAIL') + ': ' + m); if (!c) p
   Sync.pushLibrary = origPush;
 
   // ── 審查修正 5：重試會重掛庫的訂閱 ──
-  let attached = 0;
-  const saved = { isSignedIn: Sync.isSignedIn, _detachListeners: Sync._detachListeners, _attachListeners: Sync._attachListeners, _backfillLocal: Sync._backfillLocal, _attachLibrary: Sync._attachLibrary, _detachLibrary: Sync._detachLibrary };
-  Object.assign(Sync, { isSignedIn: () => true, _detachListeners: () => {}, _attachListeners: () => {}, _backfillLocal: () => {}, _detachLibrary: () => {}, _attachLibrary: () => { attached++; } });
+  let attached = 0, planAttached = 0;
+  const saved = { isSignedIn: Sync.isSignedIn, _detachListeners: Sync._detachListeners, _attachListeners: Sync._attachListeners, _backfillLocal: Sync._backfillLocal, _attachLibrary: Sync._attachLibrary, _detachLibrary: Sync._detachLibrary, _attachPlanWeeks: Sync._attachPlanWeeks, _detachPlanWeeks: Sync._detachPlanWeeks };
+  Object.assign(Sync, { isSignedIn: () => true, _detachListeners: () => {}, _attachListeners: () => {}, _backfillLocal: () => {}, _detachLibrary: () => {}, _attachLibrary: () => { attached++; }, _detachPlanWeeks: () => {}, _attachPlanWeeks: () => { planAttached++; } });
   Sync.libraryDenied = true;
+  Sync.planWeeksDenied = true;
   Sync.resubscribe();
   assert(attached === 1 && Sync.libraryDenied === false, 'resubscribe re-attaches library and clears libraryDenied');
+  // 第 56 條：每人一份課表的規則剛發布好，按「重新讀取」也要重掛課表的訂閱
+  assert(planAttached === 1 && Sync.planWeeksDenied === false, 'resubscribe re-attaches plan weeks and clears planWeeksDenied');
   Object.assign(Sync, saved);
 
   console.log('done');

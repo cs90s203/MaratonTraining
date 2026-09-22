@@ -1,0 +1,45 @@
+{
+  "_note": "教練（Mick）在對話裡給的整週課表（決策紀錄第 57 條）。教練模式「本週課表設定」可以一鍵排進某個人的那一週：整週換掉（包含已經過去的日子），同一天原本就有的同一個項目沿用原本的 id（打過的勾留著）。items 的每一項用「名稱＋類型」對常用項目庫：庫裡有的用庫裡那份（她自己調過的，例如帶熱身影片的「Zone 2 跑」），沒有的照這裡的內容新增進庫。間歇跑庫裡沒有時用她之前舉的例子（決策紀錄第 42 條：暖身 10 分、4 ×（400 公尺＋恢復 90 秒）、緩和 10 分，約 35–40 分）。明天以後她已經先記了東西的日子不動。days 是週一到週日，每天列 items 的 key。影片 id 要在 data/videos.json 裡（tools/verify_plan.py 會查）。",
+  "presets": [
+    {
+      "id": "2026-09-21",
+      "weekNumber": 3,
+      "name": "9/21 那週（Mick 傳來的）",
+      "items": {
+        "rest": { "type": "rest", "title": "完全休息" },
+        "breath": { "type": "recovery", "title": "盆底肌內核呼吸練習" },
+        "stretch": { "type": "recovery", "title": "伸展", "duration": { "min": 15, "max": 15 }, "videoRefs": ["mady-full-body-stretch-15"] },
+        "zone2": {
+          "type": "run", "title": "Zone 2 跑", "duration": { "min": 20, "max": 25 }, "heartRateZone": "Zone 2", "rpe": { "min": 4, "max": 5 },
+          "intensityNote": "輕鬆對話",
+          "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。"
+        },
+        "legsGlutes": { "type": "muscle", "title": "腿臀", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-booty-no-jumps-10"] },
+        "gluteBack": { "type": "muscle", "title": "臀背", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-boobs-back-10"] },
+        "gluteCore": { "type": "muscle", "title": "臀核心", "duration": { "min": 10, "max": 10 }, "videoRefs": ["lilly-hip-dips-10"] },
+        "core": { "type": "muscle", "title": "核心", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-beginner-abs-10"] },
+        "back": { "type": "muscle", "title": "背", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-only-back-10"] },
+        "interval": {
+          "type": "interval", "title": "間歇跑", "duration": { "min": 35, "max": 40 },
+          "segments": [
+            { "kind": "warmup", "amount": { "unit": "min", "min": 10, "max": 10 }, "zone": null, "note": "輕鬆跑" },
+            { "kind": "repeat", "times": 4, "steps": [
+              { "kind": "main", "amount": { "unit": "m", "min": 400, "max": 400 }, "zone": null, "note": "" },
+              { "kind": "recover", "amount": { "unit": "sec", "min": 90, "max": 90 }, "zone": null, "note": "慢跑或走路" }
+            ] },
+            { "kind": "cooldown", "amount": { "unit": "min", "min": 10, "max": 10 }, "zone": null, "note": "輕鬆跑" }
+          ]
+        }
+      },
+      "days": [
+        ["rest", "breath", "stretch"],
+        ["zone2", "breath", "stretch"],
+        ["legsGlutes", "gluteBack", "stretch"],
+        ["zone2", "breath", "stretch"],
+        ["gluteCore", "core", "stretch"],
+        ["back", "zone2", "stretch"],
+        ["interval", "breath", "stretch"]
+      ]
+    }
+  ]
+}

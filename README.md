@@ -20,7 +20,8 @@
 純前端，沒有自己的伺服器。**Firebase（Authentication + Firestore）當後端。**
 
 ```
-課表 + 影片 + 動作清單   靜態 JSON，bundle 進前端（帶 ?v= 版本號）
+課表 + 影片 + 動作清單   出廠版本是靜態 JSON，bundle 進前端（帶 ?v= 版本號）
+每個人改過的課表          Firestore，每人每週一份（教練 Mick 排三個人的，見決策紀錄第 56 條）
 使用者完成紀錄            Firestore，一天一筆文件
 身分                     Firebase Auth（Google 登入）+ Security Rules email 白名單
 ```
@@ -72,12 +73,13 @@ python3 tools/verify_plan.py   # 課表 JSON
 ## 進度
 
 - [x] **CP0** 專案骨架、port 登記、架構與待決事項定案、日期修正
-- [x] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過（現在 56 項）
+- [x] **CP1** 課表轉 JSON + `tools/verify_plan.py` 驗證腳本通過（現在 62 項）
 - [x] **CP2** 今日視圖
 - [x] **CP3** 接 Firestore + 離線與失敗狀態
 - [x] **CP4** 週視圖、總覽、使用者切換
 - [x] **教練模式** 三人皆可切換編輯共用課表（設定頁開關），見
-      [決策紀錄第 11 條](docs/決策紀錄.md#11-教練模式課表從共用唯讀改成三人皆可寫)
+      [決策紀錄第 11 條](docs/決策紀錄.md#11-教練模式課表從共用唯讀改成三人皆可寫已被第-56-條取代)
+      （v0.26.0 起改成每人一份課表、Mick 是教練，見第 56 條）
 - [x] **CP5** 部署到 GitHub Pages——**https://cs90s203.github.io/MaratonTraining/**
       （2026-09-11 上線；邀請新的共用者仍要補 `data/users.json` +
       `firestore.rules.local` 的 `isMember()`／`isSelf()`）
@@ -121,5 +123,6 @@ python3 tools/verify_plan.py   # 課表 JSON
 - [x] **v0.23.0** 改常用項目會套用到今天以後用到它的課表（只套改了的地方），見 [決策紀錄第 52 條](docs/決策紀錄.md)
 - [x] **v0.24.0** 唯讀看別人每天的紀錄（本週頁名字選單、總覽入口），見 [決策紀錄第 53 條](docs/決策紀錄.md)
 - [x] **v0.25.0** 教練備註（有寫才出現）；休息日可以排「選做」的恢復運動，不算完成率，見 [決策紀錄第 54、55 條](docs/決策紀錄.md)
+- [x] **v0.26.0** 每個人一份課表：Mick 是教練排三個人的、其他人只能改自己的；複製課表（明天起）；常用項目庫、別人的目標只有 Mick 能改；對話裡給的整週課表一鍵排進某個人那週，見 [決策紀錄第 56、57 條](docs/決策紀錄.md)
 
 完整的規格審查報告（36 條發現）見 CHANGELOG 的 v0.1.0 條目。

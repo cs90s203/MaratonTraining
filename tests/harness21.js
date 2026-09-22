@@ -23,7 +23,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   await sandbox.PlanData.load();
   const { PlanData, Store, App } = sandbox;
   Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushLibrary = () => {};
-  const pushes = []; Store._cloudPushPlanOverride = (wn) => pushes.push(wn);
+  const pushes = []; Store._cloudPushPlanWeek = (uid, wn) => pushes.push(wn);
   Store.coachMode = true;
   const W = PlanData.locateToday().weekNumber + 1;
   const D = Store.effectiveWeek(W).days.findIndex((d) => !d.selectOne && d.items.some((it) => it.type === 'run'));

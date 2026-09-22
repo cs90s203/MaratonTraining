@@ -5,7 +5,8 @@ const App = {
   state: {
     page: 'week',          // 決策紀錄第 17 條：沒有「今日」頁，本週頁預設展開今天那一列
     weekViewNumber: 1,
-    viewingUserId: null,   // null = 預設看自己；總覽頁「查看別人」用，跟 Store.activeUserId（寫入身分）分開
+    viewingUserId: null,   // null = 預設看自己；總覽頁「查看別人」、本週頁的名字選單用，跟 Store.activeUserId（寫入身分）分開。
+                           // 第 56 條：教練模式下這就是「正在排誰的課表」（能不能改看 Store.canEditPlanOf）
     overviewPhaseId: null, // 決策紀錄第 22 條：總覽頁「階段目標」卡目前選看哪個階段；null = 目前所在階段
     expandedDay: null,     // {weekNumber,dayIndex}：本週頁手風琴目前展開的那一列；null = 全收
     itemPicker: null,      // 決策紀錄第 45 條：教練模式打開的項目庫清單 {weekNumber,dayIndex,itemId|'add'}
@@ -111,6 +112,13 @@ const App = {
     render();
   },
 
+  // 決策紀錄第 56 條：本週頁現在是誰的課表（每個人一份）。教練模式開著、而且 Store.canEditPlanOf 這個人，就是在排她的課表。
+  planUserId() {
+    const v = this.state.viewingUserId;
+    return v && v !== Store.activeUserId && PlanData.userById[v] ? v : Store.activeUserId;
+  },
+  _canEditPlan() { return Store.coachMode && Store.canEditPlanOf(this.planUserId()); },
+
   viewProgress(userId) {
     this.state.viewingUserId = userId;
     this.state.overviewPhaseId = null; // 換人看，階段選擇跟著退回「目前所在階段」
@@ -128,7 +136,7 @@ const App = {
   // 其餘用純數字，min/max 打反了自動排正。空字串（兩邊都空）＝清掉這一項。
   savePhaseTargets(phaseId, targetUserId) {
     const root = document.getElementById('ptgt-form');
-    if (!root) return;
+    if (!root || !Store.canEditGoalsOf(targetUserId || Store.activeUserId)) return;
     const val = (name) => { const el = root.querySelector(`[name="${name}"]`); return el ? el.value.trim() : ''; };
     const range = (parse, key) => {
       const a = parse(val(`${key}_min`)), b = parse(val(`${key}_max`));
@@ -189,14 +197,14 @@ const App = {
     render();
   },
 
-  // ── 訓練目標（profile/goals；決策紀錄第 15 條：教練模式下可以幫別人設）────────────
+  // ── 訓練目標（profile/goals；決策紀錄第 15、56 條：別人的只有教練能幫忙設）────────────
   // 每個 handler 都接受可選的 userId——views.js 的 renderGoalsCard 自己的表單也一律傳
   // 明確的 userId（等於 Store.activeUserId），不靠「不傳＝自己」的隱含預設，比較不容易
-  // 在改動時漏掉。
+  // 在改動時漏掉。能不能寫由 Store 擋（canEditGoalsOf），畫面上沒有權限的本來就不給輸入框。
   setRaceGoal(value, userId) { Store.setRaceGoal(value, userId); render(); },
   addGoal(userId) {
     const el = document.getElementById('goal-new');
-    if (!el || !el.value.trim()) return;
+    if (!el || !el.value.trim() || !Store.canEditGoalsOf(userId || Store.activeUserId)) return;
     Store.addGoal(el.value, userId);
     render();
   },
@@ -260,7 +268,7 @@ const App = {
           const rows = [...list.querySelectorAll('.weekday-acc')];
           const from = rows.indexOf(evt.item), to = row && list.contains(row) ? rows.indexOf(row) : -1;
           if (from < 0 || to < 0 || from === to) return;
-          setTimeout(() => this.swapSharedWeekDays(wn, from, to), 0);
+          setTimeout(() => this.swapPlanWeekDays(wn, from, to), 0);
           return;
         }
         const from = evt.oldDraggableIndex, to = evt.newDraggableIndex;
@@ -284,22 +292,24 @@ const App = {
   },
   resetDayOrder(weekNumber) { Store.resetDayOrder(weekNumber); render(); },
 
-  // 教練模式拖曳（決策紀錄第 50 條）：兩天的共用課表對調（所有人一起變）。項目 id 跟著內容走，日期是格子的。
-  // 今天以前的日子不能動（畫面上沒有把手、也不能當落點，這裡再擋一次）。牽涉到今天時先確認：今天已經練過的人，
+  // 教練模式拖曳（決策紀錄第 50 條）：正在排的那個人（第 56 條）的兩天課表對調。項目 id 跟著內容走，日期是格子的。
+  // 今天以前的日子不能動（畫面上沒有把手、也不能當落點，這裡再擋一次）。牽涉到今天時先確認：今天已經練過的話，
   // 勾會留在今天、換走的課會在另一天顯示成沒做——那堂課不要再做一次（第 0 條）。
-  swapSharedWeekDays(weekNumber, a, b) {
+  swapPlanWeekDays(weekNumber, a, b) {
     a = Number(a); b = Number(b);
     if (!(a >= 0 && a <= 6 && b >= 0 && b <= 6) || a === b) return;
+    if (!this._canEditPlan()) { render(); return; }
+    const uid = this.planUserId();
     const today = PlanData.dayKey(PlanData.today());
     const ka = PlanData.keyForWeekDay(weekNumber, a), kb = PlanData.keyForWeekDay(weekNumber, b);
     if (ka < today || kb < today) { alert('今天以前的日子不能換。'); render(); return; }
-    const week = this._cloneEffectiveWeek(weekNumber);
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const days = week.days.slice();
     const la = PlanData.weekdayLabel(a), lb = PlanData.weekdayLabel(b);
-    if ((ka === today || kb === today) && !confirm(`把週${la}跟週${lb}的課表對調？\n今天已經練過的人，打的勾會留在今天，換走的那堂課會在另一天顯示成還沒做——不要再做一次。`)) { render(); return; }
+    if ((ka === today || kb === today) && !confirm(`把週${la}跟週${lb}的課表對調？\n今天已經練過的話，打的勾會留在今天，換走的那堂課會在另一天顯示成還沒做——不要再做一次。`)) { render(); return; }
     [days[a], days[b]] = [days[b], days[a]];
     week.days = days.map((d, i) => ({ ...d, dayIndex: i }));
-    week.layoutAt = new Date().toISOString(); // 天數換過了：別台還停在舊排列的畫面不能再照位置存（store.js saveWeekOverride）
+    week.layoutAt = new Date().toISOString(); // 天數換過了：別台還停在舊排列的畫面不能再照位置存（store.js savePlanWeek）
     const e = this.state.expandedDay;
     if (e && e.weekNumber === weekNumber && (e.dayIndex === a || e.dayIndex === b)) {
       this.state.expandedDay = { weekNumber, dayIndex: e.dayIndex === a ? b : a }; // 展開的那一天跟著內容走
@@ -308,7 +318,7 @@ const App = {
     this.state.amountEdit = null;
     this.state.noteEdit = null;
     this.state.libraryEdit = null;
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
@@ -364,10 +374,10 @@ const App = {
   },
 
   // ── 教練模式 ──────────────────────────────────────────────────────────────
-  // 課表內容存在 Store.planOverrides（Firestore 的 planOverrides/{週次}，白名單內
-  // 任何人都能寫）。每次編輯都是「讀整週目前有效的內容（出廠值或已有的覆寫）→
-  // 深拷貝避免動到原物件 → 改一小塊 → 整週寫回」，不逐項目局部更新——這樣新增/
-  // 刪除項目不需要處理陣列的部分寫入語意。
+  // 決策紀錄第 56 條：每個人一份課表（Store.planWeeks，Firestore 的 users/{userId}/planWeeks/{週次}）。
+  // 教練（Mick）排三個人的，其他人只能改自己的——改的是 planUserId() 那個人的。每次編輯都是
+  // 「讀她那週目前有效的內容 → 深拷貝避免動到原物件 → 改一小塊 → 整週寫回」，不逐項目局部更新——
+  // 這樣新增/刪除項目不需要處理陣列的部分寫入語意。
 
   toggleCoachMode() {
     Store.setCoachMode(!Store.coachMode);
@@ -433,14 +443,15 @@ const App = {
   },
   saveItemNote(weekNumber, dayIndex, itemId, el) {
     this.state.noteEdit = null;
+    const uid = this.planUserId();
     const text = String((el && el.value) || '').trim().slice(0, 200);
-    const cur = Store.effectiveWeek(weekNumber).days[dayIndex].items.find((x) => x.id === itemId);
-    if (!cur || (cur.coachNote || '') === text || this._planDayLocked(weekNumber, dayIndex)) { setTimeout(() => render(), 0); return; }
-    const week = this._cloneEffectiveWeek(weekNumber);
+    const cur = Store.effectiveWeek(weekNumber, uid).days[dayIndex].items.find((x) => x.id === itemId);
+    if (!this._canEditPlan() || !cur || (cur.coachNote || '') === text || this._planDayLocked(weekNumber, dayIndex)) { setTimeout(() => render(), 0); return; }
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const it = week.days[dayIndex].items.find((x) => x.id === itemId);
     if (!it) { setTimeout(() => render(), 0); return; }
     if (text) it.coachNote = text; else delete it.coachNote;
-    Store.saveWeekOverride(weekNumber, week, true);
+    Store.savePlanWeek(uid, weekNumber, week, { silent: true });
     setTimeout(() => render(), 0);
   },
 
@@ -459,10 +470,11 @@ const App = {
   },
 
   // 決策紀錄第 52 條：改了常用項目，今天以後（含今天）用到它的課表項目跟著改，今天以前的日子不動。
+  // 第 56 條：三個人的課表都套（常用項目庫只有教練能改，教練能寫三個人的課表）。
   // 只套「這次改了的欄位」——同名的出廠項目各週的備註、時間本來就不一樣，整份蓋過去會洗掉。
   // 影片：這次拿掉的從項目拿掉；常用項目有、項目還沒有的加上（之前存過、當時沒套上的修改，再按一次儲存就會補上）。
   // 時間／距離：項目的數字還是舊的常用項目那個數字才跟著改（某天單獨改過的時間不動）。
-  // 套過的項目記下 templateId，之後改名也對得到。回傳改到幾天。
+  // 套過的項目記下 templateId，之後改名也對得到。回傳改到幾天（同一天好幾個人都改到只算一天）。
   _applyTemplateToPlan(templateId, oldItem, newItem) {
     const norm = (it) => { const c = it && Store._cleanLibraryFields('item', { name: '', item: it }); return c ? c.item : null; };
     const o = norm(oldItem), n = norm(newItem);
@@ -474,42 +486,49 @@ const App = {
     const oldRefs = PlanData.itemVideoRefs(o), newRefs = PlanData.itemVideoRefs(n);
     const removed = oldRefs.filter((r) => !newRefs.includes(r));
     const today = PlanData.dayKey(PlanData.today());
-    let days = 0;
-    for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) {
-      if (PlanData.keyForWeekDay(wn, 6) < today) continue;
-      if (!Store.effectiveWeek(wn).days.some((d, di) => PlanData.keyForWeekDay(wn, di) >= today && d.items.some((it) => Store.usesTemplate(it, templateId, o)))) continue;
-      const week = this._cloneEffectiveWeek(wn);
-      let weekChanged = false;
-      week.days.forEach((d, di) => {
-        if (PlanData.keyForWeekDay(wn, di) < today) return;
-        let dayChanged = false;
-        d.items.forEach((it) => {
-          if (!Store.usesTemplate(it, templateId, o)) return;
-          const before = J(it);
-          changed.forEach((k) => { it[k] = copy(n[k]); });
-          amountChanged.forEach((k) => { if (J(it[k]) === J(o[k])) it[k] = copy(n[k]); });
-          const refs = PlanData.itemVideoRefs(it).filter((r) => !removed.includes(r));
-          newRefs.forEach((r) => { if (!refs.includes(r)) refs.push(r); });
-          const capped = refs.slice(0, PlanData.MAX_ITEM_VIDEOS);
-          it.videoRefs = capped;
-          it.videoRef = capped[0] || null;
-          it.templateId = templateId;
-          if (changed.length) it.derived = false;
-          if (J(it) !== before) dayChanged = true;
+    const touched = new Set();
+    PlanData.users.forEach((u) => {
+      const uid = u.userId;
+      for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) {
+        if (PlanData.keyForWeekDay(wn, 6) < today) continue;
+        if (!Store.effectiveWeek(wn, uid).days.some((d, di) => PlanData.keyForWeekDay(wn, di) >= today && d.items.some((it) => Store.usesTemplate(it, templateId, o)))) continue;
+        const week = this._cloneEffectiveWeek(wn, uid);
+        const changedDays = [];
+        week.days.forEach((d, di) => {
+          if (PlanData.keyForWeekDay(wn, di) < today) return;
+          let dayChanged = false;
+          d.items.forEach((it) => {
+            if (!Store.usesTemplate(it, templateId, o)) return;
+            const before = J(it);
+            changed.forEach((k) => { it[k] = copy(n[k]); });
+            amountChanged.forEach((k) => { if (J(it[k]) === J(o[k])) it[k] = copy(n[k]); });
+            const refs = PlanData.itemVideoRefs(it).filter((r) => !removed.includes(r));
+            newRefs.forEach((r) => { if (!refs.includes(r)) refs.push(r); });
+            const capped = refs.slice(0, PlanData.MAX_ITEM_VIDEOS);
+            it.videoRefs = capped;
+            it.videoRef = capped[0] || null;
+            it.templateId = templateId;
+            if (changed.length) it.derived = false;
+            if (J(it) !== before) dayChanged = true;
+          });
+          if (dayChanged) changedDays.push(di);
         });
-        if (dayChanged) { days++; weekChanged = true; }
-      });
-      if (weekChanged) Store.saveWeekOverride(wn, week, true);
-    }
-    return days;
+        // 照項目 id 找、不是照位置改，不用檢查畫面有沒有被搬過天（batch）
+        if (changedDays.length && Store.savePlanWeek(uid, wn, week, { silent: true, batch: true })) {
+          changedDays.forEach((di) => touched.add(`${wn}-${di}`));
+        }
+      }
+    });
+    return touched.size;
   },
 
   // 換成別的常用項目：id 不變（打勾紀錄照 id 對，換掉不會讓做過的課又變成沒做）
   swapItemFromLibrary(weekNumber, dayIndex, itemId, templateId) {
-    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    const uid = this.planUserId();
     const tpl = Store.libraryList('item').find((t) => t.id === templateId);
     if (!tpl) { alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return; }
-    const week = this._cloneEffectiveWeek(weekNumber);
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const day = week.days[dayIndex];
     const idx = day.items.findIndex((it) => it.id === itemId);
     if (idx === -1) { this.state.itemPicker = null; render(); return; }
@@ -522,15 +541,16 @@ const App = {
     this.state.amountEdit = null;
     this.state.noteEdit = null;
     this.state.savedFlash = null;
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
   addItemFromLibrary(weekNumber, dayIndex, templateId) {
-    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    const uid = this.planUserId();
     const tpl = Store.libraryList('item').find((t) => t.id === templateId);
     if (!tpl) { alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return; }
-    const week = this._cloneEffectiveWeek(weekNumber);
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const day = week.days[dayIndex];
     day.items.push(this._itemFromTemplate(tpl, newItemId()));
     if (day.selectOne) day.items.forEach((it) => { it.derived = false; });
@@ -538,13 +558,14 @@ const App = {
     this.state.amountEdit = null;
     this.state.noteEdit = null;
     this.state.savedFlash = null;
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
   // 時間（長跑是公里）那格改了：el 是改的那個輸入框，同一組兩格一起讀。兩格都空＝沒有這個數字。
   setItemAmount(weekNumber, dayIndex, itemId, el) {
-    if (this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    const uid = this.planUserId();
     const box = el && el.closest('.amt-edit');
     if (!box) return;
     const key = box.dataset.amt === 'distanceKm' ? 'distanceKm' : 'duration';
@@ -568,22 +589,24 @@ const App = {
     // 游標到不了上限那格。改完離開整組時（amountFocusOut）才重畫一次。
     const ae = this.state.amountEdit;
     const editing = !!(ae && ae.weekNumber === weekNumber && ae.dayIndex === dayIndex && ae.itemId === itemId);
-    const week = this._cloneEffectiveWeek(weekNumber);
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const it = week.days[dayIndex].items.find((x) => x.id === itemId);
     if (!it) { render(); return; }
     if (JSON.stringify(it[key] || null) === JSON.stringify(range)) { if (!editing) render(); return; } // 沒變（例如 30–30 寫成 30）
     it[key] = range;
     it.derived = false; // 教練動過數字就是確認過（第 19 條）
     this.state.savedFlash = null;
-    Store.saveWeekOverride(weekNumber, week, editing);
+    Store.savePlanWeek(uid, weekNumber, week, { silent: editing });
     if (!editing) render();
   },
 
   // ── 常用項目庫（決策紀錄第 26 條）─────────────────────────────────────────────
   // 課表上的項目「存成常用」（第 26、45 條）：整套設定存一份到共用庫，名稱照標題。
   // 按鈕只在項目庫還沒有一模一樣的內容時出現（改過時間、或出廠課表的項目），所以不會存出重複的。
+  // 第 56 條：常用項目庫只有教練能改，「存成常用」也是。
   saveItemAsTemplate(weekNumber, dayIndex, itemId) {
-    const day = Store.effectiveWeek(weekNumber).days[dayIndex];
+    if (!this._libraryAllowed()) return;
+    const day = Store.effectiveWeek(weekNumber, this.planUserId()).days[dayIndex];
     const it = day && day.items.find((x) => x.id === itemId);
     if (!it) return;
     if (Store.libraryItemMatching(it)) { render(); return; }
@@ -593,6 +616,14 @@ const App = {
     render();
   },
 
+
+  // 第 56 條：常用項目庫只有教練能改（畫面上本來就不給，這裡是第二道——真正擋的是規則）
+  _libraryAllowed() {
+    if (Store.canEditLibrary()) return true;
+    const c = Store.coachUser();
+    alert(`常用項目庫只有 ${c ? c.displayName : '教練'} 能改。`);
+    return false;
+  },
 
   // 份量不預填（第 45 條）：以前預填「8–10 次」，改成秒的時候 8–10 留著，填 30 會存成「10–30 秒」
   _blankExercise() { return { name: '', sets: 2, qty: 'reps', min: '', max: '', perSide: false, notes: '' }; },
@@ -604,6 +635,7 @@ const App = {
   // origin：從本週頁某張卡的「查看動作」打開的，編輯器就畫在那張卡的位置。
   // copyOf（第 43 條「複製」）：打開一份還沒存的新內容，照 copyOf 那份預填；按存檔才建立，取消什麼都不留。
   startLibraryEdit(kind, id, origin, copyOf) {
+    if (!this._libraryAllowed()) return;
     this.state.libFlash = '';
     if (copyOf) id = 'new';
     const srcId = copyOf || id;
@@ -658,7 +690,7 @@ const App = {
   // 刪除／恢復內建的動作清單或影片（決策紀錄第 39 條）
   deleteBuiltin(kind, id) {
     const base = kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id];
-    if (!base) return;
+    if (!base || !this._libraryAllowed()) return;
     if (!Sync.isSignedIn()) { alert('要先登入才能刪除內建內容（三個人共用）。'); return; }
     const cur = kind === 'workout' ? Store.workoutFor(id) : Store.videoFor(id);
     const name = kind === 'workout' ? cur.name : cur.title;
@@ -673,6 +705,7 @@ const App = {
     render();
   },
   undeleteBuiltin(kind, id) {
+    if (!this._libraryAllowed()) return;
     if (!Sync.isSignedIn()) { alert('要先登入才能恢復內建內容（三個人共用）。'); return; }
     const r = Store.setBuiltinRemoved(kind, id, false, Store.libraryServerUpdatedAt(id), (ok, msg) => {
       if (!ok) { render(); alert(msg); }
@@ -688,7 +721,7 @@ const App = {
   // 內建內容還原成 JSON 的版本，一樣只從今天起（第 33 條）
   restoreBuiltin(kind, id) {
     const base = kind === 'workout' ? PlanData.workoutById[id] : PlanData.videoById[id];
-    if (!base) return;
+    if (!base || !this._libraryAllowed()) return;
     if (!Sync.isSignedIn()) { alert('要先登入才能還原內建內容（三個人共用）。'); return; }
     const u = Store.libraryUsage(kind, id);
     const name = kind === 'workout' ? base.name : base.title;
@@ -758,7 +791,7 @@ const App = {
 
   saveLibraryWorkout() {
     const e = this.state.libraryEdit;
-    if (!e || e.kind !== 'workout') return;
+    if (!e || e.kind !== 'workout' || !this._libraryAllowed()) return;
     const d = e.draft;
     if (!String(d.name || '').trim()) { alert('請填動作清單名稱。'); return; }
     const exercises = [];
@@ -794,7 +827,7 @@ const App = {
 
   saveLibraryVideo() {
     const e = this.state.libraryEdit;
-    if (!e || e.kind !== 'video') return;
+    if (!e || e.kind !== 'video' || !this._libraryAllowed()) return;
     const d = e.draft;
     if (!String(d.title || '').trim()) { alert('請填影片標題。'); return; }
     if (d.linkType === 'video' && !/^https:\/\//i.test(String(d.url || '').trim())) {
@@ -814,6 +847,7 @@ const App = {
 
   // 編輯常用項目的內容：同一份項目表單（_readItemForm／_validateItemFields），只是存到庫裡
   saveTemplateEdit(id) {
+    if (!this._libraryAllowed()) return;
     const isNew = id === 'new'; // 第 43 條：直接在項目庫新增
     const tpl = isNew ? null : Store.libraryDoc(id);
     if (!isNew && !tpl) return;
@@ -830,9 +864,9 @@ const App = {
     delete fields.derived; delete fields.intensityDerived;
     const saved = Store.saveLibraryDoc(isNew ? null : id, 'item', { name: fields.title, item: fields });
     if (!saved) { alert('內容不完整，沒有存檔。'); return; }
-    // 第 52 條：今天以後用到它的課表跟著改
+    // 第 52 條：今天以後用到它的課表跟著改（第 56 條：三個人的課表都套）
     const n = isNew ? 0 : this._applyTemplateToPlan(id, tpl.item, saved.item);
-    this.state.libFlash = n ? `已套用到今天以後的 ${n} 天課表（今天以前的日子不動）。` : '';
+    this.state.libFlash = n ? `已套用到三個人今天以後的 ${n} 天課表（今天以前的日子不動）。` : '';
     this.state.libraryEdit = null;
     render();
   },
@@ -843,7 +877,7 @@ const App = {
 
   deleteLibraryDoc(id) {
     const doc = Store.libraryDoc(id);
-    if (!doc) return;
+    if (!doc || !this._libraryAllowed()) return;
     const label = doc.name || doc.title;
     const msg = doc.kind === 'item'
       ? `刪除常用項目「${label}」？已經排進課表的日子不受影響。`
@@ -854,13 +888,14 @@ const App = {
     render();
   },
 
-  _cloneEffectiveWeek(weekNumber) {
-    const current = Store.effectiveWeek(weekNumber);
-    const clone = JSON.parse(JSON.stringify(current));
-    // 記住這次編輯是從哪個版本開始改的（出廠值沒有 updatedAt，null 也是有效的
-    // 起點）。firebase-sync.js 存檔前會拿這個跟雲端最新版本比對，偵測「別人剛好
-    // 也在改這週」的衝突——三個白名單成員共用同一份課表，這是真的會發生的情境。
-    clone.__baseUpdatedAt = current.updatedAt || null;
+  // userId：要改的是誰的課表（第 56 條）。不給＝本週頁現在在排的那個人。
+  _cloneEffectiveWeek(weekNumber, userId) {
+    const uid = userId || this.planUserId();
+    const clone = JSON.parse(JSON.stringify(Store.effectiveWeek(weekNumber, uid)));
+    // 記住這次編輯是從哪個版本開始改的（她還沒有自己那份＝null，也是有效的起點）。
+    // firebase-sync.js 存檔前會拿這個跟雲端最新版本比對，偵測「別人剛好也在改這週」的衝突——
+    // Mick 跟 Annlin 可能同時在改 Annlin 的課表。
+    clone.__baseUpdatedAt = Store._planBase(weekNumber, uid);
     return clone;
   },
 
@@ -1049,8 +1084,9 @@ const App = {
   },
 
   deleteItem(weekNumber, dayIndex, itemId) {
-    if (this._planDayLocked(weekNumber, dayIndex)) return;
-    const week = this._cloneEffectiveWeek(weekNumber);
+    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    const uid = this.planUserId();
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const day = week.days[dayIndex];
     if (day.items.length <= 1) { alert('這天至少要留一個項目——原規格書的教訓：一天空白會讓畫面壞掉。'); return; }
 
@@ -1071,13 +1107,14 @@ const App = {
 
     if (!confirm('確定刪除這個項目？已經打過勾的舊紀錄會保留在資料裡，但畫面上不會再顯示。')) return;
     day.items = day.items.filter((it) => it.id !== itemId);
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
   moveItem(weekNumber, dayIndex, itemId, direction) {
-    if (this._planDayLocked(weekNumber, dayIndex)) return;
-    const week = this._cloneEffectiveWeek(weekNumber);
+    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    const uid = this.planUserId();
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const day = week.days[dayIndex];
     const idx = day.items.findIndex((it) => it.id === itemId);
     const swapWith = idx + direction;
@@ -1085,32 +1122,38 @@ const App = {
     const tmp = day.items[idx];
     day.items[idx] = day.items[swapWith];
     day.items[swapWith] = tmp;
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
   toggleDaySelectOne(weekNumber, dayIndex) {
-    const week = this._cloneEffectiveWeek(weekNumber);
+    if (!this._canEditPlan()) { render(); return; }
+    const uid = this.planUserId();
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     const day = week.days[dayIndex];
     if (!day.selectOne && day.items.length < 2) {
       alert('「二擇一」至少要有兩個選項，請先新增一個項目再切換。');
       return;
     }
     day.selectOne = !day.selectOne;
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
   setDayNotes(weekNumber, dayIndex, value) {
-    const week = this._cloneEffectiveWeek(weekNumber);
+    if (!this._canEditPlan()) return;
+    const uid = this.planUserId();
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     week.days[dayIndex].dayNotes = value || null;
-    Store.saveWeekOverride(weekNumber, week, true); // silent：避免 textarea 失焦時吃掉下一次點擊
+    Store.savePlanWeek(uid, weekNumber, week, { silent: true }); // silent：避免 textarea 失焦時吃掉下一次點擊
   },
 
   setLongRunMetric(weekNumber, value) {
-    const week = this._cloneEffectiveWeek(weekNumber);
+    if (!this._canEditPlan()) { render(); return; }
+    const uid = this.planUserId();
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     week.longRunMetric = value || null;
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
@@ -1121,24 +1164,129 @@ const App = {
     const a = minVal === '' ? Number(maxVal) : Number(minVal);
     const b = maxVal === '' ? Number(minVal) : Number(maxVal);
     if (!Number.isFinite(a) || !Number.isFinite(b) || Math.min(a, b) < 0 || Math.max(a, b) > 200) { alert('目標跑量要在 0-200 公里之間'); return; }
-    const week = this._cloneEffectiveWeek(weekNumber);
+    if (!this._canEditPlan()) { render(); return; }
+    const uid = this.planUserId();
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     week.weeklyVolumeKm = { min: Math.min(a, b), max: Math.max(a, b) };
     delete week.weeklyVolumeNullReason; // 舊版欄位（第 8 條時代），不再有意義
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
   clearWeeklyVolume(weekNumber) {
-    const week = this._cloneEffectiveWeek(weekNumber);
+    if (!this._canEditPlan()) { render(); return; }
+    const uid = this.planUserId();
+    const week = this._cloneEffectiveWeek(weekNumber, uid);
     delete week.weeklyVolumeKm;
     delete week.weeklyVolumeNullReason;
-    Store.saveWeekOverride(weekNumber, week);
+    Store.savePlanWeek(uid, weekNumber, week);
     render();
   },
 
-  resetWeekOverride(weekNumber) {
-    if (!confirm('確定要把這週還原成出廠預設值嗎？你在這週做的所有調整都會消失（其他週不受影響）。')) return;
-    Store.resetWeekOverride(weekNumber);
+  // 只還原正在排的那個人這一週（第 56 條），直接回到出廠課表
+  resetPlanWeek(weekNumber) {
+    if (!this._canEditPlan()) { render(); return; }
+    const uid = this.planUserId();
+    const name = (PlanData.userById[uid] || {}).displayName || uid;
+    if (!confirm(`確定要把 ${name} 第 ${weekNumber} 週的課表還原成出廠預設值嗎？這週的調整都會消失（其他週、其他人不受影響）。`)) return;
+    Store.resetPlanWeek(uid, weekNumber);
+    render();
+  },
+
+  // 決策紀錄第 57 條：教練在對話裡給的整週課表（data/week-presets.json），一鍵排進正在排的那個人的那一週。只有教練
+  //（會把還沒有的項目加進常用項目庫）。整週換掉，包含已經過去的日子——她要的：「雖然週一已經過了但還是排」；
+  // 同一天原本就有的同一個項目沿用 id，打過的勾留著。按確認才排。
+  applyWeekPreset(presetId) {
+    const preset = (PlanData.weekPresets || []).find((p) => p.id === presetId);
+    if (!preset || !Store.coachMode || !this._libraryAllowed()) { render(); return; }
+    // 要對她雲端上的常用項目庫：沒登入時庫是空的，會把她自己調過的「Zone 2 跑」當成沒有、另外新增一份（審查抓到）
+    if (!Sync.isSignedIn()) { render(); alert('要先登入才能排（要用你常用項目庫裡的項目）。'); return; }
+    const uid = this.planUserId();
+    if (!Store.canEditPlanOf(uid)) { render(); return; }
+    const wn = preset.weekNumber;
+    const name = (PlanData.userById[uid] || {}).displayName || uid;
+    const { templates, missing } = Store.presetTemplates(preset);
+    // 先算一次（還沒進庫的先照 preset 的內容算）：哪幾天不動、哪幾天的勾會不見，講給她聽
+    const draft = { ...templates };
+    missing.forEach((k) => { draft[k] = { id: null, item: preset.items[k] }; });
+    const plan = Store.presetPlan(preset, uid, draft);
+    const dayLabel = (c) => { const d = PlanData.dateForWeekDay(wn, c); return `週${PlanData.weekdayLabel(c)}（${d.getMonth() + 1}/${d.getDate()}）`; };
+    const titlesOf = (keys) => [...new Set(keys.map((k) => preset.items[k].title))];
+    const reused = titlesOf(Object.keys(templates).filter((k) => templates[k]));
+    const added = titlesOf(missing);
+    const lines = [
+      `把「${preset.name}」排進 ${name} 第 ${wn} 週？`,
+      '週一到週日整週換成這份，包含已經過去的日子跟今天。',
+      plan.kept.length ? `${plan.kept.map(dayLabel).join('、')} ${name} 已經先記了（例如先排了休息），這${plan.kept.length === 1 ? '天' : '幾天'}不動。` : '',
+      added.length ? `常用項目庫會加上：${added.join('、')}。` : '',
+      reused.length ? `用常用項目庫裡原本的：${reused.join('、')}。` : '',
+      '同一天原本就有的同一個項目，打過的勾會留著。',
+      ...plan.lost.map((x) => `${dayLabel(x.c)}打過勾的「${x.titles.join('」「')}」不在新的課表裡，那個勾不會再顯示。`),
+      plan.reduced ? `${name} 標了第 ${wn} 週「本週已降量」。` : '',
+      plan.swapped ? `${name} 這週自己換過順序，她那邊看到的日子會照她的對調。` : '',
+    ].filter(Boolean);
+    if (!confirm(lines.join('\n'))) return;
+    for (const k of missing) {
+      if (templates[k]) continue; // 同名同類型的前面已經存進庫了
+      const def = preset.items[k];
+      const saved = Store.saveLibraryDoc(null, 'item', { name: def.title, item: def });
+      if (!saved) { alert(`「${def.title}」存不進常用項目庫，這次沒有排。`); render(); return; }
+      templates[k] = { id: saved.id, item: saved.item };
+      missing.filter((k2) => preset.items[k2].title === def.title && preset.items[k2].type === def.type).forEach((k2) => { templates[k2] = templates[k]; });
+    }
+    Store.savePlanWeek(uid, wn, Store.presetPlan(preset, uid, templates).week, { batch: true });
+    this.state.itemPicker = null;
+    this.state.amountEdit = null;
+    this.state.noteEdit = null;
+    render();
+  },
+
+  // 決策紀錄第 56 條：把 fromUserId 的課表複製給正在排的那個人。只有教練、只在教練模式。
+  // range：'week'（畫面上這一週）| 'future'（今天以後全部）；一律從明天開始。按確認才複製。
+  async copyPlanFrom(fromUserId, range) {
+    this.state.viewMenuOpen = false;
+    const to = this.planUserId();
+    const name = (uid) => (PlanData.userById[uid] || {}).displayName || uid;
+    if (!Store.coachMode || !Store.isCoach(Store.activeUserId) || fromUserId === to || !PlanData.userById[fromUserId]) { render(); return; }
+    if (!Sync.isSignedIn()) { render(); alert('要先登入才能複製課表。'); return; }
+    // 兩個人的課表都要讀到了才複製（審查抓到）：還沒讀到、或新的規則還沒發布時，會拿舊的共用課表／出廠當來源
+    if (Sync.planWeeksDenied || !Sync.planWeeksLoaded(fromUserId) || !Sync.planWeeksLoaded(to)) {
+      render(); alert('課表還沒讀完（或新的規則還沒發布），這次沒有複製。等一下再試。'); return;
+    }
+    const wn = this.state.weekViewNumber; // 等伺服器的期間換了週，「這一週」還是按下去那一週
+    render();
+    // 對方哪幾週自己對調過順序、哪幾天已經先記了東西，要問過伺服器才準（那些要跳過），連不上就不複製
+    if (!(await Sync.fetchCopyGuards(to))) { alert('沒有連上網路，這次沒有複製。'); return; }
+    const p = Store.copyPlanPreview(fromUserId, to, range, wn);
+    const t = PlanData.parseLocalDate(p.tomorrow);
+    const tomorrowLabel = `${t.getMonth() + 1}/${t.getDate()}`;
+    const weeksText = (list) => `第 ${list.join('、')} 週`;
+    const scope = range === 'week' ? `第 ${wn} 週`
+      : (p.inRange.length ? `第 ${p.inRange[0]}～${p.inRange[p.inRange.length - 1]} 週` : '');
+    if (!p.inRange.length) { alert(`${range === 'week' ? `第 ${wn} 週` : '課表'}沒有明天以後的日子，不用複製。`); return; }
+    const skipLine = p.skipped.length ? `${weeksText(p.skipped)} ${name(to)} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過。` : '';
+    const keptLine = p.kept ? `${name(to)} 已經先記了的 ${p.kept} 天不動（例如先排了休息）。` : '';
+    if (!p.weeks.length) {
+      // 跳過的週、不動的天都沒有比過，不能說它們「一樣」：全部都跳過就只講跳過；有跳過／不動的就只說「其他日子」一樣
+      const allSkipped = p.skipped.length > 0 && p.skipped.length === p.inRange.length;
+      alert(allSkipped
+        ? `${weeksText(p.skipped)} ${name(to)} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過，這次沒有複製。`
+        : [skipLine, keptLine, `${p.skipped.length || p.kept ? '其他日子' : `${name(to)} ${scope}（明天起）的課表`}已經跟 ${name(fromUserId)} 一樣了，不用複製。`].filter(Boolean).join('\n'));
+      return;
+    }
+    const lines = [
+      `把 ${name(fromUserId)} 的課表複製到 ${name(to)}？`,
+      `範圍：${scope}，明天（${tomorrowLabel}）起；今天和以前不動。`,
+      p.changedDays ? `會改 ${p.changedDays} 天。` : '',
+      p.ownEdited ? `${name(to)} 自己改過的 ${p.ownEdited} 天會被蓋掉。` : '',
+      keptLine,
+      skipLine,
+      p.reduced.length ? `${weeksText(p.reduced)} ${name(to)} 標了「本週已降量」。` : '',
+      p.goalChanged ? `目標跑量也會換成 ${name(fromUserId)} 的。` : '',
+      p.metricChanged ? `長跑計量單位（以時間／距離計）也會換成 ${name(fromUserId)} 的。` : '',
+    ].filter(Boolean);
+    if (!confirm(lines.join('\n'))) return;
+    Store.applyCopyPlan(p);
     render();
   },
 };

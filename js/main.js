@@ -127,7 +127,11 @@ async function boot() {
   Sync.onChange(renderFromData);
   Sync.init();
 
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') renderIfDayChanged(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    renderIfDayChanged();
+    Sync.ensurePlanWeeks(); // 課表訂閱出錯拆掉了的話重掛（決策紀錄第 56 條：規則發布之前就開著 App 的人）
+  });
   window.addEventListener('pageshow', renderIfDayChanged);
   scheduleMidnightCheck();
 

@@ -540,6 +540,14 @@ button.vol-who.pick { border: 0; font: inherit; font-size: 12px; font-weight: 70
 button.vol-who.pick svg { width: 12px; height: 12px; }
 button.vol-who.pick.viewing { color: var(--warn); background: var(--warnBg); } /* 正在看別人：跟平常的名字分得出來 */
 .view-pick { margin: 0 0 10px; }
+/* 決策紀錄第 56 條：名字選單裡「把別人的課表複製給 ○○」（只有教練） */
+.copy-sec { border-top: 1px solid var(--line); padding: 8px 10px 10px; display: grid; gap: 6px; }
+.copy-head { font-size: 12px; font-weight: 700; color: var(--warn); }
+.copy-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.copy-name { font-size: 13px; font-weight: 600; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.copy-btn { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--warn); background: transparent; border: 1px solid var(--warn); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+.copy-btn:hover, .copy-btn:focus-visible { background: var(--warnBg); }
+.copy-btn:disabled { opacity: .4; cursor: default; background: transparent; }
 /* 看別人的一天（決策紀錄第 53 條，唯讀） */
 .ro-item { display: flex; gap: 10px; align-items: flex-start; }
 .ro-item + .ro-item { margin-top: 10px; }
@@ -591,6 +599,11 @@ button.vol-who.pick.viewing { color: var(--warn); background: var(--warnBg); } /
 /* 教練模式拖曳：放開就跟這一列對調（決策紀錄第 50 條） */
 .weekday-acc.swap-target { outline: 2px dashed var(--warn); outline-offset: -2px; border-radius: 10px; background: var(--warnBg); }
 .day-order-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--text3); margin: 8px 6px 0; line-height: 1.5; }
+.day-order-hint.coach-hints { flex-direction: column; align-items: flex-start; gap: 4px; }
+/* 決策紀錄第 57 條：本週課表設定最上面「預先排好的課表」 */
+.preset-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 12px; border-radius: 10px; background: var(--warnBg); }
+.preset-text { font-size: 13.5px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 2px; }
+.preset-lbl { font-size: 11px; font-weight: 700; color: var(--warn); }
 .weekday-body { padding: 4px 0 10px; }
 .weekday-body .day-body { padding: 0; }
 .weekday-body .item { margin-top: 8px; }

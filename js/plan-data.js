@@ -1,4 +1,4 @@
-// 載入靜態資料（plan/videos/workouts/users）+ 所有日期算術。
+// 載入靜態資料（plan/videos/workouts/users/week-presets）+ 所有日期算術。
 //
 // ⚠️ 全檔案唯一允許算日期的地方。不要在別的檔案裡自己用 new Date() 加減天數——
 // 這裡的函式已經處理過 babylog 踩過的 UTC 陷阱
@@ -9,17 +9,20 @@
 // 這裡一律用「年/月/日三個數字」建構本地 Date，絕不用字串直接餵給 Date() 或呼叫
 // toISOString()。日曆基準見 docs/日曆基準.md。
 const PlanData = (() => {
-  let plan = null, videos = null, workouts = null, users = null;
+  let plan = null, videos = null, workouts = null, users = null, weekPresets = [];
   let videoById = {}, workoutById = {}, userById = {};
 
   async function load() {
-    const [p, v, w, u] = await Promise.all([
+    const [p, v, w, u, wp] = await Promise.all([
       fetch(`data/plan.json?v=${APP_VERSION}`).then((r) => r.json()),
       fetch(`data/videos.json?v=${APP_VERSION}`).then((r) => r.json()),
       fetch(`data/workouts.json?v=${APP_VERSION}`).then((r) => r.json()),
       fetch(`data/users.json?v=${APP_VERSION}`).then((r) => r.json()),
+      // 決策紀錄第 57 條：教練在對話裡給的整週課表。讀不到不影響其他功能（只是沒有「排進這週」），不能讓整個 App 開不起來
+      fetch(`data/week-presets.json?v=${APP_VERSION}`).then((r) => r.json()).catch(() => null),
     ]);
     plan = p; videos = v.videos; workouts = w.workouts; users = u.users;
+    weekPresets = wp && Array.isArray(wp.presets) ? wp.presets : [];
     videoById = Object.fromEntries(videos.map((x) => [x.id, x]));
     workoutById = Object.fromEntries(workouts.map((x) => [x.id, x]));
     userById = Object.fromEntries(users.map((x) => [x.userId, x]));
@@ -132,7 +135,7 @@ const PlanData = (() => {
   // 兩邊對不上時（舊版網頁只改了 videoRef、或有人在 Firebase Console 手改）取聯集、videoRef
   // 排第一：寧可多顯示一部，也不要安靜地少掉一部。
   // 心率一律用 Zone 表示（決策紀錄第 30 條）。**顯示一律走 fmtHeartRateZone**，不要直接印
-  // item.heartRateZone：教練改過的週（Firestore planOverrides）跟常用項目裡還存著舊的「60-70%」，
+  // item.heartRateZone：教練改過的週（Firestore planWeeks／舊的 planOverrides）跟常用項目裡還存著舊的「60-70%」，
   // 不做資料遷移，讀的時候換算，下次教練存檔就會存成 Zone。
   // 換算基準（第 30 條）：最大心率百分比的五區，Zone 1 50-60%、Zone 2 60-70%、Zone 3 70-80%、
   // Zone 4 80-90%、Zone 5 90-100%。區間上限剛好在邊界上不算進下一區（60-70% 是 Zone 2）；
@@ -244,6 +247,7 @@ const PlanData = (() => {
     get videos() { return videos; },
     get workouts() { return workouts; },
     get users() { return users; },
+    get weekPresets() { return weekPresets; }, // getter：load() 之後才有值（見下面 videoById 的說明）
     // ⚠️ 一定要是 getter，不能用 shorthand property。videoById/workoutById/userById
     // 在模組頂端先宣告成空物件，load() 之後才重新指派——如果這裡直接寫
     // `videoById, workoutById, userById,`，這個回傳物件在 IIFE 執行的那一刻
