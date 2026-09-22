@@ -390,15 +390,8 @@ const App = {
 
   // ── 課表上的項目（決策紀錄第 45 條）─────────────────────────────────────────
   // 沒有編輯表單：名稱是項目庫的選單（換成別的常用項目）、時間那格直接改、存成常用、上下移、刪除。
-  // 項目的內容（類型、心率、段落、影片、動作、備註）只在常用項目庫定義。今天以前的日子不能改。
-  _planDayLocked(weekNumber, dayIndex) {
-    if (PlanData.keyForWeekDay(weekNumber, dayIndex) < PlanData.dayKey(PlanData.today())) {
-      alert('今天以前的日子不能改。');
-      render();
-      return true;
-    }
-    return false;
-  },
+  // 項目的內容（類型、心率、段落、影片、動作、備註）只在常用項目庫定義。
+  // 決策紀錄第 59 條：過去的日子跟其他日子一樣可以改（以前這裡會擋，「今天以前的日子不能改」）。
 
   // 點兩下（第 46 條）：課表的時間、「第 X 週」切換教練模式都要點兩下，避免誤觸。
   // 自己判斷（400ms 內點同一個東西），不靠 dblclick——iOS Safari 對不是連結的元素不一定送 dblclick。
@@ -416,7 +409,6 @@ const App = {
   },
   amountTap(weekNumber, dayIndex, itemId) {
     if (!this._isDoubleTap(`amt:${weekNumber}-${dayIndex}-${itemId}`)) return;
-    if (this._planDayLocked(weekNumber, dayIndex)) return;
     this.state.amountEdit = { weekNumber, dayIndex, itemId };
     this.state.itemPicker = null;
     this.state.noteEdit = null;
@@ -434,7 +426,6 @@ const App = {
 
   // 教練備註（第 54 條）：這天這個項目的一句話。按「＋ 備註」在卡片裡打，離開輸入框就存；清空＝拿掉。
   startItemNote(weekNumber, dayIndex, itemId) {
-    if (this._planDayLocked(weekNumber, dayIndex)) return;
     this.state.itemPicker = null;
     this.state.amountEdit = null;
     this.state.noteEdit = { weekNumber, dayIndex, itemId };
@@ -446,7 +437,7 @@ const App = {
     const uid = this.planUserId();
     const text = String((el && el.value) || '').trim().slice(0, 200);
     const cur = Store.effectiveWeek(weekNumber, uid).days[dayIndex].items.find((x) => x.id === itemId);
-    if (!this._canEditPlan() || !cur || (cur.coachNote || '') === text || this._planDayLocked(weekNumber, dayIndex)) { setTimeout(() => render(), 0); return; }
+    if (!this._canEditPlan() || !cur || (cur.coachNote || '') === text) { setTimeout(() => render(), 0); return; }
     const week = this._cloneEffectiveWeek(weekNumber, uid);
     const it = week.days[dayIndex].items.find((x) => x.id === itemId);
     if (!it) { setTimeout(() => render(), 0); return; }
@@ -524,7 +515,7 @@ const App = {
 
   // 換成別的常用項目：id 不變（打勾紀錄照 id 對，換掉不會讓做過的課又變成沒做）
   swapItemFromLibrary(weekNumber, dayIndex, itemId, templateId) {
-    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan()) return;
     const uid = this.planUserId();
     const tpl = Store.libraryList('item').find((t) => t.id === templateId);
     if (!tpl) { alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return; }
@@ -546,7 +537,7 @@ const App = {
   },
 
   addItemFromLibrary(weekNumber, dayIndex, templateId) {
-    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan()) return;
     const uid = this.planUserId();
     const tpl = Store.libraryList('item').find((t) => t.id === templateId);
     if (!tpl) { alert('找不到這個常用項目，可能剛被刪掉了。'); render(); return; }
@@ -564,7 +555,7 @@ const App = {
 
   // 時間（長跑是公里）那格改了：el 是改的那個輸入框，同一組兩格一起讀。兩格都空＝沒有這個數字。
   setItemAmount(weekNumber, dayIndex, itemId, el) {
-    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan()) return;
     const uid = this.planUserId();
     const box = el && el.closest('.amt-edit');
     if (!box) return;
@@ -1084,7 +1075,7 @@ const App = {
   },
 
   deleteItem(weekNumber, dayIndex, itemId) {
-    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan()) return;
     const uid = this.planUserId();
     const week = this._cloneEffectiveWeek(weekNumber, uid);
     const day = week.days[dayIndex];
@@ -1112,7 +1103,7 @@ const App = {
   },
 
   moveItem(weekNumber, dayIndex, itemId, direction) {
-    if (!this._canEditPlan() || this._planDayLocked(weekNumber, dayIndex)) return;
+    if (!this._canEditPlan()) return;
     const uid = this.planUserId();
     const week = this._cloneEffectiveWeek(weekNumber, uid);
     const day = week.days[dayIndex];

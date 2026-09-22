@@ -56,12 +56,13 @@ const fn = (name) => vm.runInContext(name, sandbox);
   assert(Store.effectiveWeek(W).days[D].items.find((x) => x.id === it.id).coachNote.length === 200, 'swapping the item keeps the note (it belongs to the day)');
   App.saveItemAsTemplate(W, D, it.id);
   assert(Store.libraryList('item').every((t) => !('coachNote' in t.item)), 'saving as a template does not copy the note into the library');
-  // 過去的日子不能寫
+  // 過去的日子跟其他日子一樣可以寫（決策紀錄第 59 條）
   const past = PlanData.plan.weeks.flatMap((w) => w.days.map((d, di) => ({ w: w.weekNumber, di, d }))).find((x) => PlanData.keyForWeekDay(x.w, x.di) < PlanData.dayKey(PlanData.today()));
   if (past) {
     const nA = sandbox.__alerts.length;
     App.startItemNote(past.w, past.di, past.d.items[0].id);
-    assert(App.state.noteEdit === null && sandbox.__alerts.length === nA + 1, 'past days: note cannot be written');
+    assert(App.state.noteEdit && App.state.noteEdit.itemId === past.d.items[0].id && sandbox.__alerts.length === nA, 'past days: note can be written, same as any other day');
+    App.state.noteEdit = null;
   }
 
   // ── 第 55 條：休息日可以加運動，加的是要做的（v0.26.3：她說「+ 就是一起、和的意思，不是二選一，也不是或」）──

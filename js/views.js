@@ -283,9 +283,8 @@ function renderDayBody(weekNumber, dayIndex, userId) {
     <textarea class="note-input daynotes-edit" placeholder="這天的備註（選填，例如二擇一的說明）" onchange="A.setDayNotes(${weekNumber},${dayIndex},this.value)">${h(d.dayNotes || '')}</textarea>
   `;
 
-  // 決策紀錄第 45 條：課表上的項目只能「從項目庫換」「改時間」，今天以前的日子不能改
-  const planLocked = PlanData.keyForWeekDay(weekNumber, dayIndex) < PlanData.dayKey(PlanData.today());
-
+  // 決策紀錄第 59 條：課表上的項目只能「從項目庫換」「改時間」，過去、現在、未來的日子一視同仁——
+  // 換項目 id 不變（打勾紀錄照 id 對，不會孤兒）、加/刪/搬動也不影響其他項目的紀錄。
   if (d.selectOne) {
     html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, true, isExpired, uid)).join(
       `<div class="choice-or">或</div>`);
@@ -293,14 +292,10 @@ function renderDayBody(weekNumber, dayIndex, userId) {
     html += d.items.map((item, i) => renderItemCard(weekNumber, dayIndex, item, i, d.items.length, entry, false, isExpired, uid)).join('');
   }
 
-  if (planLocked) {
-    html += `<div class="coach-locked-note">今天以前的日子不能改。</div>`;
-  } else {
-    const pk = App.state.itemPicker;
-    const addOpen = !!(pk && pk.weekNumber === weekNumber && pk.dayIndex === dayIndex && pk.itemId === 'add');
-    html += `<div class="coach-add-row"><button class="btn coach-add-row" aria-expanded="${addOpen}" onclick="A.toggleItemPicker(${weekNumber},${dayIndex},'add')">＋ 從項目庫加一個</button></div>`;
-    if (addOpen) html += renderLibraryPickList(weekNumber, dayIndex, 'add', null);
-  }
+  const pk = App.state.itemPicker;
+  const addOpen = !!(pk && pk.weekNumber === weekNumber && pk.dayIndex === dayIndex && pk.itemId === 'add');
+  html += `<div class="coach-add-row"><button class="btn coach-add-row" aria-expanded="${addOpen}" onclick="A.toggleItemPicker(${weekNumber},${dayIndex},'add')">＋ 從項目庫加一個</button></div>`;
+  if (addOpen) html += renderLibraryPickList(weekNumber, dayIndex, 'add', null);
 
   // 第 46 條：教練模式是改課表的地方，當天紀錄（實際數字、沒照表、體感強度、附註、身體狀況）不畫，關掉教練模式照舊
 
@@ -598,8 +593,9 @@ function renderItemCard(weekNumber, dayIndex, item, itemIndexInDay, itemCountInD
   const unsynced = ownPlan && Sync.isSignedIn() && Sync.isWriteFailed('entries', dateKey);
 
   // 決策紀錄第 45 條：教練模式的項目卡沒有編輯表單。名稱是項目庫的選單（點了換成別的常用項目），
-  // 時間（長跑是公里）那格可以直接改；其餘內容在「設定 → 常用項目庫」定義。今天以前的日子全部唯讀。
-  const editable = coach && dateKey >= PlanData.dayKey(PlanData.today());
+  // 時間（長跑是公里）那格可以直接改；其餘內容在「設定 → 常用項目庫」定義。
+  // 決策紀錄第 59 條：過去的日子跟其他日子一樣可以改——換項目 id 不變，打勾紀錄不會孤兒（不是第 43 條的整天對調）。
+  const editable = coach;
   const pk = App.state.itemPicker;
   const pickerOpen = editable && !!(pk && pk.weekNumber === weekNumber && pk.dayIndex === dayIndex && pk.itemId === item.id);
   // 時間平常是文字，點兩下才變輸入框（第 46 條：避免一碰就改到）

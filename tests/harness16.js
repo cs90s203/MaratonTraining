@@ -1,4 +1,5 @@
-// 決策紀錄第 45 條：課表項目卡——名稱是項目庫選單、時間直接改、存成常用只在跟項目庫不同時出現、今天以前唯讀
+// 決策紀錄第 45 條：課表項目卡——名稱是項目庫選單、時間直接改、存成常用只在跟項目庫不同時出現
+// 決策紀錄第 59 條：過去的日子跟其他日子一樣可以改（不是第 45 條原本的今天以前唯讀）
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path').resolve(__dirname, '..'); // repo 根目錄
@@ -137,22 +138,28 @@ const J = (x) => JSON.stringify(x);
     assert(Store.effectiveWeek(so.w).days[so.di].items.every((it) => !it.derived), 'select-one day: swap clears derived on both options');
   }
 
-  // ── 今天以前的日子：唯讀 ──
+  // ── 今天以前的日子：跟其他日子一樣可以改（決策紀錄第 59 條，她：「為什麼週一不能跟其他天一樣教練模式修改內容？」）──
   const todayKey = PlanData.dayKey(PlanData.today());
   const past = PlanData.plan.weeks.flatMap((w) => w.days.map((d, di) => ({ w: w.weekNumber, di, d }))).find((x) => PlanData.keyForWeekDay(x.w, x.di) < todayKey && !x.d.selectOne && x.d.items.some((it) => it.type === 'run'));
   if (past) {
     const pit = past.d.items.find((it) => it.type === 'run');
     const ph = card(past.w, past.di, pit.id);
-    assert(!ph.includes('item-pick') && !ph.includes('amt-edit') && !ph.includes('A.moveItem(') && !ph.includes('A.deleteItem(') && (ph.includes('A.saveItemAsTemplate(') === !Store.libraryItemMatching(pit)), 'past card: read-only, only 存成常用 (when not already in the library)');
+    assert(ph.includes('item-pick') && ph.includes(`A.amountTap(${past.w},${past.di},'${pit.id}')`) && ph.includes('A.moveItem(') && ph.includes('A.deleteItem('), 'past card: editable exactly like a future one (name picker, time, move, delete)');
     const pb = fn('renderDayBody')(past.w, past.di);
-    assert(pb.includes('今天以前的日子不能改') && !pb.includes("'add')"), 'past day: no add, says why');
-    const pushN = pushes.length, al = sandbox.__alerts.length;
+    assert(!pb.includes('今天以前的日子不能改') && pb.includes("'add')"), 'past day: has ＋ 從項目庫加一個, no read-only note');
+
+    // 已經打過勾的項目：換成別的常用項目 id 不變，勾留著（不是第 43 條那種整天搬到別的日期）
+    App.toggleItem(past.w, past.di, pit.id);
+    const dk = PlanData.keyForWeekDay(past.w, past.di);
+    assert(Store.entryFor('mick', dk).done[pit.id] === true, 'past item ticked, as setup for the next check');
+    const pushN = pushes.length;
     App.swapItemFromLibrary(past.w, past.di, pit.id, t0.id);
+    assert(pushes.length === pushN + 1 && Store.effectiveWeek(past.w).days[past.di].items.find((it) => it.id === pit.id).title === t0.item.title, 'past day: swap succeeds, same id');
+    assert(Store.entryFor('mick', dk).done[pit.id] === true, 'her tick on that id survives the swap');
     App.addItemFromLibrary(past.w, past.di, t0.id);
     App.setItemAmount(past.w, past.di, pit.id, fakeEl('duration', '10', '10'));
     App.deleteItem(past.w, past.di, pit.id);
-    App.moveItem(past.w, past.di, pit.id, 1);
-    assert(pushes.length === pushN && sandbox.__alerts.length === al + 5, 'past day: swap / add / time / delete / move all refused');
+    assert(pushes.length === pushN + 4, 'past day: add / time / delete also succeed');
   } else console.log('SKIP: no past run day yet');
 
   // ── 常用項目庫的表單：一個名稱、沒有強度說明、沒有長說明 ──
@@ -210,13 +217,16 @@ const J = (x) => JSON.stringify(x);
   assert(App.state.amountEdit !== null, '46-1: moving to the other box keeps editing');
   App.amountFocusOut({ relatedTarget: null }, group);
   assert(App.state.amountEdit === null, '46-1: leaving the boxes closes editing');
+  // 決策紀錄第 59 條：過去的日子跟其他日子一樣點兩下才能改，不是不能改
   const todayKey = PlanData.dayKey(PlanData.today());
   const past = PlanData.plan.weeks.flatMap((w) => w.days.map((d, di) => ({ w: w.weekNumber, di, d }))).find((x) => PlanData.keyForWeekDay(x.w, x.di) < todayKey && x.d.items.some((y) => y.type === 'run'));
   if (past) {
     const pit = past.d.items.find((y) => y.type === 'run');
+    App.state.amountEdit = null; App._lastTap = null;
     const nA = sandbox.__alerts.length;
     App.amountTap(past.w, past.di, pit.id); App.amountTap(past.w, past.di, pit.id);
-    assert(App.state.amountEdit === null && sandbox.__alerts.length === nA + 1, '46-1: past day cannot open the time inputs');
+    assert(App.state.amountEdit && App.state.amountEdit.itemId === pit.id && sandbox.__alerts.length === nA, '46-1: past day still needs a double tap, same as any other day, no longer refused');
+    App.state.amountEdit = null;
   }
 
   // 2. 教練模式不畫當天紀錄卡
