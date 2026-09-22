@@ -958,8 +958,8 @@ const Store = {
   // 一律從明天開始：今天已經做過的課被換掉，打的勾會對不上，那堂課又冒出來——第 0 條。
   // to 自己對調過順序（第 14 條）的週整週跳過：對調記的是「第幾格顯示課表第幾天」，底下的課換掉，
   // 她這週已經做過的課可能被換到後面。
-  // to 在明天以後的日子已經先記了東西（第 31 條可以預先排休息：二擇一選了休息、休息項目打了勾、自主休息）
-  // 的那一天不動（審查抓到）：換掉的話，她排好的休息會不見、換成她沒打算做的課（第 0 條）。
+  // to 在明天以後的日子已經先記了東西（第 31 條可以預先排休息：二擇一選了休息、休息項目打了勾、自主休息）的那幾天，
+  // 一樣照教練的課表換（她要的：照她排的課表排，不要自己留著舊的），但確認畫面一天一天點名（recorded），教練按之前就知道。
   // 回傳預覽（什麼都不改）；確認之後 applyCopyPlan 照這份存。
   _hasRecord(userId, dateKey) {
     const e = this.entryFor(userId, dateKey);
@@ -973,7 +973,7 @@ const Store = {
     } else {
       for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) weeks.push(wn);
     }
-    const out = { from: fromUserId, to: toUserId, range, tomorrow, inRange: [], weeks: [], skipped: [], kept: 0, reduced: [], changedDays: 0, ownEdited: 0, goalChanged: false, metricChanged: false };
+    const out = { from: fromUserId, to: toUserId, range, tomorrow, inRange: [], weeks: [], skipped: [], recorded: [], reduced: [], changedDays: 0, ownEdited: 0, goalChanged: false, metricChanged: false };
     weeks.forEach((wn) => {
       const days = IDENTITY_ORDER.filter((di) => PlanData.keyForWeekDay(wn, di) >= tomorrow);
       if (!days.length) return;
@@ -983,9 +983,8 @@ const Store = {
       const src = this.effectiveWeek(wn, fromUserId), dst = this.effectiveWeek(wn, toUserId);
       const dstOwn = this.planWeeks[toUserId] && this.planWeeks[toUserId][wn];
       const editors = (dstOwn && !dstOwn.isFactory && dstOwn.editedBy) || {};
-      const differs = days.filter((di) => dayCompareKey(src.days[di]) !== dayCompareKey(dst.days[di]));
-      const changed = differs.filter((di) => !this._hasRecord(toUserId, PlanData.keyForWeekDay(wn, di)));
-      out.kept += differs.length - changed.length;
+      const changed = days.filter((di) => dayCompareKey(src.days[di]) !== dayCompareKey(dst.days[di]));
+      changed.forEach((di) => { if (this._hasRecord(toUserId, PlanData.keyForWeekDay(wn, di))) out.recorded.push({ weekNumber: wn, dayIndex: di }); });
       const fieldsChanged = WEEK_PLAN_FIELDS.filter((k) => stableJson(src[k] == null ? null : src[k]) !== stableJson(dst[k] == null ? null : dst[k]));
       if (!changed.length && !fieldsChanged.length) return;
       if (adj && adj.reduced) out.reduced.push(wn); // 她標了「本週已降量」：確認畫面講一聲
@@ -999,14 +998,14 @@ const Store = {
   },
 
   // 照預覽存（每週一份，版本比對跟平常改課表同一條路）。回傳存了幾週。
-  // 存之前再擋一次（審查抓到）：確認視窗開著跨過午夜，預覽的「明天」已經變成今天；那幾天這期間被她記了東西。
+  // 存之前再擋一次（審查抓到）：確認視窗開著跨過午夜，預覽的「明天」已經變成今天。
   applyCopyPlan(preview) {
     if (!preview || !this.isCoach(this.activeUserId) || preview.from === preview.to) return 0;
     const at = nowIso();
     const tomorrow = this._dayAfter(this.todayKey());
     let saved = 0;
     preview.weeks.forEach(({ weekNumber: wn, days: planned, fields }) => {
-      const days = planned.filter((di) => PlanData.keyForWeekDay(wn, di) >= tomorrow && !this._hasRecord(preview.to, PlanData.keyForWeekDay(wn, di)));
+      const days = planned.filter((di) => PlanData.keyForWeekDay(wn, di) >= tomorrow);
       if (!days.length && !fields.length) return;
       const src = this.effectiveWeek(wn, preview.from);
       const week = JSON.parse(JSON.stringify(this.effectiveWeek(wn, preview.to)));
@@ -1023,29 +1022,38 @@ const Store = {
 
   // ── 預先排好的整週課表（決策紀錄第 57 條，data/week-presets.json）─────────────────────
   // preset.items：{ key: 項目內容 }；preset.days：週一到週日，每天列 key。
-  // 項目用「名稱＋類型」對常用項目庫：庫裡有的用庫裡那份（她自己調過的，例如帶熱身影片的「Zone 2 跑」），
-  // 沒有的由 App.applyWeekPreset 照 preset 的內容新增進庫。只比名稱會對到不同類型的同名項目（審查抓到：
-  // 庫裡一個肌力訓練的「伸展」會讓週一的休息日變成要做 20 分鐘的肌力）。回傳 { templates: {key: {id,item}|null}, missing: [key] }
+  // 照她這次講的排（她說：「你怎麼沒有照我排的課表排？」）：
+  // - useLibrary:true 的（她只寫了名字、沒講內容的：Zone 2 跑、間歇跑、完全休息）用常用項目庫裡「名稱＋類型」一樣的那份
+  //  （她自己調過的，例如帶熱身影片的「Zone 2 跑」）；庫裡沒有才照 preset 的內容。
+  // - 其他的（她給了影片、時間的）一律照她這次講的內容：庫裡有一模一樣的就連過去；有同名但內容不一樣的，這週照她講的排、
+  //   她的庫不動（不連、不新增）；庫裡沒有的新增進庫，之後排下一週可以直接挑。
+  // 只比名稱會對到不同類型的同名項目（審查抓到：庫裡一個肌力訓練的「伸展」會讓週一的休息日變成要做肌力），所以一律名稱＋類型。
+  // 回傳 { templates: {key: {id|null, item}|null}, missing: [要新增進庫的 key], differ: [庫裡同名但內容不一樣、這週照她講的 key] }
   presetTemplates(preset) {
     const lib = this.libraryList('item');
-    const templates = {}, missing = [];
+    const templates = {}, missing = [], differ = [];
     Object.keys((preset && preset.items) || {}).forEach((key) => {
       const def = preset.items[key];
-      const t = lib.find((x) => x.item && x.item.title === def.title && x.item.type === def.type) || null;
-      templates[key] = t ? { id: t.id, item: t.item } : null;
-      if (!t) missing.push(key);
+      const same = lib.filter((x) => x.item && x.item.title === def.title && x.item.type === def.type);
+      if (def.useLibrary && same.length) { templates[key] = { id: same[0].id, item: same[0].item }; return; }
+      const exact = this.libraryItemMatching(def);
+      if (exact) { templates[key] = { id: exact.id, item: exact.item }; return; }
+      if (same.length) { templates[key] = { id: null, item: def }; differ.push(key); return; }
+      templates[key] = null;
+      missing.push(key);
     });
-    return { templates, missing };
+    return { templates, missing, differ };
   },
 
-  // 照 preset 組出這個人那一週的新內容（不存），順便算出確認畫面要講的事。templates：每個 key 用哪份常用項目（{id, item}）。
-  // - 整週換掉，包含已經過去的日子跟今天（教練明確要的：「雖然週一已經過了但還是排」）。
-  // - 明天以後她已經先記了東西的日子（例如先排了休息，第 31 條）不動——跟複製課表同一條（第 0 條，審查抓到）。
+  // 照 preset 組出這個人那一週的新內容（不存），順便算出確認畫面要講的事。templates：每個 key 用哪份（{id|null, item}）。
+  // - 整週七天全部照她排的換掉，包含已經過去的日子跟今天（她要的：「雖然週一已經過了但還是排」）。
+  //   以前明天以後先記過東西的日子（例如先選了休息）會整天不動——結果那天還是原本的「完全休息 或 散步＋伸展」，
+  //   她：「你怎麼沒有照我排的課表排？……不要擅自改成或」。現在照排，確認畫面點名哪一天記過什麼、會被換掉。
   // - 同一天原本就有的同一個項目（名稱跟類型一樣）沿用原本的 id：打過的勾照 id 對，換掉整天也不會讓做過的課變成沒做；
   //   那個項目原本的教練備註也留著（第 54 條：備註是給那一天的）。
   // preset 的第 i 天寫進課表的第 i 天（跟教練排課同一套位置）；她自己對調過順序的話，她那邊照她的對調顯示——
-  // 所以「哪一天」、「有沒有記過」都照她的日曆算：課表第 i 天出現在日曆上 order.indexOf(i) 那一格。
-  // 回傳 { week, kept: [日曆格], lost: [{ c, titles }], reduced, swapped }
+  // 所以「哪一天記過什麼」照她的日曆算：課表第 i 天出現在日曆上 order.indexOf(i) 那一格。
+  // 回傳 { week, lost: [{ c, picked, ticked }], statuses: [{ c, status }], reduced, swapped }
   presetPlan(preset, userId, templates) {
     const wn = preset.weekNumber;
     const oldWeek = this.effectiveWeek(wn, userId);
@@ -1055,11 +1063,7 @@ const Store = {
     const adj = this.weekAdjustmentFor(wn, userId);
     const own = adj && isValidDayOrder(adj.dayOrder) ? adj.dayOrder : IDENTITY_ORDER;
     const today = this.todayKey();
-    const kept = [];
     preset.days.forEach((keys, di) => {
-      const c = own.indexOf(di); // 這份內容在她日曆上的哪一天
-      const key = PlanData.keyForWeekDay(wn, c);
-      if (key > today && this._hasRecord(userId, key)) { kept.push(c); return; }
       const old = week.days[di] || { items: [] };
       const used = new Set();
       const items = keys.map((k) => {
@@ -1076,22 +1080,26 @@ const Store = {
       week.days[di] = { dayIndex: di, items, selectOne: false, dayNotes: null };
     });
     week.layoutAt = nowIso(); // 天的內容換了：別台還停在舊畫面的，不能再照位置存
-    // 換掉的日子裡，她打過的勾（含二擇一選的）新的那天已經沒有的——照日曆那一天講，不是照名稱
-    //（同名的項目可能在別天還有，只講名稱會讓人以為講錯了）
-    const lost = [];
+    // 換掉之後，她這週記過、但新的那天已經沒有的——照日曆那一天講，不是只講名稱（同名的可能在別天還有）：
+    // picked＝二擇一選的（未來的日子可以先選休息，第 31 條）、ticked＝打的勾。
+    // statuses＝今天跟以後標了自主休息／更換項目的日子：那是她的紀錄，排課改不到，那天照樣顯示那個狀態。
+    const lost = [], statuses = [];
     for (let c = 0; c < 7; c++) {
-      if (kept.includes(c)) continue;
-      const e = this.entryFor(userId, PlanData.keyForWeekDay(wn, c));
+      const key = PlanData.keyForWeekDay(wn, c);
+      const e = this.entryFor(userId, key);
       if (!e || e.deleted) continue;
+      const st = entryStatus(e);
+      if (st && key >= today) statuses.push({ c, status: st });
       const di = own[c];
       const newIds = new Set(week.days[di].items.map((it) => it.id));
       const oldById = {};
       oldWeek.days[di].items.forEach((it) => { oldById[it.id] = it; });
-      const ids = Object.keys(e.done || {}).filter((id) => e.done[id]).concat(e.selectedItemId ? [e.selectedItemId] : []);
-      const titles = [...new Set(ids.filter((id) => oldById[id] && !newIds.has(id)).map((id) => oldById[id].title))];
-      if (titles.length) lost.push({ c, titles });
+      const gone = (id) => oldById[id] && !newIds.has(id);
+      const picked = e.selectedItemId && gone(e.selectedItemId) ? [oldById[e.selectedItemId].title] : [];
+      const ticked = [...new Set(Object.keys(e.done || {}).filter((id) => e.done[id] && id !== e.selectedItemId && gone(id)).map((id) => oldById[id].title))];
+      if (picked.length || ticked.length) lost.push({ c, picked, ticked, future: key > today });
     }
-    return { week, kept, lost, reduced: !!(adj && adj.reduced), swapped: own !== IDENTITY_ORDER && own.some((v, i) => v !== i) };
+    return { week, lost, statuses, reduced: !!(adj && adj.reduced), swapped: own !== IDENTITY_ORDER && own.some((v, i) => v !== i) };
   },
 
   // ── 常用項目庫（Firestore library/{id}；決策紀錄第 26 條）─────────────────────

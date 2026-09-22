@@ -1205,23 +1205,30 @@ const App = {
     if (!Store.canEditPlanOf(uid)) { render(); return; }
     const wn = preset.weekNumber;
     const name = (PlanData.userById[uid] || {}).displayName || uid;
-    const { templates, missing } = Store.presetTemplates(preset);
-    // 先算一次（還沒進庫的先照 preset 的內容算）：哪幾天不動、哪幾天的勾會不見，講給她聽
+    const { templates, missing, differ } = Store.presetTemplates(preset);
+    // 先算一次（還沒進庫的先照 preset 的內容算）：哪幾天她記過的東西會被換掉，講給她聽
     const draft = { ...templates };
     missing.forEach((k) => { draft[k] = { id: null, item: preset.items[k] }; });
     const plan = Store.presetPlan(preset, uid, draft);
+    const who = uid === Store.activeUserId ? '你' : `${name} `; // 名字後面空一格、「你」不用：「Phoebe 先選的」「你先選的」
     const dayLabel = (c) => { const d = PlanData.dateForWeekDay(wn, c); return `週${PlanData.weekdayLabel(c)}（${d.getMonth() + 1}/${d.getDate()}）`; };
     const titlesOf = (keys) => [...new Set(keys.map((k) => preset.items[k].title))];
-    const reused = titlesOf(Object.keys(templates).filter((k) => templates[k]));
+    const reused = titlesOf(Object.keys(templates).filter((k) => templates[k] && templates[k].id));
     const added = titlesOf(missing);
+    const differs = titlesOf(differ);
+    const statusName = { rested: '自主休息', substituted: '更換項目' };
     const lines = [
       `把「${preset.name}」排進 ${name} 第 ${wn} 週？`,
-      '週一到週日整週換成這份，包含已經過去的日子跟今天。',
-      plan.kept.length ? `${plan.kept.map(dayLabel).join('、')} ${name} 已經先記了（例如先排了休息），這${plan.kept.length === 1 ? '天' : '幾天'}不動。` : '',
+      '週一到週日七天全部照這份排，包含已經過去的日子跟今天。',
       added.length ? `常用項目庫會加上：${added.join('、')}。` : '',
-      reused.length ? `用常用項目庫裡原本的：${reused.join('、')}。` : '',
+      reused.length ? `用常用項目庫裡的：${reused.join('、')}。` : '',
+      differs.length ? `常用項目庫裡的「${differs.join('」「')}」內容不一樣，這週照這份排（庫裡那份不動）。` : '',
       '同一天原本就有的同一個項目，打過的勾會留著。',
-      ...plan.lost.map((x) => `${dayLabel(x.c)}打過勾的「${x.titles.join('」「')}」不在新的課表裡，那個勾不會再顯示。`),
+      ...plan.lost.map((x) => `${dayLabel(x.c)}${[
+        x.picked.length ? `${who}${x.future ? '先' : ''}選的「${x.picked.join('」「')}」` : '',
+        x.ticked.length ? `打過勾的「${x.ticked.join('」「')}」` : '',
+      ].filter(Boolean).join('、')}不在新的課表裡，會換成這份排的內容。`),
+      ...plan.statuses.map((x) => `${dayLabel(x.c)}${who}標了「${statusName[x.status]}」，那天會照樣顯示${statusName[x.status]}（要練的話到那天取消）。`),
       plan.reduced ? `${name} 標了第 ${wn} 週「本週已降量」。` : '',
       plan.swapped ? `${name} 這週自己換過順序，她那邊看到的日子會照她的對調。` : '',
     ].filter(Boolean);
@@ -1265,13 +1272,15 @@ const App = {
       : (p.inRange.length ? `第 ${p.inRange[0]}～${p.inRange[p.inRange.length - 1]} 週` : '');
     if (!p.inRange.length) { alert(`${range === 'week' ? `第 ${wn} 週` : '課表'}沒有明天以後的日子，不用複製。`); return; }
     const skipLine = p.skipped.length ? `${weeksText(p.skipped)} ${name(to)} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過。` : '';
-    const keptLine = p.kept ? `${name(to)} 已經先記了的 ${p.kept} 天不動（例如先排了休息）。` : '';
+    const dayName = (x) => { const d = PlanData.dateForWeekDay(x.weekNumber, x.dayIndex); return `第 ${x.weekNumber} 週週${PlanData.weekdayLabel(x.dayIndex)}（${d.getMonth() + 1}/${d.getDate()}）`; };
+    const recordedLine = p.recorded.length
+      ? `${name(to)} 已經先記了東西（例如先選了休息）的 ${p.recorded.length} 天也會換成 ${name(fromUserId)} 的：${p.recorded.slice(0, 6).map(dayName).join('、')}${p.recorded.length > 6 ? ' 等' : ''}。` : '';
     if (!p.weeks.length) {
-      // 跳過的週、不動的天都沒有比過，不能說它們「一樣」：全部都跳過就只講跳過；有跳過／不動的就只說「其他日子」一樣
+      // 跳過的週沒有比過，不能說它「一樣」：全部都跳過就只講跳過；有跳過的就只說「其他日子」一樣
       const allSkipped = p.skipped.length > 0 && p.skipped.length === p.inRange.length;
       alert(allSkipped
         ? `${weeksText(p.skipped)} ${name(to)} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過，這次沒有複製。`
-        : [skipLine, keptLine, `${p.skipped.length || p.kept ? '其他日子' : `${name(to)} ${scope}（明天起）的課表`}已經跟 ${name(fromUserId)} 一樣了，不用複製。`].filter(Boolean).join('\n'));
+        : [skipLine, `${p.skipped.length ? '其他日子' : `${name(to)} ${scope}（明天起）的課表`}已經跟 ${name(fromUserId)} 一樣了，不用複製。`].filter(Boolean).join('\n'));
       return;
     }
     const lines = [
@@ -1279,7 +1288,7 @@ const App = {
       `範圍：${scope}，明天（${tomorrowLabel}）起；今天和以前不動。`,
       p.changedDays ? `會改 ${p.changedDays} 天。` : '',
       p.ownEdited ? `${name(to)} 自己改過的 ${p.ownEdited} 天會被蓋掉。` : '',
-      keptLine,
+      recordedLine,
       skipLine,
       p.reduced.length ? `${weeksText(p.reduced)} ${name(to)} 標了「本週已降量」。` : '',
       p.goalChanged ? `目標跑量也會換成 ${name(fromUserId)} 的。` : '',

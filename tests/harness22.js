@@ -265,7 +265,8 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   Store._notify = origNotify;
   Sync._detachPlanWeeks();
 
-  // ── 審查 1：她已經先記了東西的日子（例如預先選了休息）複製時不動（第 0 條）──
+  // ── 她已經先記了東西的日子（例如預先選了休息）：照教練的課表換，但確認畫面一天一天點名
+  //   （以前是整天不動，結果她那邊還是舊的「或」——使用者：「你怎麼沒有照我排的課表排？」）──
   Store.activeUserId = 'mick'; Store.coachMode = true;
   Sync.planWeeksLoaded = () => true; // 這段假設兩邊的課表都讀到了（讀到了沒的判斷上面測過）
   const sel = (() => {
@@ -284,13 +285,17 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     edit('mick', sel.wn, (x) => { x.days[sel.di] = { ...x.days[sel.di], selectOne: false, items: [{ id: 'x-run', type: 'run', title: '輕鬆跑', duration: { min: 30, max: 30 } }] }; });
     const pk = Store.copyPlanPreview('mick', 'Annlin', 'week', sel.wn);
     const wk = pk.weeks.find((x) => x.weekNumber === sel.wn);
-    assert(pk.kept === 1 && !(wk && wk.days.includes(sel.di)), 'her pre-picked rest day is kept out of the copy');
+    assert(pk.recorded.length === 1 && pk.recorded[0].dayIndex === sel.di && wk && wk.days.includes(sel.di), 'her pre-picked day is copied too, and flagged');
     msg = '';
-    sandbox.confirm = (m) => { msg = m; return true; };
+    sandbox.confirm = (m) => { msg = m; return false; };
     App.state.viewingUserId = 'Annlin'; App.state.weekViewNumber = sel.wn;
     await App.copyPlanFrom('mick', 'week');
-    assert(Store.dayStatus(sel.wn, sel.di, 'Annlin') === 'done' && Store.effectiveWeek(sel.wn, 'Annlin').days[sel.di].selectOne, 'after copying, her rest is still there (no run appeared)');
-    assert(msg.includes('Annlin 已經先記了的 1 天不動') || sandbox.__alerts.some((m) => m.includes('Annlin 已經先記了的 1 天不動')), 'the message says that day was left alone');
+    assert(msg.includes('Annlin 已經先記了東西（例如先選了休息）的 1 天也會換成 Mick 的') && msg.includes(`第 ${sel.wn} 週週${PlanData.weekdayLabel(sel.di)}`), 'the confirm names that day (week and weekday) before copying');
+    assert(Store.effectiveWeek(sel.wn, 'Annlin').days[sel.di].selectOne && Store.dayStatus(sel.wn, sel.di, 'Annlin') === 'done', 'declined: her day stays as it was');
+    sandbox.confirm = () => true;
+    await App.copyPlanFrom('mick', 'week');
+    const after = Store.effectiveWeek(sel.wn, 'Annlin').days[sel.di];
+    assert(!after.selectOne && after.items[0].title === '輕鬆跑', "confirmed: the day follows the coach's plan (no leftover 「或」)");
   }
   // 確認視窗跨過午夜：預覽的「明天」變成今天 → 存的時候再擋
   const stale = { from: 'mick', to: 'Annlin', weeks: [{ weekNumber: TW, days: [TD], fields: [] }] };

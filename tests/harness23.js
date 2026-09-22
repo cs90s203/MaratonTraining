@@ -59,7 +59,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   sandbox.confirm = (m) => { msg = m; return true; };
   App.applyWeekPreset('2026-09-21');
   assert(msg.includes('把「9/21 那週（Mick 傳來的）」排進 Mick 第 3 週？') && msg.includes('包含已經過去的日子跟今天'), 'confirm: whose week, and that past days are included');
-  assert(msg.includes('常用項目庫會加上：完全休息、盆底肌內核呼吸練習、伸展') && msg.includes('用常用項目庫裡原本的：Zone 2 跑'), 'confirm: which items get added to the library, which come from it');
+  assert(msg.includes('常用項目庫會加上：完全休息、盆底肌內核呼吸練習、伸展') && msg.includes('用常用項目庫裡的：Zone 2 跑'), 'confirm: which items get added to the library, which come from it');
   assert(msg.includes(`打過勾的「${monOld.title}」不在新的課表裡`) && !msg.includes(`「${tueOld.title}」不在`), 'confirm: the Monday tick that disappears is named; the kept Zone 2 tick is not');
   assert(expected.every((t, di) => titles('mick', di) === t), 'all seven days are exactly as she wrote them (Monday included)');
   const w = Store.effectiveWeek(WN, 'mick');
@@ -129,22 +129,33 @@ const fn = (name) => vm.runInContext(name, sandbox);
   const wrongStretch = Store.saveLibraryDoc(null, 'item', { name: '呼吸', item: { type: 'muscle', title: '盆底肌內核呼吸練習', duration: { min: 20, max: 20 } } });
   const tp = Store.presetTemplates(test);
   assert(tp.templates.breath && tp.templates.breath.item.type === 'recovery' && tp.templates.breath.id !== wrongStretch.id, 'library match needs the same name AND type');
-  // 3. 明天以後她已經先記了的日子不動（例如先選了休息），確認畫面照日期講；本週已降量也講
+  // 3. 明天以後她已經先記了東西的日子（例如先選了休息）也照排——以前整天不動，結果還是舊的「或」
+  //   （使用者：「你怎麼沒有照我排的課表排？……不要擅自改成或」）；確認畫面照日期講會換掉什麼；本週已降量也講
   const sunOld = Store.effectiveWeek(FW, 'Phoebe').days[6];
   const restOpt = sunOld.items.find((it) => it.type === 'rest');
   const sunKey = PlanData.keyForWeekDay(FW, 6);
   if (restOpt) Store.mergeRemoteEntry('Phoebe', sunKey, { done: { [restOpt.id]: true }, selectedItemId: sunOld.selectOne ? restOpt.id : null, status: null, updatedAt: '2026-09-22T09:00:00.000Z', fieldAt: {} });
   else Store.mergeRemoteEntry('Phoebe', sunKey, { done: {}, selectedItemId: null, status: 'rested', updatedAt: '2026-09-22T09:00:00.000Z', fieldAt: {} });
   Store.weekAdjustments.Phoebe = { ...(Store.weekAdjustments.Phoebe || {}), [FW]: { reduced: true } };
-  const sunBefore = ftitles(6), sunStatus = Store.dayStatus(FW, 6, 'Phoebe');
   let m2 = '';
   sandbox.confirm = (m) => { m2 = m; return true; };
   App.applyWeekPreset('test-future');
   const sd = PlanData.dateForWeekDay(FW, 6);
-  assert(m2.includes(`週日（${sd.getMonth() + 1}/${sd.getDate()}）`) && m2.includes('Phoebe 已經先記了') && m2.includes('這天不動'), 'confirm names the kept day by date');
-  assert(ftitles(6) === sunBefore && Store.dayStatus(FW, 6, 'Phoebe') === sunStatus, 'her arranged day is left exactly as it was');
+  const sunLabel = `週日（${sd.getMonth() + 1}/${sd.getDate()}）`;
+  assert(restOpt
+    ? m2.includes(`${sunLabel}Phoebe ${sunOld.selectOne ? '先選的' : ''}`) && m2.includes(`「${restOpt.title}」不在新的課表裡，會換成這份排的內容`)
+    : m2.includes(`${sunLabel}Phoebe 標了「自主休息」`), 'confirm names by date what she had arranged on that day');
+  assert(ftitles(6) === expected[6] && !Store.effectiveWeek(FW, 'Phoebe').days[6].selectOne, 'that day is scheduled exactly as written too (no leftover 「或」)');
   assert(m2.includes(`Phoebe 標了第 ${FW} 週「本週已降量」`), 'confirm mentions 本週已降量');
   assert(ftitles(0) === expected[0] && ftitles(5) === expected[5], 'the other days are applied');
+  // 3b. 她給了影片的項目照她講的：庫裡同名同類型但影片不一樣的不拿來用、也不動她的庫；只寫名字的（useLibrary）才用庫裡的
+  const alt = JSON.parse(JSON.stringify(test));
+  alt.items.stretch.videoRefs = ['pamela-leg-stretch'];
+  const libStretch = Store.libraryList('item').find((x) => x.item.title === '伸展' && x.item.type === 'recovery');
+  const tpa = Store.presetTemplates(alt);
+  assert(tpa.differ.includes('stretch') && tpa.templates.stretch.id === null && PlanData.itemVideoRefs(tpa.templates.stretch.item).includes('pamela-leg-stretch'), 'an item she specified uses her video, not the library one with the same name');
+  assert(JSON.stringify(Store.libraryDoc(libStretch.id).item.videoRefs) === JSON.stringify(libStretch.item.videoRefs), 'and her library item is left untouched');
+  assert(tpa.templates.zone2.id === myZ2.id, 'items she only named (Zone 2 跑) come from her library');
   // 4. 間歇跑：庫裡原本有的就用庫裡的（上面已經加進庫了）；有時間，預計跑量算得到它
   const sunInterval = Store.effectiveWeek(WN, 'mick').days[6].items.find((it) => it.type === 'interval');
   assert(sunInterval && sunInterval.duration && sunInterval.duration.min === 35 && PlanData.itemSegments(sunInterval).length === 3, 'interval has a time and her 400 m × 4 example');

@@ -1,16 +1,16 @@
 {
-  "_note": "教練（Mick）在對話裡給的整週課表（決策紀錄第 57 條）。教練模式「本週課表設定」可以一鍵排進某個人的那一週：整週換掉（包含已經過去的日子），同一天原本就有的同一個項目沿用原本的 id（打過的勾留著）。items 的每一項用「名稱＋類型」對常用項目庫：庫裡有的用庫裡那份（她自己調過的，例如帶熱身影片的「Zone 2 跑」），沒有的照這裡的內容新增進庫。間歇跑庫裡沒有時用她之前舉的例子（決策紀錄第 42 條：暖身 10 分、4 ×（400 公尺＋恢復 90 秒）、緩和 10 分，約 35–40 分）。明天以後她已經先記了東西的日子不動。days 是週一到週日，每天列 items 的 key。影片 id 要在 data/videos.json 裡（tools/verify_plan.py 會查）。",
+  "_note": "教練（Mick）在對話裡給的整週課表（決策紀錄第 57 條）。教練模式「本週課表設定」可以一鍵排進某個人的那一週：整週換掉（包含已經過去的日子），同一天原本就有的同一個項目沿用原本的 id（打過的勾留著）。照她這次講的排：useLibrary:true 的（她只寫了名字的：Zone 2 跑、間歇跑、完全休息）用常用項目庫裡「名稱＋類型」一樣的那份（她自己調過的，例如帶熱身影片的「Zone 2 跑」）；其他的（她給了影片、時間的）照這裡的內容，庫裡有一模一樣的才連過去、同名但內容不一樣的庫不動，沒有的新增進庫。間歇跑庫裡沒有時用她之前舉的例子（決策紀錄第 42 條：暖身 10 分、4 ×（400 公尺＋恢復 90 秒）、緩和 10 分，約 35–40 分）。七天全部照排（包含她已經先記了東西的日子，確認畫面會點名）。days 是週一到週日，每天列 items 的 key。影片 id 要在 data/videos.json 裡（tools/verify_plan.py 會查）。",
   "presets": [
     {
       "id": "2026-09-21",
       "weekNumber": 3,
       "name": "9/21 那週（Mick 傳來的）",
       "items": {
-        "rest": { "type": "rest", "title": "完全休息" },
+        "rest": { "type": "rest", "title": "完全休息", "useLibrary": true },
         "breath": { "type": "recovery", "title": "盆底肌內核呼吸練習" },
         "stretch": { "type": "recovery", "title": "伸展", "duration": { "min": 15, "max": 15 }, "videoRefs": ["mady-full-body-stretch-15"] },
         "zone2": {
-          "type": "run", "title": "Zone 2 跑", "duration": { "min": 20, "max": 25 }, "heartRateZone": "Zone 2", "rpe": { "min": 4, "max": 5 },
+          "type": "run", "title": "Zone 2 跑", "useLibrary": true, "duration": { "min": 20, "max": 25 }, "heartRateZone": "Zone 2", "rpe": { "min": 4, "max": 5 },
           "intensityNote": "輕鬆對話",
           "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。"
         },
@@ -20,7 +20,7 @@
         "core": { "type": "muscle", "title": "核心", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-beginner-abs-10"] },
         "back": { "type": "muscle", "title": "背", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-only-back-10"] },
         "interval": {
-          "type": "interval", "title": "間歇跑", "duration": { "min": 35, "max": 40 },
+          "type": "interval", "title": "間歇跑", "useLibrary": true, "duration": { "min": 35, "max": 40 },
           "segments": [
             { "kind": "warmup", "amount": { "unit": "min", "min": 10, "max": 10 }, "zone": null, "note": "輕鬆跑" },
             { "kind": "repeat", "times": 4, "steps": [
