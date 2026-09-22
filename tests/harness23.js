@@ -72,7 +72,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   assert(v && v.linkType === 'video' && v.url.startsWith('https://www.youtube.com/watch?v=g_tea8ZNk5A') && v.creator === 'Mady Morrison', 'stretch links to the video she sent');
   assert(fn('isRestDay')(w.days[0]) && Store.dayStatus(WN, 0, 'mick') !== 'expired', 'Monday is a rest day (the extras are optional)');
   const lib = Store.libraryList('item');
-  const addedTitles = ['完全休息', '盆底肌內核呼吸練習', '伸展', '腿臀', '臀背', '臀核心', '核心', '背', '間歇跑'];
+  const addedTitles = ['完全休息', '盆底肌內核呼吸練習', '伸展', '腿臀', '胸背', '臀核心', '核心', '背', '間歇跑'];
   assert(lib.length === libBefore + addedTitles.length && addedTitles.every((t) => lib.filter((x) => x.item.title === t).length === 1) && lib.filter((x) => x.item.title === 'Zone 2 跑').length === 1, 'library gains exactly the new items once each; Zone 2 not duplicated');
   assert(w.days.every((d) => d.items.every((it) => !!it.templateId)), 'every item is linked to its library item (later library edits follow)');
   assert(pushes.length === 1 && pushes[0].uid === 'mick' && pushes[0].wn === WN, "saved into Mick's own plan");

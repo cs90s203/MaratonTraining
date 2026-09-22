@@ -15,7 +15,7 @@
           "notes": "心率壓在 Zone 2，配速不重要；沒有心率錶就用講話測試：能完整講一句話但微喘。Zone 2 上限先抓保守一點。若跑起來骨盆有下墜感就縮短當天時間。"
         },
         "legsGlutes": { "type": "muscle", "title": "腿臀", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-booty-no-jumps-10"] },
-        "gluteBack": { "type": "muscle", "title": "臀背", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-boobs-back-10"] },
+        "chestBack": { "type": "muscle", "title": "胸背", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-boobs-back-10"] },
         "gluteCore": { "type": "muscle", "title": "臀核心", "duration": { "min": 10, "max": 10 }, "videoRefs": ["lilly-hip-dips-10"] },
         "core": { "type": "muscle", "title": "核心", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-beginner-abs-10"] },
         "back": { "type": "muscle", "title": "背", "duration": { "min": 10, "max": 10 }, "videoRefs": ["pamela-only-back-10"] },
@@ -34,7 +34,7 @@
       "days": [
         ["rest", "breath", "stretch"],
         ["zone2", "breath", "stretch"],
-        ["legsGlutes", "gluteBack", "stretch"],
+        ["legsGlutes", "chestBack", "stretch"],
         ["zone2", "breath", "stretch"],
         ["gluteCore", "core", "stretch"],
         ["back", "zone2", "stretch"],
