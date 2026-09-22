@@ -185,14 +185,22 @@ function renderSyncPill() {
   if (Sync.state === 'wrong-identity') {
     return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.goTo('settings')"><span class="dot"></span>身分不符</button>`;
   }
+  // 第 64 條：課表還沒存進雲端（網路斷掉、被拒）——照現在的課表算出來（Store.planUnsavedWeeks），不看共用的同步狀態，
+  // 存好了就自己消失；點了先講原因（手機沒有 hover）再補送
+  if (Store.planUnsavedWeeks().length) {
+    // 同時還有別的問題（訂閱斷了、紀錄寫入被拒）就寫「同步有問題」，點了兩個都講（審查抓到：以前另一個問題被整個蓋掉）
+    const alsoOther = Sync.state === 'fail' || Sync.state === 'write-denied';
+    return `<button class="sync-pill off" title="${h(Sync.syncMessage())}" onclick="A.syncPillTap()"><span class="dot"></span>${alsoOther ? '同步有問題，點擊看原因' : '還沒存進雲端，點擊看原因'}</button>`;
+  }
   if (Sync.state === 'write-denied') {
     // 手機沒有 hover，title 看不到——原因要點得出來，不然只剩四個字猜不出哪筆、為什麼。
     return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.showSyncMessage()"><span class="dot"></span>寫入被拒，點擊看原因</button>`;
   }
   if (Sync.state === 'fail') {
-    return `<button class="sync-pill off" onclick="A.retrySync()"><span class="dot"></span>離線，點擊重試</button>`;
+    // 點了先講原因再重試（審查抓到：以前只寫「離線，點擊重試」，原因看不到）
+    return `<button class="sync-pill off" title="${h(Sync.message)}" onclick="A.syncPillTap()"><span class="dot"></span>同步有問題，點擊看原因</button>`;
   }
-  if (Sync.hasPendingWrites) {
+  if (Sync.hasPendingWrites || Store.planSyncing()) {
     return `<span class="sync-pill busy"><span class="dot"></span>本機已存，同步中…</span>`;
   }
   return `<span class="sync-pill ok"><span class="dot"></span>已同步</span>`;
@@ -1191,23 +1199,23 @@ function renderViewPicker(state, uid) {
   return `<div class="pick-list view-pick">${rows}${copy}</div>`;
 }
 
-// 複製別人的課表給正在排的這個人（第 56 條，只有教練）：「這一週」＝畫面上這一週，「今天以後」＝到比賽為止；
-// 都從明天開始。按了先跳確認（會改幾天、她自己改過的幾天會被蓋掉、她自己對調過的週跳過），確認才複製。
+// 複製別人的課表給正在排的這個人（第 56 條，只有教練）：「這一週」＝畫面上這一週，「第 N 週以後」＝今天所在的週起到最後一週；
+// 整週都複製，包含已經過去的日子跟今天（第 64 條）。按了先跳確認（會改幾天、會掉的勾、會變差的日子、她自己改過的幾天會被蓋掉、
+// 她自己對調過的週跳過），確認才複製。
 function renderCopyPlanRows(state, target) {
-  const tomorrow = Store._dayAfter(Store.todayKey());
-  const wn = state.weekViewNumber;
-  if (PlanData.keyForWeekDay(PlanData.plan.totalWeeks, 6) < tomorrow) return ''; // 計畫結束了
-  const weekHasFuture = PlanData.keyForWeekDay(wn, 6) >= tomorrow;
+  if (Store.todayKey() > PlanData.keyForWeekDay(PlanData.plan.totalWeeks, 6)) return ''; // 計畫結束了
   const sources = PlanData.users.filter((u) => u.userId !== target);
   const toName = h((PlanData.userById[target] || {}).displayName || target);
+  // 「以後」從今天所在的週算起（不是畫面上這週），按鈕上寫明第幾週，免得在看第 10 週時以為從第 10 週起（審查抓到）
+  const fromWeek = Store.copyWeeksInRange('future')[0];
   return `
     <div class="copy-sec">
-      <div class="copy-head">把別人的課表複製給 ${toName}（明天起）</div>
+      <div class="copy-head">把別人的課表複製給 ${toName}（整週）</div>
       ${sources.map((u) => `
         <div class="copy-row">
           <span class="copy-name">${h(u.displayName)} 的</span>
-          <button type="button" class="copy-btn" ${weekHasFuture ? '' : 'disabled title="這一週沒有明天以後的日子"'} onclick="A.copyPlanFrom('${jsq(u.userId)}','week')">這一週</button>
-          <button type="button" class="copy-btn" onclick="A.copyPlanFrom('${jsq(u.userId)}','future')">今天以後</button>
+          <button type="button" class="copy-btn" onclick="A.copyPlanFrom('${jsq(u.userId)}','week')">這一週</button>
+          <button type="button" class="copy-btn" onclick="A.copyPlanFrom('${jsq(u.userId)}','future')">第 ${fromWeek} 週以後</button>
         </div>`).join('')}
     </div>`;
 }

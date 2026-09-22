@@ -24,7 +24,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   const { PlanData, Store, App, Sync } = sandbox;
   Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushLibrary = () => {};
   const pushes = [];
-  Store._cloudPushPlanWeek = (uid, wn, doc) => pushes.push({ uid, wn, doc });
+  Store._cloudPushPlanWeek = (uid, wn, doc) => { pushes.push({ uid, wn, doc }); Store._planCloudAt[`${uid}:${wn}`] = doc.updatedAt; }; // 當作雲端馬上確認
   Sync.user = { email: 'x@example.com' }; Sync.detectedUserId = 'mick';
   Sync.subscribeOtherEntries = () => {}; Sync.subscribeOtherWeekAdjustments = () => {}; Sync.subscribeOtherProfile = () => {};
   const preset = PlanData.weekPresets.find((p) => p.id === '2026-09-21');
@@ -154,10 +154,10 @@ const fn = (name) => vm.runInContext(name, sandbox);
   Store._cloudPushPlanWeek = Sync.pushPlanWeek.bind(Sync);
   const lw = App._cloneEffectiveWeek(FW, 'Phoebe'); lw.days[0].items[0].title = '沒登入時改的';
   Store.savePlanWeek('Phoebe', FW, lw);
-  assert(!Store._planPending[`Phoebe:${FW}`], 'signed-out save leaves no pending mark');
+  assert(!Store.planDirty('Phoebe', FW) && !Store.planSyncing(), 'signed-out save is not counted as unsaved or in flight (never pushed up after signing in)');
   Store.mergeRemotePlanWeek('Phoebe', FW, { ...JSON.parse(JSON.stringify(PlanData.week(FW))), weekNumber: FW, userId: 'Phoebe', updatedAt: '2026-09-23T00:00:00.000Z' });
   assert(ftitles(0) === PlanData.week(FW).days[0].items.map((it) => it.title).join('+'), 'after signing in, the cloud copy of that week is accepted');
-  Store._cloudPushPlanWeek = (uid, wn, doc) => pushes.push({ uid, wn, doc });
+  Store._cloudPushPlanWeek = (uid, wn, doc) => { pushes.push({ uid, wn, doc }); Store._planCloudAt[`${uid}:${wn}`] = doc.updatedAt; }; // 當作雲端馬上確認
   Sync.user = syncUser;
   // 2. 名稱一樣、類型不一樣的庫存項目不能拿來用（週一的休息日不能變成要做肌力）
   const wrongStretch = Store.saveLibraryDoc(null, 'item', { name: '呼吸', item: { type: 'muscle', title: '盆底肌內核呼吸練習', duration: { min: 20, max: 20 } } });

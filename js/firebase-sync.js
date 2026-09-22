@@ -70,6 +70,8 @@ const Sync = {
   },
 
   init() {
+    // 決策紀錄第 64 條：網路恢復時把還沒存進雲端的課表補送（babylog 也是連上之後補送）
+    if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('online', () => this.retryUnsavedPlanWeeks());
     try {
       if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       fbAuth = firebase.auth();
@@ -114,6 +116,9 @@ const Sync = {
         this._detachPlanOverrides();
         this._detachPlanWeeks();
         clearTimeout(this._planRetryTimer); this._planRetryTimer = null;
+        // 第 64 條：還沒存上去的、雲端版本這些只屬於剛登出的帳號（手機本機另外留著，同一個帳號再登入時還原）
+        Store.resetPlanSyncState(); this._planResult = {}; this._planSession++; this._quietPlan = {}; this._failSources = {};
+        clearTimeout(this._unsavedRetryTimer); this._unsavedRetryTimer = null; this._unsavedRetryStep = 0;
         this._detachLibrary();
         // ⚠️ 「未授權」是 _handleSnapErr 先設好狀態再呼叫 signOut() 走到這裡的——
         // 這時不能把狀態洗回 idle，否則畫面會回到「點擊登入以同步」，使用者看到的是
@@ -133,6 +138,8 @@ const Sync = {
       this._attachListeners();
       this._attachPlanOverrides();
       this.planWeeksDenied = false; // 上一次登入時被拒的旗子不帶過來（重新訂閱，被拒會再設回來）
+      if (this._restoreUnsaved()) setTimeout(() => this.retryUnsavedPlanWeeks(), 0); // 上次沒存上去的（第 64 條）
+      this._noticeLocalOnly(); // 沒登入時在這台改的：講一次「不會上傳」（審查抓到：雲端沒有那一週時，以前完全沒人講）
       this._attachPlanWeeks();
       this._attachLibrary();
       // 本機補推要等「這個帳號是誰」確認完再做（決策紀錄第 41 條）：裝置上選的身分如果不是這個帳號，
@@ -256,6 +263,7 @@ const Sync = {
     this._detachPlanWeeks();
     this.planWeeksDenied = false;
     this._attachPlanWeeks();
+    this._attachPlanOverrides(); // 斷掉過就重掛（還在的話什麼都不做）
     this._backfillLocal(Store.activeUserId);
   },
 
@@ -274,6 +282,7 @@ const Sync = {
         // write-denied 也不能洗回「已同步」：被拒的那筆寫入 SDK 會回滾，回滾本身就會再觸發
         // 一次這個快照（includeMetadataChanges），沒排除的話膠囊會在使用者來得及點之前變回
         // 「已同步」。要等那些 key 重寫成功（pushDoc 的 then）才回到 done。
+        this._clearSnapFail('entries', snap);
         if (!['fail', 'unauthorized', 'wrong-identity', 'write-denied'].includes(this.state)) this._set('done', '已同步');
         else this._notify();
       }, (err) => this._handleSnapErr(err, 'entries'));
@@ -281,6 +290,7 @@ const Sync = {
     unsubPrivate = fbDb.collection(`users/${userId}/private`)
       .onSnapshot({ includeMetadataChanges: true }, (snap) => {
         this.pendingByCollection.private = snap.metadata.hasPendingWrites;
+        this._clearSnapFail('private', snap);
         snap.docChanges().forEach((c) => {
           if (c.type === 'removed') return;
           Store.mergeRemotePrivate(c.doc.id, c.doc.data());
@@ -291,6 +301,7 @@ const Sync = {
     unsubWeekAdj = fbDb.collection(`users/${userId}/weekAdjustments`)
       .onSnapshot({ includeMetadataChanges: true }, (snap) => {
         this.pendingByCollection.weekAdjustments = snap.metadata.hasPendingWrites;
+        this._clearSnapFail('weekAdjustments', snap);
         snap.docChanges().forEach((c) => {
           if (c.type === 'removed') return;
           Store.mergeRemoteWeekAdjustment(userId, c.doc.id, c.doc.data());
@@ -303,6 +314,7 @@ const Sync = {
     unsubProfile = fbDb.collection(`users/${userId}/profile`)
       .onSnapshot({ includeMetadataChanges: true }, (snap) => {
         this.pendingByCollection.profile = snap.metadata.hasPendingWrites;
+        this._clearSnapFail('profile', snap);
         snap.docChanges().forEach((c) => {
           if (c.type === 'removed') return;
           if (c.doc.id === 'goals') Store.mergeRemoteGoals(userId, c.doc.data());
@@ -315,9 +327,10 @@ const Sync = {
   // v0.25 以前三人共用的課表（第 56 條之後唯讀）：某人某週還沒有自己那份時讀它。只在登入/登出時掛/拆一次，
   // 跟 Store.activeUserId 切換無關。
   _attachPlanOverrides() {
-    if (unsubPlanOverrides) return; // 已經訂閱過
+    if (unsubPlanOverrides || !fbDb) return; // 已經訂閱過（訂閱出錯會先拆掉，見 _handleSnapErr，才能重掛）
     unsubPlanOverrides = fbDb.collection('planOverrides')
       .onSnapshot((snap) => {
+        this._clearSnapFail('planOverrides', snap);
         snap.docChanges().forEach((c) => {
           const weekNumber = Number(c.doc.id);
           if (c.type === 'removed') { Store.clearRemoteWeekOverride(weekNumber); return; }
@@ -349,6 +362,7 @@ const Sync = {
       unsubPlanWeeks[uid] = fbDb.collection(`users/${uid}/planWeeks`)
         .onSnapshot({ includeMetadataChanges: true }, (snap) => {
           if (!snap.metadata.fromCache) this._planWeeksLoaded[uid] = true;
+          this._clearSnapFail(`planWeeks:${uid}`, snap);
           const wasDenied = this.planWeeksDenied;
           this.planWeeksDenied = false; // 讀得到了＝規則發布好了
           // 第一個快照會一次送來她所有改過的週：一份一份重畫整頁（三個人加起來可能幾十次）會讓手機卡一下，
@@ -358,8 +372,10 @@ const Sync = {
             const weekNumber = Number(c.doc.id);
             if (!Number.isInteger(weekNumber)) return;
             if (c.type === 'removed') { Store.clearRemotePlanWeek(uid, weekNumber, true); return; }
-            Store.mergeRemotePlanWeek(uid, weekNumber, c.doc.data(), true);
+            // 第 64 條：這台沒存上去的修改被別台的新版本換掉了——當下講，不能只寫在小字裡
+            this._mergeRemote(uid, weekNumber, c.doc.data(), true, snap.metadata.fromCache);
           });
+          if (changes.length) this._planSettled(); // 寫進去的（快照送來這台那份）從手機本機拿掉、同步狀態跟著變
           if (changes.length || wasDenied) Store._notify();
         }, (err) => this._handleSnapErr(err, 'planWeeks', uid));
     });
@@ -373,7 +389,7 @@ const Sync = {
 
   // 有拆掉的課表訂閱就重掛（main.js 在 App 切回前景時呼叫；出錯後一分鐘也會自己試一次）
   ensurePlanWeeks() {
-    if (this.isSignedIn() && fbDb) this._attachPlanWeeks();
+    if (this.isSignedIn() && fbDb) { this._attachPlanWeeks(); this.retryUnsavedPlanWeeks(); }
   },
   _schedulePlanRetry() {
     if (this._planRetryTimer) return;
@@ -407,6 +423,7 @@ const Sync = {
       .onSnapshot({ includeMetadataChanges: true }, (snap) => {
         const wasDenied = this.libraryDenied;
         this.libraryDenied = false;
+        this._clearSnapFail('library', snap);
         let removed = false;
         // docChanges() 不帶參數＝不含「只有 metadata 變」的文件（快取→伺服器確認、寫入中→寫完）
         snap.docChanges().forEach((c) => {
@@ -529,45 +546,260 @@ const Sync = {
   // 下一筆就開始比對的話，雲端還是更舊的那份，會被誤判成「剛被別人改過」——連點兩下 ↓、複製完馬上微調都會中。
   // 排隊之後下一筆等上一筆寫完才比對，雲端就是上一筆，對得上。
   _planQueue: {},
+  _planSession: 0, // 登出一次加一：上一個帳號還在路上的存檔，結果回來時不動這個帳號的狀態
   pushPlanWeek(userId, weekNumber, weekObj, baseUpdatedAt, onFail) {
     const qkey = `${userId}:${weekNumber}`;
-    // 沒登入：只存在這台（跟以前一樣），不送雲端——Store 剛記的「還在路上」要清掉，不然登入之後雲端送來的這週會一直被擋（審查抓到）
-    if (!this.isSignedIn()) { delete Store._planPending[qkey]; return Promise.resolve(); }
-    const run = () => this._pushPlanWeekNow(userId, weekNumber, weekObj, baseUpdatedAt, onFail);
+    // 沒登入：只存在這台（跟以前一樣），不送雲端——也不算「還沒存進雲端」（登入之後不會把它補送上去）
+    if (!this.isSignedIn()) {
+      const c = Store._planChainOf.get(weekObj);
+      if (c) c.localOnly = true; // 只在這台，不算「還沒存進雲端」、也不會補送上去；登入後雲端有別的版本時換掉並講（審查抓到）
+      this._planResult[`planWeeks:${weekNumber}:${userId}`] = 'signed-out';
+      return Promise.resolve();
+    }
+    this._planResult[`planWeeks:${weekNumber}:${userId}`] = 'queued';
+    Store._planInFlight[qkey] = (Store._planInFlight[qkey] || 0) + 1;
+    this._persistUnsaved(); // 存的當下就留在手機本機：送的期間關掉 App 也不會丟（審查抓到：以前送失敗才存）
+    const session = this._planSession;
+    const run = () => this._pushPlanWeekNow(userId, weekNumber, weekObj, baseUpdatedAt, onFail, session);
     const next = (this._planQueue[qkey] || Promise.resolve()).then(run, run);
     this._planQueue[qkey] = next;
     next.then(() => { if (this._planQueue[qkey] === next) delete this._planQueue[qkey]; });
     return next;
   },
+  // 決策紀錄第 63 條：等這幾週排隊中的存檔都跑完，回傳哪幾週沒存進去（被拒、版本對不上、沒連上）。一定 resolve。
+  // 複製課表用：以前按完沒有任何結果提示，寫入被退回時只有右上角的同步狀態會講，看起來就像「按了沒反應」。
+  // 回傳沒存進去的週 [{ weekNumber, kind }]，kind：'conflict'（別人剛改過，已退回雲端的版本）、'denied'（規則擋下）、
+  // 'network'（沒連上，這台留著、會自動補存）、'signed-out'。看的是這一次排隊跑完的結果（_planResult）。
+  settlePlanWeeks(userId, weekNumbers, depth) {
+    const waits = weekNumbers.map((wn) => this._planQueue[`${userId}:${wn}`] || Promise.resolve());
+    return Promise.all(waits).then(() => {
+      // 等的期間又被排進去送（補送）：再等一次（最多五輪，不然一直斷線會等不完）
+      const again = weekNumbers.filter((wn) => this._planQueue[`${userId}:${wn}`]);
+      if (again.length && (depth || 0) < 5) return this.settlePlanWeeks(userId, weekNumbers, (depth || 0) + 1);
+      return weekNumbers.map((wn) => {
+        const r = this._planResult[`planWeeks:${wn}:${userId}`];
+        // 最後照「雲端有沒有這一份」講（審查抓到：只看 _planResult，登出清掉、或補送重排成 queued，會把沒送到的講成已經複製好了）
+        if (Store.planDirty(userId, wn) || this._planQueue[`${userId}:${wn}`]) return { weekNumber: wn, kind: r === 'denied' ? 'denied' : 'network' };
+        return { weekNumber: wn, kind: r === 'conflict' || r === 'signed-out' ? r : 'ok' };
+      }).filter((x) => x.kind !== 'ok');
+    });
+  },
+  _planResult: {},
+  // 複製課表自己講結果：那幾週「沒存進去」的視窗先不跳（不然同一件事講兩次）。不帶參數＝結束
+  _quietPlan: {},
+  quietPlanWeeks(userId, weekNumbers) {
+    if (!userId) { this._quietPlan = {}; return; }
+    weekNumbers.forEach((wn) => { this._quietPlan[`planWeeks:${wn}:${userId}`] = true; });
+  },
+  // 決策紀錄第 64 條：修改沒存進去（別人剛改過、別台改過、還原沒成功）一律當下跳視窗講，不放在同步狀態等她點
+  //（審查抓到：放在小字裡，好幾週的只看得到最後一筆，看過就一起清掉）。同一輪好幾週的合成一個視窗。
+  _lost: {},
+  _lostTimer: null,
+  _reportLost(userId, weekNumber, text) {
+    const key = `planWeeks:${weekNumber}:${userId}`;
+    if (this._quietPlan[key]) return;
+    this._lost[key] = text;
+    if (this._lostTimer) return;
+    this._lostTimer = setTimeout(() => {
+      this._lostTimer = null;
+      const msgs = Object.values(this._lost);
+      this._lost = {};
+      if (msgs.length && typeof alert === 'function') alert(msgs.join('\n'));
+    }, 0);
+  },
+  _who(userId) { return (PlanData.userById[userId] || {}).displayName || userId; },
+  // 沒登入的時候在這台改的課表：登入時講一次就好（不會上傳、重新整理就不見），講完當成一般的本機內容，不要一直掛在同步狀態上
+  _noticeLocalOnly() {
+    Store.planLocalOnlyWeeks().forEach(({ userId, weekNumber }) => {
+      this._reportLost(userId, weekNumber, `沒登入的時候在這台改的第 ${weekNumber} 週（${this._who(userId)}）不會上傳，重新整理就會不見——要留下來的話，現在再改一次。`);
+      const doc = Store.planWeeks[userId][weekNumber];
+      if (doc) Store._planChainOf.delete(doc);
+    });
+  },
+  // 收雲端那一份（快照、讀回來的、送的期間先放著的）：合併，然後照結果講。只有這裡把合併結果變成提示，不散在各處
+  _mergeRemote(userId, weekNumber, doc, silent, fromCache) {
+    const st = doc ? Store.mergeRemotePlanWeek(userId, weekNumber, doc, silent, fromCache)
+      : (Store.clearRemotePlanWeek(userId, weekNumber, silent), 'ok');
+    if (st === 'dropped') {
+      // 這台那份被換掉了：結果要記成「沒存進去」，不能留著 'network'（複製課表看這個講結果，會說「會自動補存」——不會了）
+      this._planResult[`planWeeks:${weekNumber}:${userId}`] = 'conflict';
+      this._reportLost(userId, weekNumber, `${this._who(userId)} 的第 ${weekNumber} 週剛在別的地方被改過，這台還沒存進雲端的修改沒有存進去，畫面換成雲端上最新的。`);
+    } else if (st === 'dropped-local') {
+      this._reportLost(userId, weekNumber, `沒登入的時候在這台改的第 ${weekNumber} 週（${this._who(userId)}），登入之後換成雲端上的——沒登入時改的不會上傳。`);
+    }
+    return st;
+  },
+  planDeniedMsg(userId) { return this._planDeniedMsg(userId); },
+  _planDeniedMsg(userId) {
+    const who = this._who(userId);
+    const coach = Store.coachUser();
+    const republish = '請把 firestore.rules.local 整份重新貼到 Firebase Console 發布。';
+    // 規則檔只在教練的電腦上：不是教練的人叫她請教練發布（審查抓到）
+    const coachName = coach ? coach.displayName : '教練';
+    const fix = Store.canEditLibrary() ? republish : `規則檔在 ${coachName} 的電腦上，請 ${coachName} 重新發布。`;
+    // 能不能寫是 Firebase 的規則（看登入的帳號）決定的，不是這台選的「我是誰」——兩種可能都講（審查抓到：以前照這台的身分講，會講錯）
+    return `${who} 的課表寫入被拒。可能是 Firebase 上的規則還是舊版（還沒有「每人一份課表」）——${fix}也可能是這個 Google 帳號不能改 ${who} 的課表。`;
+  },
+  // 同步狀態點了講的全部原因：課表沒存上去的（算出來的）＋別的同步問題（訂閱斷了、紀錄寫入被拒）——
+  // 審查抓到：以前課表那段排在前面又用 ||，另一個問題一個字都看不到
+  syncMessage() {
+    const other = (this.state === 'fail' || this.state === 'write-denied') && this.message ? this.message : '';
+    return [this.planIssueMessage(), other].filter(Boolean).join('\n');
+  },
+  // 課表「還沒存進雲端」的原因：一週一行，照現在還沒存上去的（Store.planUnsavedWeeks）算，不另外記
+  planIssueMessage() {
+    return Store.planUnsavedWeeks().map(({ userId, weekNumber }) => {
+      const r = this._planResult[`planWeeks:${weekNumber}:${userId}`];
+      if (r === 'denied') return `第 ${weekNumber} 週：${this._planDeniedMsg(userId)}這台手機上的修改還在，存得進去的時候會自動補存。`;
+      return `${this._who(userId)} 的第 ${weekNumber} 週還沒存進雲端${r === 'network' ? '（沒有連上網路）' : ''}。這台手機上的修改還在，連上網路會自動補存。`;
+    }).join('\n');
+  },
+  // 決策紀錄第 64 條（照 babylog 的「連上之後補送」）：網路斷掉、被拒而沒存進雲端的課表，連上網路、切回 App、
+  // 按同步狀態、或過一陣子，就把這台現在的那份再送一次。比對用那份的 chain，不會被誤判成「別人改過」。
+  retryUnsavedPlanWeeks() {
+    if (!this.isSignedIn() || !fbDb) return;
+    // 送出去讓規則決定（審查抓到：以前看這台選的「我是誰」，教練把身分切成別人就會把他改到一半、其實寫得進去的那週直接丟掉）。
+    // 真的被拒就留著、講原因（同步狀態：寫入被拒要發布規則），規則發布或換回身分之後自動補送。
+    Store.planUnsavedWeeks().forEach(({ userId, weekNumber }) => this.pushPlanWeek(userId, weekNumber, Store.planWeeks[userId][weekNumber], null));
+  },
+  _reloadPlanWeek(userId, weekNumber) {
+    return fbDb.collection(`users/${userId}/planWeeks`).doc(String(weekNumber)).get()
+      .then((snap) => {
+        const cached = !!(snap.metadata && snap.metadata.fromCache);
+        if (snap.exists) this._mergeRemote(userId, weekNumber, snap.data(), false, cached);
+        else if (!cached) this._mergeRemote(userId, weekNumber, null);
+      })
+      .catch(() => {});
+  },
+  // 決策紀錄第 64 條：還沒存進雲端的課表（Store.planDirty，正在送的也算）存在手機本機（照登入的帳號分開），
+  // 關掉 App 再開、同一個帳號登入時還原再補送。跟 babylog 一樣「寫入不因為關掉 App 而消失」——
+  // babylog 靠 Firestore 的離線佇列，課表用的 transaction 沒有，要自己留。每次都照現在的狀態整份重寫，不會跟畫面對不上。
+  _UNSAVED_KEY: 'mt_plan_unsaved_v1',
+  _persistUnsaved() {
+    const acct = this.user && this.user.email;
+    if (!acct) return;
+    let all = {};
+    try { all = JSON.parse(localStorage.getItem(this._UNSAVED_KEY) || '{}') || {}; } catch (e) { all = {}; }
+    const mine = {};
+    Object.keys(Store.planWeeks).forEach((uid) => Object.keys(Store.planWeeks[uid] || {}).forEach((w) => {
+      if (!Store.planDirty(uid, Number(w))) return;
+      const doc = Store.planWeeks[uid][w];
+      const chain = Store._planChainOf.get(doc);
+      mine[`${uid}:${w}`] = { doc, base: chain.base, mine: chain.mine };
+    }));
+    // 只動這個分頁自己寫過的 key：同一台電腦開兩個分頁時，整份覆寫會把另一個分頁的離線修改抹掉（審查抓到）
+    const bucket = { ...(all[acct] || {}), ...mine };
+    (this._myUnsaved || []).forEach((k) => { if (!mine[k]) delete bucket[k]; });
+    this._myUnsaved = Object.keys(mine);
+    if (Object.keys(bucket).length) all[acct] = bucket; else delete all[acct];
+    try { localStorage.setItem(this._UNSAVED_KEY, JSON.stringify(all)); } catch (e) { /* 存不了就只留在記憶體 */ }
+  },
+  _restoreUnsaved() {
+    const acct = this.user && this.user.email;
+    if (!acct) return 0;
+    let all = {};
+    try { all = JSON.parse(localStorage.getItem(this._UNSAVED_KEY) || '{}') || {}; } catch (e) { return 0; }
+    const mine = all[acct] || {};
+    let n = 0;
+    Object.keys(mine).forEach((k) => {
+      const { doc, base, mine: list } = mine[k] || {};
+      const [uid, wnStr] = k.split(':');
+      const wn = Number(wnStr);
+      if (!doc || !Number.isInteger(wn) || !PlanData.userById[uid] || !Store._isValidWeekShape(doc) && !doc.isFactory) return;
+      if (!Store.planWeeks[uid]) Store.planWeeks[uid] = {};
+      const cur = Store.planWeeks[uid][wn];
+      // 畫面上是別的內容（例如沒登入時在這台改的）：換成上次沒存進雲端的那份，但要講（審查抓到：以前無聲換掉）
+      if (cur && cur.updatedAt !== doc.updatedAt) {
+        this._reportLost(uid, wn, `${this._who(uid)} 的第 ${wn} 週換成上次還沒存進雲端的那份了（沒登入時在這台改的不會上傳）。`);
+      }
+      Store.planWeeks[uid][wn] = doc;
+      const chain = { base: base == null ? null : base, mine: Array.isArray(list) && list.length ? list : [doc.updatedAt], dead: false };
+      Store._planChainCur[k] = chain;
+      Store._planChainOf.set(doc, chain); // 雲端版本還不知道＝還沒存進雲端（planDirty），快照來了再比
+      n++;
+    });
+    return n;
+  },
+  _unsavedRetryTimer: null,
+  _unsavedRetryStep: 0,
+  _scheduleUnsavedRetry() {
+    if (this._unsavedRetryTimer || !Store.planUnsavedWeeks().length) return;
+    const delays = [15000, 60000, 180000];
+    const d = delays[Math.min(this._unsavedRetryStep, delays.length - 1)];
+    this._unsavedRetryStep++;
+    this._unsavedRetryTimer = setTimeout(() => { this._unsavedRetryTimer = null; this.retryUnsavedPlanWeeks(); }, d);
+  },
+  // 課表有東西變了（存完、失敗、快照）：手機本機那份照現在的重寫、重畫（同步狀態是算出來的）、還有沒存上去的就排補送
+  _planSettled() {
+    this._persistUnsaved();
+    if (Store.planUnsavedWeeks().length) this._scheduleUnsavedRetry(); else this._unsavedRetryStep = 0;
+    this._notify();
+  },
+  // 送完一筆：送的期間雲端來了別人的版本（Store._planDeferred），最後一筆送完再比
+  _planSent(userId, weekNumber) {
+    const k = `${userId}:${weekNumber}`;
+    Store._planInFlight[k] = Math.max(0, (Store._planInFlight[k] || 0) - 1);
+    if (Store._planInFlight[k]) return;
+    delete Store._planInFlight[k];
+    if (!Object.prototype.hasOwnProperty.call(Store._planDeferred, k)) return;
+    const doc = Store._planDeferred[k];
+    delete Store._planDeferred[k];
+    this._mergeRemote(userId, weekNumber, doc);
+  },
   // 一定 resolve、不 reject（排在後面的要接著跑）
-  _pushPlanWeekNow(userId, weekNumber, weekObj, baseUpdatedAt, onFail) {
+  _pushPlanWeekNow(userId, weekNumber, weekObj, baseUpdatedAt, onFail, session) {
     const key = `planWeeks:${weekNumber}:${userId}`;
     const pendKey = `${userId}:${weekNumber}`;
     const clean = JSON.parse(JSON.stringify(weekObj)); // 深層清掉 undefined
     const ref = fbDb.collection(`users/${userId}/planWeeks`).doc(String(weekNumber));
-    const who = (PlanData.userById[userId] || {}).displayName || userId;
+    const who = this._who(userId);
+    const stale = () => session !== this._planSession; // 已經登出（或換了帳號）：結果不動現在的狀態
+    // 決策紀錄第 64 條：這一份是從雲端哪一版開始改的（chain.base）、這台之後自己存的每一版（chain.mine）——
+    // 雲端還是其中一版就不算衝突（前一筆沒存上去、或其實存上去了只是回應沒收到，都不會被誤判成「別人改過」）；
+    // 不是＝別人（別台）改過，擋下。衝突之後這條 chain 作廢，排在後面、照舊內容改的存檔也一起擋下，不會蓋掉別人的。
+    const chain = Store._planChainOf.get(weekObj);
+    const allowed = chain ? [chain.base, ...chain.mine] : [baseUpdatedAt || null];
     return fbDb.runTransaction((tx) => tx.get(ref).then((snap) => {
       const remoteAt = snap.exists ? (snap.data() || {}).updatedAt || null : null;
-      if (remoteAt && remoteAt !== (baseUpdatedAt || null)) {
+      if ((chain && chain.dead) || (remoteAt && !allowed.includes(remoteAt))) {
         const err = new Error('plan-conflict'); err.code = 'plan-conflict'; throw err;
       }
       tx.set(ref, clean);
     })).then(() => {
-      // 寫進去的是最後一次存的那份：本機不用再擋雲端的快照了（見 Store.mergeRemotePlanWeek）
-      if (Store._planPending[pendKey] === clean.updatedAt) delete Store._planPending[pendKey];
-      if (!this.failedWrites.delete(key)) return;
-      if (this.state === 'write-denied' && this.failedWrites.size === 0) this._set('done', '已同步');
-      else this._notify();
+      if (stale()) return;
+      // 雲端現在是這一份（這台之後又改的，planDirty 照樣算還沒存上去）。回應回來之前畫面已經收了別人更新的版本，就不動（那才是雲端最新的）
+      const own = Store.planWeeks[userId] && Store.planWeeks[userId][weekNumber];
+      if (!chain || (own && Store._planChainOf.get(own) === chain)) Store._planCloudAt[pendKey] = clean.updatedAt;
+      this._planResult[key] = 'ok';
+      this._planSent(userId, weekNumber);
+      this._planSettled();
     }).catch((err) => {
-      delete Store._planPending[pendKey]; // 沒存進去：接下來雲端的版本照收
-      if (err && err.code === 'plan-conflict') {
-        this.failedWrites.add(key);
-        this._set('fail', `${who} 的第 ${weekNumber} 週剛被別人改過，你這次的修改沒有存進去，請重新整理後再編輯。`);
+      if (stale()) return null;
+      const conflict = err && err.code === 'plan-conflict';
+      const denied = err && err.code === 'permission-denied';
+      this._planResult[key] = conflict ? 'conflict' : denied ? 'denied' : 'network';
+      if (conflict) {
+        const first = !(chain && chain.dead && chain.reported);
+        if (chain) { chain.dead = true; chain.reported = true; } // 排在後面、照舊內容改的也作廢；同一條只講一次
+        if (first) this._reportLost(userId, weekNumber, `${who} 的第 ${weekNumber} 週剛被別人改過，你這次的修改沒有存進去，畫面換成雲端上最新的。確認一下你要改的還在不在。`);
+        delete Store._planDeferred[pendKey]; // 下面直接讀雲端最新的
+        this._planSent(userId, weekNumber);
         // 用遠端最新版本蓋掉本機剛剛的樂觀更新，避免這台裝置的畫面跟雲端分岔。
-        return ref.get().then((snap) => { if (snap.exists) Store.mergeRemotePlanWeek(userId, weekNumber, snap.data()); }).catch(() => {});
+        return this._reloadPlanWeek(userId, weekNumber).then(() => this._planSettled());
       }
-      if (onFail) onFail();
-      this._onWriteError('planWeeks', String(weekNumber), userId, key, err);
+      if (onFail) {
+        // 還原本週這種有自己退回方式的：照它的，當下講（畫面跳回去卻沒說，會以為按了沒反應）。
+        // 期間又改過就退不回來（審查抓到：那時畫面是「還原之後又改的」，之後會補存上去，不能說「退回原本的內容」）
+        const rolledBack = onFail() !== false;
+        const why = denied ? this._planDeniedMsg(userId) : '沒有連上網路';
+        const when = denied ? '存得進去的時候' : '連上網路';
+        this._reportLost(userId, weekNumber, rolledBack
+          ? `${who} 的第 ${weekNumber} 週沒有還原成功（${why}），畫面退回原本的內容。`
+          : `${who} 的第 ${weekNumber} 週的還原沒有存進雲端（${why}），但你在那之後又改了這一週，畫面上是還原之後再改的內容，${when}會自動補存。`);
+      }
+      // 一般的存檔：畫面上留著、手機本機留著（Store.planDirty 算得出來），同步狀態講「還沒存進雲端」，之後自動補送
+      this._planSent(userId, weekNumber);
+      this._planSettled();
       return null;
     });
   },
@@ -629,6 +861,7 @@ const Sync = {
         this.planWeeksDenied = true;
         this._notify();
       } else {
+        this._failSources[`planWeeks:${ownerId}`] = true;
         this._set('fail', '同步發生錯誤（課表）：' + (err ? err.message : '')); // 其他錯誤要看得到（膠囊會寫「離線，點擊重試」）
       }
       this._schedulePlanRetry(); // 一分鐘後自己再試（規則發布好了就讀得到）
@@ -668,7 +901,19 @@ const Sync = {
       fbAuth.signOut();
       return;
     }
+    if (collectionName === 'planOverrides') this._detachPlanOverrides(); // 拆掉才重掛得了（不然它設的「同步有問題」永遠清不掉）
+    this._failSources[collectionName] = true;
     this._set('fail', '同步發生錯誤：' + (err ? err.message : ''));
+  },
+  // 哪些訂閱現在是斷的（審查抓到：只記一個的話，會自己重掛的課表一恢復就把紀錄那邊還斷著的洗成「已同步」）
+  _failSources: {},
+  // 某個訂閱恢復了：全部都回來了才回到「已同步」。只有伺服器確認過的快照算數——
+  // 離線時重掛，Firestore 會馬上用快取送一份回來，那不代表連上了（審查抓到）
+  _clearSnapFail(source, snap) {
+    if (snap && snap.metadata && snap.metadata.fromCache) return;
+    delete this._failSources[source];
+    if (this.state !== 'fail' || Object.keys(this._failSources).length || this.failedWrites.size) return;
+    this._set('done', '已同步');
   },
 
   // targetUserId：決策紀錄第 15 條，教練模式下可以幫別人寫 profile/goals——多數呼叫
@@ -717,13 +962,7 @@ const Sync = {
         this._set('write-denied', Store.canEditLibrary()
           ? `常用項目庫寫入被拒。Firebase 上的規則可能還是舊版——${republish}`
           : `常用項目庫只有 ${coachName} 能改，這次沒有存。`);
-      } else if (kind === 'planWeeks') {
-        // 規則檔只在教練的電腦上：不是教練的人叫她請教練發布（審查抓到）
-        const fix = Store.canEditLibrary() ? republish : `新的規則還沒發布，請 ${coachName} 發布之後再改一次。`;
-        this._set('write-denied', Store.canEditPlanOf(userId)
-          ? `${who} 的課表寫入被拒。Firebase 上的規則可能還是舊版（還沒有「每人一份課表」）——${fix}`
-          : `只能改自己的課表，${who} 的課表沒有改到。`);
-      } else if (kind === 'profile') {
+      } else if (kind === 'profile') { // 課表（planWeeks）不走這裡：它的原因是算出來的（planIssueMessage、_planDeniedMsg）
         const fix = Store.canEditLibrary() ? republish : `新的規則還沒發布，請 ${coachName} 發布之後再改一次。`;
         this._set('write-denied', Store.canEditGoalsOf(userId)
           ? `${who} 的訓練目標寫入被拒。Firebase 上的規則可能還是舊版——${fix}`

@@ -11,7 +11,7 @@ const sandbox = {
   document: { getElementById: () => null, addEventListener: () => {}, querySelector: () => null },
   localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: () => {} },
   fetch: async (u) => ({ json: async () => map[Object.keys(map).find((k) => u.includes(k))] }),
-  alert: (m) => sandbox.__alerts.push(m), confirm: () => true, __alerts: [],
+  alert: (m) => sandbox.__alerts.push(m), confirm: (m) => { sandbox.__confirms.push(m); return true; }, __alerts: [], __confirms: [],
   APP_VERSION: 't', Sortable: function () {},
 };
 sandbox.window = sandbox;
@@ -27,7 +27,9 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   const realPlanWeeksLoaded = Sync.planWeeksLoaded; // 複製課表的測試會先換成假的，後面測它本身時要換回來
   Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushLibrary = () => {};
   const pushes = [];
-  Store._cloudPushPlanWeek = (uid, wn, doc, base, onFail) => pushes.push({ uid, wn, doc, base, onFail });
+  // 假的存檔當作雲端馬上確認（真的 App 是 Sync 寫成功之後記）；不記的話每一週都算「還沒存進雲端」，複製會被擋下
+  const fakePush = (uid, wn, doc, base, onFail) => { pushes.push({ uid, wn, doc, base, onFail }); Store._planCloudAt[`${uid}:${wn}`] = doc.updatedAt; };
+  Store._cloudPushPlanWeek = fakePush;
   const title = (uid, wn, di) => Store.effectiveWeek(wn, uid).days[di].items[0].title;
   const loc = PlanData.locateToday();
   const TW = loc.weekNumber, TD = loc.dayIndex;
@@ -76,7 +78,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 
   // ── 還原：只還原她這一週，回到出廠（不是舊的共用課表）──
   pushes.length = 0;
-  sandbox.confirm = () => true;
+  sandbox.confirm = (m) => { sandbox.__confirms.push(m); return true; };
   App.resetPlanWeek(W);
   assert(Store.planSource(W, 'Annlin') === 'reset' && title('Annlin', W, 1) === factory.days[1].items[0].title, 'reset goes back to the factory plan, not the old shared one');
   assert(Store.planSource(W, 'mick') === 'legacy' && pushes.length === 1 && pushes[0].uid === 'Annlin' && pushes[0].doc.isFactory === true, 'reset only touches her (writes a factory marker)');
@@ -109,12 +111,12 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   assert(App.state.libraryEdit === null && sandbox.__alerts.some((m) => m.includes('只有 Mick 能改')), 'non-coach: library editor does not open');
   Store.addGoal('幫 Mick 設', 'mick');
   assert(!(Store.goalsFor('mick') || { items: [] }).items.some((g) => g.text === '幫 Mick 設') && Store.canEditGoalsOf('Annlin'), 'non-coach cannot write someone else\'s goals (own still fine)');
-  assert(Store.applyCopyPlan({ from: 'mick', to: 'Annlin', weeks: [{ weekNumber: W, days: [6], fields: [] }] }) === 0, 'non-coach cannot copy plans');
+  assert(Store.applyCopyPlan({ from: 'mick', to: 'Annlin', weeks: [{ weekNumber: W, days: [6], fields: [] }] }).weeks.length === 0, 'non-coach cannot copy plans');
   Store.activeUserId = 'mick';
   Store.addGoal('教練幫 Annlin 設', 'Annlin');
   assert(Store.goalsFor('Annlin').items.some((g) => g.text === '教練幫 Annlin 設'), 'coach can set Annlin\'s goals');
 
-  // ── 複製：預覽（今天和以前不動、她自己對調過的週跳過、她自己改過的天）→ 確認 → 存 ──
+  // ── 複製：預覽（第 64 條：整週都複製，包含今天跟已經過去的日子；她自己對調過的週跳過、她自己改過的天）→ 確認 → 存 ──
   const edit = (uid, wn, fnEdit) => { const x = App._cloneEffectiveWeek(wn, uid); fnEdit(x); return Store.savePlanWeek(uid, wn, x); };
   edit('mick', TW, (x) => { x.days[TD].items[0].title = '今天 Mick'; if (TD < 6) x.days[TD + 1].items[0].title = '明天 Mick'; });
   edit('mick', F1, (x) => { x.days[0].items[0].title = 'F1 Mick'; });
@@ -122,12 +124,12 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   Store.weekAdjustments.Annlin = { ...(Store.weekAdjustments.Annlin || {}), [F1]: { dayOrder: [1, 0, 2, 3, 4, 5, 6] } };
   const p = Store.copyPlanPreview('mick', 'Annlin', 'future', TW);
   const wTW = p.weeks.find((x) => x.weekNumber === TW), wW = p.weeks.find((x) => x.weekNumber === W), wF3 = p.weeks.find((x) => x.weekNumber === F3);
-  assert(p.weeks.every((x) => x.weekNumber >= TW) && (!wTW || wTW.days.every((di) => di > TD)), 'today and before are never copied');
+  assert(p.weeks.every((x) => x.weekNumber >= TW) && wTW && wTW.days.includes(TD), '「這週以後」starts at this week, and today is copied too (whole week, decision 64)');
   assert(TD === 6 || (wTW && wTW.days.includes(TD + 1)), 'tomorrow is copied');
   assert(p.skipped.includes(F1) && !p.weeks.some((x) => x.weekNumber === F1), 'her self-swapped week is skipped');
   assert(wW && wW.days.includes(1) && wW.days.includes(5) && p.ownEdited === 1, 'her own edit counts as 自己改過 (1 day)');
   assert(wF3 && wF3.days.includes(2) && wF3.fields.includes('weeklyVolumeKm') && p.goalChanged, '目標跑量 comes along');
-  const expected = (TD < 6 ? 1 : 0) + 2 + 1;
+  const expected = 1 + (TD < 6 ? 1 : 0) + 2 + 1; // 今天＋明天＋W 的兩天＋F3 的一天
   assert(p.changedDays === expected, `changed days counted (${p.changedDays} = ${expected})`);
 
   Sync.isSignedIn = () => true;
@@ -140,10 +142,10 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   const todayBefore = title('Annlin', TW, TD);
   await App.copyPlanFrom('mick', 'future');
   assert(fetched === 'Annlin', 'asks the server for her day swaps and records before copying');
-  assert(msg.includes('把 Mick 的課表複製到 Annlin？') && /明天（\d+\/\d+）起；今天和以前不動/.test(msg) && msg.includes(`會改 ${expected} 天。`), 'confirm says who → who, from tomorrow, how many days');
+  assert(msg.includes('把 Mick 的課表複製到 Annlin？') && msg.includes('整週都換（包含已經過去的日子跟今天）') && msg.includes(`會改 ${expected} 天；同一天名稱一樣的項目，打過的勾會留著。`), 'confirm says who → who, whole weeks, how many days');
   assert(msg.includes('Annlin 自己改過的 1 天會被蓋掉。') && msg.includes(`第 ${F1} 週 Annlin 自己對調過順序，這週跳過。`) && msg.includes('目標跑量也會換成 Mick 的。'), 'confirm warns about her own edits, skipped weeks and the goal');
   assert(title('Annlin', F3, 2) === 'F3 Mick' && Store.weekVolume(F3, 'Annlin').goal.min === 30 && title('Annlin', W, 5) === title('mick', W, 5) && title('Annlin', W, 1) === '舊共用課表改過', 'copied into her plan');
-  assert(title('Annlin', TW, TD) === todayBefore && (TD === 6 || title('Annlin', TW, TD + 1) === '明天 Mick'), 'today untouched, tomorrow copied');
+  assert(title('Annlin', TW, TD) === '今天 Mick' && todayBefore !== '今天 Mick' && (TD === 6 || title('Annlin', TW, TD + 1) === '明天 Mick'), 'today and tomorrow both copied');
   assert(title('Annlin', F1, 0) !== 'F1 Mick', 'skipped week untouched');
   assert(!!Store.planWeeks.Annlin[F3].layoutAt && Store.planWeeks.Annlin[F3].editedBy[2] === 'mick', 'copied weeks get a new layout stamp and the days are stamped as Mick\'s');
   assert(title('mick', F3, 2) === 'F3 Mick' && title('Phoebe', F3, 2) !== 'F3 Mick', 'source and third person untouched');
@@ -160,14 +162,19 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   assert(sandbox.__alerts.length === 1 && sandbox.__alerts[0].includes('這週跳過，這次沒有複製') && !sandbox.__alerts[0].includes('一樣了') && title('Annlin', F1, 6) !== 'F1 週日 Mick', 'only the skipped week differs: says it was skipped, copies nothing');
   App.state.weekViewNumber = TW;
   edit('mick', F3, (x) => { x.days[3].items[0].title = '不要複製'; });
-  sandbox.confirm = () => false;
+  sandbox.confirm = (m) => { sandbox.__confirms.push(m); return false; };
   await App.copyPlanFrom('mick', 'future');
   assert(title('Annlin', F3, 3) !== '不要複製', 'declined confirm copies nothing');
-  sandbox.confirm = () => true;
+  sandbox.confirm = (m) => { sandbox.__confirms.push(m); return true; };
+  // 已經過去的一週也複製得了（第 64 條：整週；以前「明天起」等於整週都不動）——真的複製一次，不是只看沒出現「明天」
   App.state.weekViewNumber = 1;
+  edit('mick', 1, (x) => { x.days[2].items[0].title = '第一週週三 Mick'; });
   sandbox.__alerts.length = 0;
+  sandbox.__confirms.length = 0;
+  const beforePast = title('Annlin', 1, 2);
   await App.copyPlanFrom('mick', 'week');
-  assert(sandbox.__alerts.some((m) => m.includes('沒有明天以後的日子')), 'copying a past week: nothing from tomorrow on');
+  assert(beforePast !== '第一週週三 Mick' && title('Annlin', 1, 2) === '第一週週三 Mick', 'a past week is really copied, day by day (decision 64: whole week)');
+  assert(sandbox.__confirms.slice(-1)[0].includes('整週都換（包含已經過去的日子）') && !sandbox.__confirms.slice(-1)[0].includes('明天'), 'and the confirm says the range as it really is');
   Sync.isSignedIn = () => false;
   sandbox.__alerts.length = 0;
   await App.copyPlanFrom('mick', 'future');
@@ -189,7 +196,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   assert(fn('renderApp')(App.state).includes('這裡改的是 Annlin 的課表'), 'banner: 這裡改的是 Annlin 的課表');
   App.state.viewMenuOpen = true;
   const menu = fn('renderWeekPage')(App.state);
-  assert(menu.includes('排 Annlin 的課表') && menu.includes('排自己的課表') && menu.includes('把別人的課表複製給 Annlin（明天起）'), 'name menu = whose plan; copy section for Annlin');
+  assert(menu.includes('排 Annlin 的課表') && menu.includes('排自己的課表') && menu.includes('把別人的課表複製給 Annlin（整週）') && /第 \d+ 週以後/.test(menu), 'name menu = whose plan; copy section for Annlin (the 「以後」 button says which week it starts at)');
   assert(menu.includes(`A.copyPlanFrom('mick','week')`) && menu.includes(`A.copyPlanFrom('Phoebe','future')`) && !menu.includes(`A.copyPlanFrom('Annlin'`), 'copy from Mick or Phoebe (never from herself)');
   App.state.viewMenuOpen = false;
   App.state.expandedDay = { weekNumber: F1, dayIndex: 6 };
@@ -229,9 +236,13 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   Sync.pushPlanWeek('Annlin', 9, { weekNumber: 9, updatedAt: 'A' }, null);
   await tick(); await tick();
   assert(sandbox.__remote['users/Annlin/planWeeks/9'] && sandbox.__remote['users/Annlin/planWeeks/9'].updatedAt === 'A', 'writes users/Annlin/planWeeks/9');
-  Sync.pushPlanWeek('Annlin', 9, { weekNumber: 9, updatedAt: 'B' }, 'stale');
-  await tick(); await tick();
-  assert(sandbox.__remote['users/Annlin/planWeeks/9'].updatedAt === 'A' && Sync.state === 'fail' && Sync.message.includes('Annlin 的第 9 週剛被別人改過'), 'someone else saved first: refused and told whose week');
+  assert(Store._planCloudAt['Annlin:9'] === 'A', 'a successful write becomes the cloud-confirmed version (decision 64)');
+  // 別人（別台）先存了 X，這台還不知道：比對基準是雲端確認過的 A，雲端卻是 X → 擋下
+  sandbox.__remote['users/Annlin/planWeeks/9'] = { weekNumber: 9, updatedAt: 'X' };
+  sandbox.__alerts.length = 0;
+  Sync.pushPlanWeek('Annlin', 9, { weekNumber: 9, updatedAt: 'B' }, 'A');
+  await tick(); await tick(); await tick();
+  assert(sandbox.__remote['users/Annlin/planWeeks/9'].updatedAt === 'X' && sandbox.__alerts.some((m) => m.includes('Annlin 的第 9 週剛被別人改過')), 'someone else saved first: refused, and a pop-up says whose week (decision 64)');
   let signedOut = false;
   vm.runInContext('fbAuth = { signOut: () => { globalThis.__signedOut = true; } }', sandbox);
   Sync.state = 'done';
@@ -242,8 +253,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   clearTimeout(Sync._planRetryTimer); Sync._planRetryTimer = null; // 測試不等那一分鐘
   Store.coachMode = true; App.state.viewingUserId = null; App.state.weekViewNumber = W;
   assert(fn('renderWeekPage')(App.state).includes('課表的新規則還沒發布'), 'coach sees the publish-the-rules banner');
-  Sync._onWriteError('planWeeks', '9', 'Annlin', 'planWeeks:9:Annlin', { code: 'permission-denied' });
-  assert(Sync.state === 'write-denied' && Sync.message.includes('firestore.rules.local'), 'write denied (coach): tells her to republish the rules');
+  assert(Sync._planDeniedMsg('Annlin').includes('firestore.rules.local'), 'write denied (coach): tells her to republish the rules');
   Sync.planWeeksDenied = false;
   // 第一個快照一次送來好幾週：全部收完只重畫一次（不是一週一次）
   Sync.planWeeksLoaded = realPlanWeeksLoaded;
@@ -285,24 +295,35 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     edit('mick', sel.wn, (x) => { x.days[sel.di] = { ...x.days[sel.di], selectOne: false, items: [{ id: 'x-run', type: 'run', title: '輕鬆跑', duration: { min: 30, max: 30 } }] }; });
     const pk = Store.copyPlanPreview('mick', 'Annlin', 'week', sel.wn);
     const wk = pk.weeks.find((x) => x.weekNumber === sel.wn);
-    assert(pk.recorded.length === 1 && pk.recorded[0].dayIndex === sel.di && wk && wk.days.includes(sel.di), 'her pre-picked day is copied too, and flagged');
+    assert(pk.lost.length === 1 && pk.lost[0].dayIndex === sel.di && pk.lost[0].picked.length === 1 && wk && wk.days.includes(sel.di), 'her pre-picked day is copied too, and her lost pick is named');
     msg = '';
     sandbox.confirm = (m) => { msg = m; return false; };
     App.state.viewingUserId = 'Annlin'; App.state.weekViewNumber = sel.wn;
     await App.copyPlanFrom('mick', 'week');
-    assert(msg.includes('Annlin 已經先記了東西（例如先選了休息）的 1 天也會換成 Mick 的') && msg.includes(`第 ${sel.wn} 週週${PlanData.weekdayLabel(sel.di)}`), 'the confirm names that day (week and weekday) before copying');
+    assert(msg.includes(`第 ${sel.wn} 週週${PlanData.weekdayLabel(sel.di)}`) && msg.includes('Annlin 先選的「') && msg.includes('不在 Mick 的課表裡，會換成 Mick 的內容'), 'the confirm names that day (week and weekday) and what she had picked, before copying');
     assert(Store.effectiveWeek(sel.wn, 'Annlin').days[sel.di].selectOne && Store.dayStatus(sel.wn, sel.di, 'Annlin') === 'done', 'declined: her day stays as it was');
-    sandbox.confirm = () => true;
+    sandbox.confirm = (m) => { sandbox.__confirms.push(m); return true; };
     await App.copyPlanFrom('mick', 'week');
     const after = Store.effectiveWeek(sel.wn, 'Annlin').days[sel.di];
     assert(!after.selectOne && after.items[0].title === '輕鬆跑', "confirmed: the day follows the coach's plan (no leftover 「或」)");
   }
-  // 確認視窗跨過午夜：預覽的「明天」變成今天 → 存的時候再擋
-  const stale = { from: 'mick', to: 'Annlin', weeks: [{ weekNumber: TW, days: [TD], fields: [] }] };
-  const beforeToday = title('Annlin', TW, TD);
-  edit('mick', TW, (x) => { x.days[TD].items[0].title = '午夜後的今天'; });
-  Store.applyCopyPlan(stale);
-  assert(title('Annlin', TW, TD) === beforeToday, 'apply re-checks the date: a day that became today is not overwritten');
+  // 第 64 條：整週複製時，同一天名稱＋類型一樣的項目沿用她原本的 id——打過的勾留著；對不上的換新 id（勾不會套到別的項目上）
+  {
+    const dKey = PlanData.keyForWeekDay(TW, TD);
+    const aItem = Store.effectiveWeek(TW, 'Annlin').days[TD].items[0];
+    Store.mergeRemoteEntry('Annlin', dKey, { done: { [aItem.id]: true }, selectedItemId: null, status: null, updatedAt: '2026-09-22T09:00:00.000Z', fieldAt: {} });
+    edit('mick', TW, (x) => { x.days[TD].items[0] = { ...x.days[TD].items[0], title: aItem.title, type: aItem.type, coachNote: 'Mick 改了時間' }; });
+    const pk = Store.copyPlanPreview('mick', 'Annlin', 'week', TW);
+    assert(!pk.lost.some((x) => x.weekNumber === TW && x.dayIndex === TD), 'same name and type: her tick is not listed as lost');
+    Store.applyCopyPlan(pk);
+    const nowItem = Store.effectiveWeek(TW, 'Annlin').days[TD].items[0];
+    assert(nowItem.id === aItem.id && nowItem.coachNote === 'Mick 改了時間' && Store.entryFor('Annlin', dKey).done[aItem.id] === true, 'copied today: same item keeps her id, so her tick stays; the coach note comes from Mick');
+    edit('mick', TW, (x) => { x.days[TD].items[0] = { ...x.days[TD].items[0], title: '別的項目', type: 'recovery' }; });
+    const pk2 = Store.copyPlanPreview('mick', 'Annlin', 'week', TW);
+    assert(pk2.lost.some((x) => x.dayIndex === TD && x.ticked.includes(aItem.title)), 'a different item: her tick is named as lost in the confirm');
+    Store.applyCopyPlan(pk2);
+    assert(Store.effectiveWeek(TW, 'Annlin').days[TD].items[0].id !== aItem.id, 'and the new item gets a new id (her old tick does not jump onto it)');
+  }
   // 兩邊的課表還沒讀到（或規則還沒發布）：不複製
   Sync.planWeeksLoaded = (uid) => uid !== 'mick';
   sandbox.__alerts.length = 0;
@@ -338,15 +359,15 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 200));
   const remoteNow = sandbox.__remote2[`users/Phoebe/planWeeks/${W2}`];
   assert(remoteNow.updatedAt === s2.updatedAt && remoteNow.days[3].items[0].title === '第一下' && remoteNow.days[4].items[0].title === '第二下', 'two quick saves both reach the cloud, in order');
-  assert(Sync.state === 'done' && !Sync.message.includes('剛被別人改過') && !Store._planPending[`Phoebe:${W2}`], 'no false "someone else changed it"');
+  assert(!sandbox.__alerts.some((m) => m.includes('剛被別人改過')) && !Store.planDirty('Phoebe', W2) && !Store.planSyncing(), 'no false "someone else changed it"; nothing left unsaved or in flight');
   Store.mergeRemotePlanWeek('Phoebe', W2, JSON.parse(JSON.stringify(remoteNow)));
   assert(title('Phoebe', W2, 4) === '第二下', 'after it landed, the cloud copy is accepted again');
-  Store._cloudPushPlanWeek = (uid, wn, doc, base, onFail) => pushes.push({ uid, wn, doc, base, onFail });
+  Store._cloudPushPlanWeek = fakePush;
 
   // ── 審查 4：不是教練的人被拒時，請教練發布規則（不是叫她去貼只在教練電腦上的檔案）──
   Store.activeUserId = 'Annlin';
-  Sync._onWriteError('planWeeks', '5', 'Annlin', 'planWeeks:5:Annlin', { code: 'permission-denied' });
-  assert(Sync.message.includes('請 Mick 發布') && !Sync.message.includes('firestore.rules.local'), 'non-coach denied: asks Mick to publish the rules');
+  const nonCoachMsg = Sync._planDeniedMsg('Annlin');
+  assert(nonCoachMsg.includes('請 Mick 重新發布') && !nonCoachMsg.includes('firestore.rules.local') && !nonCoachMsg.includes('再改一次'), 'non-coach denied: asks Mick to publish the rules (and does not tell her to redo the edit — it auto-retries now)');
   Store.activeUserId = 'mick';
   Sync.state = 'done'; Sync.failedWrites.clear();
 

@@ -94,6 +94,8 @@ function isRunType(t) { return RUN_TYPES.includes(t) || LEGACY_RUN_TYPES.include
 function isRestOnlyDay(d) {
   return !!d && !d.selectOne && Array.isArray(d.items) && d.items.length > 0 && d.items.every((it) => it.type === 'rest');
 }
+// 複製課表比「換了之後有沒有變差」用（自主休息、更換項目是她標的，不在這裡比）
+const DAY_STATUS_RANK = { pending: 0, partial: 1, done: 2 };
 
 // 一週的顯示順序：identity＝出廠順序（週一顯示週一的內容...）。決策紀錄第 14 條：
 // 環境因素讓某天跟另一天對調時，用這個排列表示「日曆上的第 i 天，顯示的其實是
@@ -120,6 +122,18 @@ function dayCompareKey(d) {
   const items = (d.items || []).map((it) => {
     const c = { ...PlanData.displayItem(it) };
     delete c.derived; delete c.intensityDerived; delete c.templateId;
+    return c;
+  });
+  return stableJson({ items, selectOne: !!d.selectOne, dayNotes: PlanData.displayNote(d.dayNotes) || null });
+}
+
+// 複製課表的比對（第 64 條）：跟 dayCompareKey 一樣照畫面上看到的比，但不看項目 id——
+// 兩個人各自排出來的同一份課表，項目 id 不同，內容一樣就不算要複製
+function dayContentKey(d) {
+  if (!d) return 'null';
+  const items = (d.items || []).map((it) => {
+    const c = { ...PlanData.displayItem(it) };
+    delete c.id; delete c.derived; delete c.intensityDerived; delete c.templateId;
     return c;
   });
   return stableJson({ items, selectOne: !!d.selectOne, dayNotes: PlanData.displayNote(d.dayNotes) || null });
@@ -193,8 +207,18 @@ const Store = {
 
   _cloudPush: null, // wired by firebase-sync.js: (kind, docId, data) => void
   _cloudPushPlanWeek: null, // wired by firebase-sync.js: (userId, weekNumber, doc, baseUpdatedAt, onFail) => void
-  // 自己存的課表還在寫進雲端的路上：{ 'userId:週': 那一份的 updatedAt }（見 mergeRemotePlanWeek）
-  _planPending: {},
+  // 決策紀錄第 64 條：「哪幾週還沒存進雲端」只從兩件事算出來（planDirty），不另外記——以前記在四個地方
+  //（還沒存上去的清單、失敗清單、每週的原因、手機本機那份），每種情況各改其中幾個，漏一個同步狀態就卡住或講錯（審查兩次抓到）。
+  // _planCloudAt：雲端確認過的最新版本 { 'userId:週': updatedAt | null（雲端沒有這份）}（快照收下、或這台寫成功時記）
+  _planCloudAt: {},
+  // 每一份存檔是「從雲端哪一版開始改的」（chain.base）、這台在那之後自己存的每一版（chain.mine）：
+  // 送出時雲端只要還是 base 或 mine 裡的一版就不算衝突，其他的＝別人（別台）改過（審查抓到：
+  // 只拿「送出那一刻雲端最新的」當基準，衝突之後排在後面的舊存檔會把別人的修改蓋掉）。dead＝衝突過，這條作廢。
+  _planChainCur: {},
+  _planChainOf: new WeakMap(),
+  // 正在送（或排隊）的存檔數 { 'userId:週': n }（Sync.pushPlanWeek 加、送完減）；送的期間雲端來了別人的版本，先放 _planDeferred，送完再比
+  _planInFlight: {},
+  _planDeferred: {},
   _cloudPushLibrary: null, // wired by firebase-sync.js: (docId, data) => void
   _cloudPushLibraryOverride: null, // wired by firebase-sync.js: (docId, fullDoc, baseUpdatedAt, onResult(ok, message)) => void
   _libraryServer: {},   // 內建修改版「雲端確認過」的最後一份（快照或重新讀取來的），寫入失敗時退回這份（第 33 條）
@@ -807,6 +831,50 @@ const Store = {
 
   // 存檔時的版本比對基準：她自己那份的 updatedAt（還沒有自己那份＝null）。舊的共用課表、出廠的時間不算——
   // 雲端比對的是 users/{userId}/planWeeks/{wn} 這份文件。
+  _planChainFor(uid, wn, next, fallbackBase) {
+    const k = `${uid}:${wn}`;
+    let chain = this._planChainCur[k];
+    const known = Object.prototype.hasOwnProperty.call(this._planCloudAt, k);
+    // 存之前的那份已經在雲端了（或這台沒改過）：從雲端那版重新開始一條
+    if (!chain || chain.dead || !this.planDirty(uid, wn)) {
+      chain = { base: known ? this._planCloudAt[k] : (fallbackBase || null), mine: [], dead: false };
+      this._planChainCur[k] = chain;
+    }
+    chain.mine.push(next.updatedAt);
+    this._planChainOf.set(next, chain);
+    return chain;
+  },
+  // 這台那份是這台改的（有 chain、沒作廢），雲端還沒確認到這一版＝還沒存進雲端（正在送的也算）
+  planDirty(uid, wn) {
+    const own = this.planWeeks[uid] && this.planWeeks[uid][wn];
+    const chain = own && this._planChainOf.get(own);
+    return !!(chain && !chain.dead && !chain.localOnly && this._planCloudAt[`${uid}:${wn}`] !== own.updatedAt);
+  },
+  // 還沒存進雲端、也沒有在送的（網路斷掉、被拒）：[{ userId, weekNumber }]——同步狀態、補送、複製前的檢查都用這個
+  planUnsavedWeeks() {
+    const out = [];
+    Object.keys(this.planWeeks).forEach((uid) => Object.keys(this.planWeeks[uid] || {}).forEach((w) => {
+      const wn = Number(w);
+      if (!this._planInFlight[`${uid}:${wn}`] && this.planDirty(uid, wn)) out.push({ userId: uid, weekNumber: wn });
+    }));
+    return out;
+  },
+  // 沒登入的時候在這台改的（不會上傳）：登入時 Sync 會講一次
+  planLocalOnlyWeeks() {
+    const out = [];
+    Object.keys(this.planWeeks).forEach((uid) => Object.keys(this.planWeeks[uid] || {}).forEach((w) => {
+      const doc = this.planWeeks[uid][w];
+      const chain = doc && this._planChainOf.get(doc);
+      if (chain && chain.localOnly) out.push({ userId: uid, weekNumber: Number(w) });
+    }));
+    return out;
+  },
+  planSyncing() { return Object.keys(this._planInFlight).some((k) => this._planInFlight[k] > 0); },
+  // 登出、換帳號：這些只屬於上一個帳號（沒存上去的在手機本機另外留著，同一個帳號再登入時還原）
+  resetPlanSyncState() {
+    this._planCloudAt = {}; this._planChainCur = {}; this._planChainOf = new WeakMap(); this._planInFlight = {}; this._planDeferred = {};
+  },
+
   _planBase(weekNumber, userId) {
     const own = this.planWeeks[userId] && this.planWeeks[userId][weekNumber];
     return own ? own.updatedAt || null : null;
@@ -883,6 +951,7 @@ const Store = {
     // basePlanVersion：這份是基於哪一版出廠課表改的。出廠課表更新（例如第 12 條拿掉走跑）之後，
     // 被改過的週不會自動跟上，本週課表設定用這個欄位提示「這週的調整基於舊版」。
     const next = { ...clean, weekNumber, userId: uid, editedBy, basePlanVersion: PlanData.plan.planVersion, updatedAt: nowIso(), updatedBy: this.activeUserId };
+    this._planChainFor(uid, weekNumber, next, baseUpdatedAt);
     if (!this.planWeeks[uid]) this.planWeeks[uid] = {};
     this.planWeeks[uid][weekNumber] = next;
     if (this._seenLayoutAt) { // 自己剛存的就是看到的
@@ -890,10 +959,7 @@ const Store = {
       this._seenLayoutAt[uid][weekNumber] = next.layoutAt || null;
     }
     if (!opts.silent) this._notify();
-    if (this._cloudPushPlanWeek) {
-      this._planPending[`${uid}:${weekNumber}`] = next.updatedAt;
-      this._cloudPushPlanWeek(uid, weekNumber, next, baseUpdatedAt);
-    }
+    if (this._cloudPushPlanWeek) this._cloudPushPlanWeek(uid, weekNumber, next, baseUpdatedAt);
     return next;
   },
 
@@ -906,6 +972,7 @@ const Store = {
     if (!this.planWeeks[uid]) this.planWeeks[uid] = {};
     const backup = this.planWeeks[uid][weekNumber];
     const next = { weekNumber, userId: uid, isFactory: true, updatedAt: nowIso(), updatedBy: this.activeUserId };
+    this._planChainFor(uid, weekNumber, next, base);
     this.planWeeks[uid][weekNumber] = next;
     if (this._seenLayoutAt) {
       if (!this._seenLayoutAt[uid]) this._seenLayoutAt[uid] = {};
@@ -913,33 +980,56 @@ const Store = {
     }
     this._notify();
     if (this._cloudPushPlanWeek) {
-      this._planPending[`${uid}:${weekNumber}`] = next.updatedAt;
+      // 回傳有沒有真的退回：期間又改過就不蓋掉（那時畫面是「還原之後又改的」，訊息不能說退回了）
       this._cloudPushPlanWeek(uid, weekNumber, next, base, () => {
-        if (this.planWeeks[uid][weekNumber] !== next) return; // 期間又有新的內容進來，不蓋掉
+        if (this.planWeeks[uid][weekNumber] !== next) return false; // 期間又有新的內容進來，不蓋掉
         if (backup) this.planWeeks[uid][weekNumber] = backup; else delete this.planWeeks[uid][weekNumber];
         if (this._seenLayoutAt && this._seenLayoutAt[uid]) this._seenLayoutAt[uid][weekNumber] = backup ? (backup.layoutAt || null) : null;
         this._notify();
+        return true;
       });
     }
     return next;
   },
 
   // silent：firebase-sync.js 一個快照收完再一起重畫（見 _attachPlanWeeks）
-  // 自己剛存的那份還在寫進雲端的路上時，雲端送來的是更早的版本（transaction 寫完才會出現在快照裡），
-  // 不讓它蓋掉畫面上剛改好的——不然畫面會跳回去，這時接著改又會拿舊版本當基準（審查抓到）。
-  // 寫進去了（快照送來同一份）、或存檔失敗（firebase-sync.js 清掉記號）之後照收。
-  mergeRemotePlanWeek(userId, weekNumber, doc, silent) {
-    const pendKey = `${userId}:${weekNumber}`;
-    const pend = this._planPending[pendKey];
-    if (pend && (!doc || doc.updatedAt !== pend)) return;
-    if (pend) delete this._planPending[pendKey];
+  // 這台還有沒存進雲端的修改（planDirty）時，雲端送來的：
+  // - 就是這台這份＝寫進去了（包含「交易成功但回應沒收到」）→ 'landed'
+  // - 是這台開始改的那版、或這台比較早的一版（最新的還沒上去）→ 'kept'，畫面留著這台的（不然會跳回去，接著改又拿舊的當基準）
+  // - 別人（別台）的版本：還在送的話先放著（'deferred'，送完再比——可能是別人在這台寫進去之後才改的）；
+  //   沒在送＝這台沒存上去的修改被換掉 → 'dropped'（Sync 當下跳視窗講）
+  // 沒有沒存上去的修改 → 照收，'ok'
+  // fromCache：這份是 Firestore 的離線快取給的，不是伺服器確認過的。課表用 transaction 寫，寫進去的不會進 SDK 的快取
+  // （審查抓到：串流斷掉時重新掛監聽，快取那份會把剛寫進雲端的蓋回舊版，畫面靜默回退，重打一次還會被誤判成「剛被別人改過」）
+  mergeRemotePlanWeek(userId, weekNumber, doc, silent, fromCache) {
+    const k = `${userId}:${weekNumber}`;
+    let status = 'ok';
+    const known = this._planCloudAt[k];
+    if (fromCache && known && (!doc || !doc.updatedAt || doc.updatedAt < known)) return 'stale';
+    const localChain = !this.planDirty(userId, weekNumber) && this.planWeeks[userId] && this.planWeeks[userId][weekNumber]
+      && this._planChainOf.get(this.planWeeks[userId][weekNumber]);
+    // 沒登入時在這台改的：不會上傳，雲端有別的版本時換成雲端的——但要講（不能無聲不見）
+    if (localChain && localChain.localOnly && doc && doc.updatedAt !== this.planWeeks[userId][weekNumber].updatedAt) status = 'dropped-local';
+    if (this.planDirty(userId, weekNumber)) {
+      const own = this.planWeeks[userId][weekNumber];
+      const chain = this._planChainOf.get(own);
+      if (doc && doc.updatedAt === own.updatedAt) { this._planCloudAt[k] = doc.updatedAt; return 'landed'; }
+      if (doc && (doc.updatedAt === chain.base || chain.mine.includes(doc.updatedAt))) { this._planCloudAt[k] = doc.updatedAt; return 'kept'; }
+      if (this._planInFlight[k]) { this._planDeferred[k] = doc; return 'deferred'; }
+      chain.dead = true;
+      status = 'dropped';
+    }
+    this._planCloudAt[k] = doc ? doc.updatedAt || null : null;
     if (!this.planWeeks[userId]) this.planWeeks[userId] = {};
     this.planWeeks[userId][weekNumber] = doc;
     if (!silent) this._notify();
+    return status;
   },
 
   clearRemotePlanWeek(userId, weekNumber, silent) {
-    if (this._planPending[`${userId}:${weekNumber}`]) return;
+    const dirty = this.planDirty(userId, weekNumber);
+    this._planCloudAt[`${userId}:${weekNumber}`] = null;
+    if (dirty) return; // 這台的還沒存上去：留著，補送會寫回去
     if (this.planWeeks[userId]) delete this.planWeeks[userId][weekNumber];
     if (!silent) this._notify();
   },
@@ -955,38 +1045,70 @@ const Store = {
     this._notify();
   },
 
-  // ── 複製課表（決策紀錄第 56 條，只有教練）──────────────────────────────────────
-  // 把 from 的課表複製到 to。range：'week'（weekNumber 那一週）| 'future'（今天以後全部）。
-  // 一律從明天開始：今天已經做過的課被換掉，打的勾會對不上，那堂課又冒出來——第 0 條。
+  // ── 複製課表（決策紀錄第 56 條，只有教練；第 64 條改成整週）────────────────────────────
+  // 把 from 的課表複製到 to。range：'week'（weekNumber 那一週）| 'future'（這週起到最後一週）。
+  // 第 64 條：整週都複製，包含這週已經過去的日子跟今天（她：「整週都複製」）。以前一律「明天起」——怕今天做過的課被換掉、
+  // 打的勾對不上。現在跟預排課表（第 57 條）同一套：同一天名稱＋類型一樣的項目沿用 to 原本的 id，打過的勾留著；
+  // 對不上的換新 id（不會把勾套到別的項目上），確認畫面照日期點名哪一天先選的／打過勾的會被換掉（lost）。
   // to 自己對調過順序（第 14 條）的週整週跳過：對調記的是「第幾格顯示課表第幾天」，底下的課換掉，
   // 她這週已經做過的課可能被換到後面。
-  // to 在明天以後的日子已經先記了東西（第 31 條可以預先排休息：二擇一選了休息、休息項目打了勾、自主休息）的那幾天，
-  // 一樣照教練的課表換（她要的：照她排的課表排，不要自己留著舊的），但確認畫面一天一天點名（recorded），教練按之前就知道。
+  // 比對只看內容、不看項目 id：兩個人各自排出來的同一份課表 id 不同，那不算「不一樣」。
   // 回傳預覽（什麼都不改）；確認之後 applyCopyPlan 照這份存。
-  _hasRecord(userId, dateKey) {
-    const e = this.entryFor(userId, dateKey);
-    return !!(e && !e.deleted && (e.selectedItemId || entryStatus(e) || Object.values(e.done || {}).some(Boolean)));
+  _copyDay(srcDay, oldDay, di, entry) {
+    const used = new Set();
+    const marked = (id) => !!(entry && !entry.deleted && (entry.selectedItemId === id || (entry.done && entry.done[id])));
+    const items = ((srcDay && srcDay.items) || []).map((src) => {
+      const same = ((oldDay && oldDay.items) || []).filter((it) => !used.has(it.id) && it.title === src.title && it.type === src.type);
+      const reuse = same.find((it) => marked(it.id)) || same[0]; // 同名的有好幾個：先留她打過勾／選的那個（審查抓到）
+      const id = reuse ? reuse.id : newItemId();
+      used.add(id);
+      return { ...JSON.parse(JSON.stringify(src)), id };
+    });
+    return { ...JSON.parse(JSON.stringify(srcDay)), items, dayIndex: di };
+  },
+  copyWeeksInRange(range, weekNumber) {
+    const total = PlanData.plan.totalWeeks;
+    if (range === 'week') return weekNumber >= 1 && weekNumber <= total ? [weekNumber] : [];
+    const loc = PlanData.locateToday();
+    const first = loc.status === 'in-plan' ? loc.weekNumber : (loc.status === 'before-start' ? 1 : total + 1);
+    const out = [];
+    for (let wn = first; wn <= total; wn++) out.push(wn);
+    return out;
   },
   copyPlanPreview(fromUserId, toUserId, range, weekNumber) {
-    const tomorrow = this._dayAfter(this.todayKey());
-    const weeks = [];
-    if (range === 'week') {
-      if (weekNumber >= 1 && weekNumber <= PlanData.plan.totalWeeks) weeks.push(weekNumber);
-    } else {
-      for (let wn = 1; wn <= PlanData.plan.totalWeeks; wn++) weeks.push(wn);
-    }
-    const out = { from: fromUserId, to: toUserId, range, tomorrow, inRange: [], weeks: [], skipped: [], recorded: [], reduced: [], changedDays: 0, ownEdited: 0, goalChanged: false, metricChanged: false };
-    weeks.forEach((wn) => {
-      const days = IDENTITY_ORDER.filter((di) => PlanData.keyForWeekDay(wn, di) >= tomorrow);
-      if (!days.length) return;
+    const today = this.todayKey();
+    const out = { from: fromUserId, to: toUserId, range, today, inRange: [], weeks: [], skipped: [], lost: [], drops: [], statuses: [], reduced: [], changedDays: 0, ownEdited: 0, goalChanged: false, metricChanged: false };
+    this.copyWeeksInRange(range, weekNumber).forEach((wn) => {
       out.inRange.push(wn);
       const adj = this.weekAdjustmentFor(wn, toUserId);
       if (adj && isValidDayOrder(adj.dayOrder) && adj.dayOrder.some((v, i) => v !== i)) { out.skipped.push(wn); return; }
       const src = this.effectiveWeek(wn, fromUserId), dst = this.effectiveWeek(wn, toUserId);
       const dstOwn = this.planWeeks[toUserId] && this.planWeeks[toUserId][wn];
       const editors = (dstOwn && !dstOwn.isFactory && dstOwn.editedBy) || {};
-      const changed = days.filter((di) => dayCompareKey(src.days[di]) !== dayCompareKey(dst.days[di]));
-      changed.forEach((di) => { if (this._hasRecord(toUserId, PlanData.keyForWeekDay(wn, di))) out.recorded.push({ weekNumber: wn, dayIndex: di }); });
+      const changed = IDENTITY_ORDER.filter((di) => dayContentKey(src.days[di]) !== dayContentKey(dst.days[di]));
+      changed.forEach((di) => {
+        const key = PlanData.keyForWeekDay(wn, di);
+        const e0 = this.entryFor(toUserId, key);
+        const e = e0 && !e0.deleted ? e0 : null;
+        const nd = this._copyDay(src.days[di], dst.days[di], di, e);
+        // 第 0 條（審查抓到）：換了之後這天看起來變差的都要點名——完成／部分完成往下掉（例如留著的勾在二擇一裡沒選到就不算）、
+        // 過去跟今天的休息日變成要練的日子（只寫了附註也算：附註不是做完）
+        if (!PlanData.isExpired(wn, di)) {
+          const before = this._dayStatusFor(dst.days[di], e), after = this._dayStatusFor(nd, e);
+          if (DAY_STATUS_RANK[after] < DAY_STATUS_RANK[before]) out.drops.push({ weekNumber: wn, dayIndex: di, kind: 'undone', from: before, to: after, future: key >= today });
+          else if (key <= today && after === 'pending' && isRestOnlyDay(dst.days[di]) && !isRestOnlyDay(nd)) out.drops.push({ weekNumber: wn, dayIndex: di, kind: 'rest-to-training', today: key === today });
+        }
+        if (!e) return;
+        const newIds = new Set(nd.items.map((it) => it.id));
+        const oldById = {};
+        dst.days[di].items.forEach((it) => { oldById[it.id] = it; });
+        const gone = (id) => oldById[id] && !newIds.has(id);
+        const picked = e.selectedItemId && gone(e.selectedItemId) ? [oldById[e.selectedItemId].title] : [];
+        const ticked = [...new Set(Object.keys(e.done || {}).filter((id) => e.done[id] && id !== e.selectedItemId && gone(id)).map((id) => oldById[id].title))];
+        if (picked.length || ticked.length) out.lost.push({ weekNumber: wn, dayIndex: di, picked, ticked, future: key > today });
+        const st = entryStatus(e);
+        if (st && key >= today) out.statuses.push({ weekNumber: wn, dayIndex: di, status: st });
+      });
       const fieldsChanged = WEEK_PLAN_FIELDS.filter((k) => stableJson(src[k] == null ? null : src[k]) !== stableJson(dst[k] == null ? null : dst[k]));
       if (!changed.length && !fieldsChanged.length) return;
       if (adj && adj.reduced) out.reduced.push(wn); // 她標了「本週已降量」：確認畫面講一聲
@@ -999,27 +1121,28 @@ const Store = {
     return out;
   },
 
-  // 照預覽存（每週一份，版本比對跟平常改課表同一條路）。回傳存了幾週。
-  // 存之前再擋一次（審查抓到）：確認視窗開著跨過午夜，預覽的「明天」已經變成今天。
+  // 照預覽存（每週一份，版本比對跟平常改課表同一條路）。回傳實際存了哪幾週、共幾天（結果提示照這個講，第 63 條）。
   applyCopyPlan(preview) {
-    if (!preview || !this.isCoach(this.activeUserId) || preview.from === preview.to) return 0;
+    const res = { weeks: [], days: 0 };
+    if (!preview || !this.isCoach(this.activeUserId) || preview.from === preview.to) return res;
     const at = nowIso();
-    const tomorrow = this._dayAfter(this.todayKey());
-    let saved = 0;
-    preview.weeks.forEach(({ weekNumber: wn, days: planned, fields }) => {
-      const days = planned.filter((di) => PlanData.keyForWeekDay(wn, di) >= tomorrow);
+    preview.weeks.forEach(({ weekNumber: wn, days, fields }) => {
       if (!days.length && !fields.length) return;
       const src = this.effectiveWeek(wn, preview.from);
-      const week = JSON.parse(JSON.stringify(this.effectiveWeek(wn, preview.to)));
+      const dst = this.effectiveWeek(wn, preview.to);
+      const week = JSON.parse(JSON.stringify(dst));
       week.__baseUpdatedAt = this._planBase(wn, preview.to);
-      days.forEach((di) => { week.days[di] = { ...JSON.parse(JSON.stringify(src.days[di])), dayIndex: di }; });
+      days.forEach((di) => {
+        const e = this.entryFor(preview.to, PlanData.keyForWeekDay(wn, di));
+        week.days[di] = this._copyDay(src.days[di], dst.days[di], di, e && !e.deleted ? e : null);
+      });
       fields.forEach((k) => { if (src[k] == null) delete week[k]; else week[k] = JSON.parse(JSON.stringify(src[k])); });
       // 天的內容換了：別台還停在舊畫面的，不能再照位置存（見 markPlanSeen）
       if (days.length) week.layoutAt = at;
-      if (this.savePlanWeek(preview.to, wn, week, { silent: true, batch: true })) saved++;
+      if (this.savePlanWeek(preview.to, wn, week, { silent: true, batch: true })) { res.weeks.push(wn); res.days += days.length; }
     });
     this._notify();
-    return saved;
+    return res;
   },
 
   // ── 預先排好的整週課表（決策紀錄第 57 條，data/week-presets.json）─────────────────────
@@ -1528,8 +1651,10 @@ const Store = {
     // （決策紀錄第 14 條的對調）。dateKey 永遠對應日曆格子本身，不受對調影響——
     // 對調換的是「看到什麼」，不是「哪天算哪天」。
     const order = this.effectiveDayOrder(weekNumber, uid);
-    const d = this.effectiveDay(weekNumber, order[dayIndex], uid);
-    const entry = this.entryFor(uid, dateKey);
+    return this._dayStatusFor(this.effectiveDay(weekNumber, order[dayIndex], uid), this.entryFor(uid, dateKey));
+  },
+  // 這一天的內容 d、這一天的紀錄 entry → 狀態（不看過期；dayStatus 跟複製課表的「換了之後會變怎樣」共用）
+  _dayStatusFor(d, entry) {
     const override = entryStatus(entry);
     if (override) return override;
     if (d.selectOne) {

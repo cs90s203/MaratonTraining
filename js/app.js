@@ -324,6 +324,8 @@ const App = {
 
   // 同步膠囊「寫入被拒」：手機沒有 hover 看不到 title，點了直接把原因講出來。
   showSyncMessage() { alert(Sync.message || '寫入被拒。'); },
+  // 同步狀態「還沒存進雲端／同步有問題」：先講原因（手機沒有 hover）再重試（第 64 條）
+  syncPillTap() { const m = Sync.syncMessage() || Sync.message; if (m) alert(m); this.retrySync(); },
 
   toggleFlag(dateKey, flagKey) {
     const priv = Store.privateFor(dateKey);
@@ -369,7 +371,7 @@ const App = {
   // 登入本身沒有完成（見 firebase-sync.js 的登入逾時保險）——後者 resubscribe()
   // 一開頭就 `if (!isSignedIn()) return;` 直接不做事，要重跑一次真正的登入流程。
   retrySync() {
-    if (Sync.isSignedIn()) { Sync.resubscribe(); render(); }
+    if (Sync.isSignedIn()) { Sync.resubscribe(); Sync.retryUnsavedPlanWeeks(); render(); }
     else { Sync.signIn(); }
   },
 
@@ -1246,7 +1248,7 @@ const App = {
   },
 
   // 決策紀錄第 56 條：把 fromUserId 的課表複製給正在排的那個人。只有教練、只在教練模式。
-  // range：'week'（畫面上這一週）| 'future'（今天以後全部）；一律從明天開始。按確認才複製。
+  // range：'week'（畫面上這一週）| 'future'（這週起到最後一週）；整週都複製（第 64 條）。按確認才複製。
   async copyPlanFrom(fromUserId, range) {
     this.state.viewMenuOpen = false;
     const to = this.planUserId();
@@ -1259,41 +1261,82 @@ const App = {
     }
     const wn = this.state.weekViewNumber; // 等伺服器的期間換了週，「這一週」還是按下去那一週
     render();
-    // 對方哪幾週自己對調過順序、哪幾天已經先記了東西，要問過伺服器才準（那些要跳過），連不上就不複製
+    const inRange = Store.copyWeeksInRange(range, wn);
+    if (!inRange.length) { alert('課表已經結束了，沒有可以複製的週。'); return; }
+    const weeksText = (list) => `第 ${list.join('、')} 週`;
+    // 決策紀錄第 64 條：兩邊正在存的先等它存完；還沒存進雲端的（網路斷掉、被拒）先講、不複製——
+    // 來源那份可能根本沒到雲端，複製過去的就是別人看不到的內容（她：「按了沒有看到備註，順序也沒被更新」）
+    await Promise.all([Sync.settlePlanWeeks(fromUserId, inRange), Sync.settlePlanWeeks(to, inRange)]);
+    const unsaved = [fromUserId, to].flatMap((uid) => inRange.filter((w) => Store.planDirty(uid, w)).map((w) => `${name(uid)} 的第 ${w} 週`));
+    if (unsaved.length) {
+      alert(`${unsaved.join('、')}還有修改沒存進雲端（沒有連上網路或寫入被拒），這次先不複製。\n等右上角變成「已同步」再按一次。`);
+      return;
+    }
+    // 對方哪幾週自己對調過順序、哪幾天記了什麼，要問過伺服器才準（對調過的週跳過），連不上就不複製
     if (!(await Sync.fetchCopyGuards(to))) { alert('沒有連上網路，這次沒有複製。'); return; }
     const p = Store.copyPlanPreview(fromUserId, to, range, wn);
-    const t = PlanData.parseLocalDate(p.tomorrow);
-    const tomorrowLabel = `${t.getMonth() + 1}/${t.getDate()}`;
-    const weeksText = (list) => `第 ${list.join('、')} 週`;
-    const scope = range === 'week' ? `第 ${wn} 週`
-      : (p.inRange.length ? `第 ${p.inRange[0]}～${p.inRange[p.inRange.length - 1]} 週` : '');
-    if (!p.inRange.length) { alert(`${range === 'week' ? `第 ${wn} 週` : '課表'}沒有明天以後的日子，不用複製。`); return; }
-    const skipLine = p.skipped.length ? `${weeksText(p.skipped)} ${name(to)} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過。` : '';
-    const dayName = (x) => { const d = PlanData.dateForWeekDay(x.weekNumber, x.dayIndex); return `第 ${x.weekNumber} 週週${PlanData.weekdayLabel(x.dayIndex)}（${d.getMonth() + 1}/${d.getDate()}）`; };
-    const recordedLine = p.recorded.length
-      ? `${name(to)} 已經先記了東西（例如先選了休息）的 ${p.recorded.length} 天也會換成 ${name(fromUserId)} 的：${p.recorded.slice(0, 6).map(dayName).join('、')}${p.recorded.length > 6 ? ' 等' : ''}。` : '';
+    const who = name(to), from = name(fromUserId);
+    const scope = range === 'week' ? `第 ${wn} 週` : `第 ${p.inRange[0]}～${p.inRange[p.inRange.length - 1]} 週`;
+    const skipLine = p.skipped.length ? `${weeksText(p.skipped)} ${who} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過。` : '';
     if (!p.weeks.length) {
       // 跳過的週沒有比過，不能說它「一樣」：全部都跳過就只講跳過；有跳過的就只說「其他日子」一樣
       const allSkipped = p.skipped.length > 0 && p.skipped.length === p.inRange.length;
       alert(allSkipped
-        ? `${weeksText(p.skipped)} ${name(to)} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過，這次沒有複製。`
-        : [skipLine, `${p.skipped.length ? '其他日子' : `${name(to)} ${scope}（明天起）的課表`}已經跟 ${name(fromUserId)} 一樣了，不用複製。`].filter(Boolean).join('\n'));
+        ? `${weeksText(p.skipped)} ${who} 自己對調過順序，${p.skipped.length === 1 ? '這週' : '這幾週'}跳過，這次沒有複製。`
+        : [skipLine, `${p.skipped.length ? '其他日子' : `${who} ${scope}的課表`}已經跟 ${from} 一樣了，不用複製。`].filter(Boolean).join('\n'));
       return;
     }
+    const dayName = (x) => { const d = PlanData.dateForWeekDay(x.weekNumber, x.dayIndex); return `第 ${x.weekNumber} 週週${PlanData.weekdayLabel(x.dayIndex)}（${d.getMonth() + 1}/${d.getDate()}）`; };
+    const lostLines = p.lost.slice(0, 6).map((x) => `${dayName(x)}${[
+      x.picked.length ? `${who} ${x.future ? '先' : ''}選的「${x.picked.join('」「')}」` : '',
+      x.ticked.length ? `打過勾的「${x.ticked.join('」「')}」` : '',
+    ].filter(Boolean).join('、')}不在 ${from} 的課表裡，會換成 ${from} 的內容。`);
+    if (p.lost.length > 6) lostLines.push(`還有 ${p.lost.length - 6} 天也一樣。`);
+    const statusName = { rested: '自主休息', substituted: '更換項目' };
+    // 第 0 條（審查抓到）：換了之後這天看起來變差的，一天一天講——完成／部分完成往下掉、過去跟今天的休息日變成要練的日子
+    const statusLabel = (st, future) => ({ done: '完成', partial: '部分完成', pending: future ? '待完成' : '未完成' }[st]);
+    const dropLines = p.drops.slice(0, 6).map((x) => (x.kind === 'undone'
+      ? `${dayName(x)}${who} 原本是「${statusLabel(x.from, x.future)}」，換成 ${from} 的之後會變成「${statusLabel(x.to, x.future)}」。`
+      : `${dayName(x)}原本是休息日，換成 ${from} 的之後會變成要練的日子${x.today ? '（今天還沒練）' : '（沒有紀錄會顯示未完成）'}。`));
+    if (p.drops.length > 6) dropLines.push(`還有 ${p.drops.length - 6} 天也會這樣。`);
+    // 範圍的說法照實際（審查抓到：整週都在過去的，不能寫「包含今天」）
+    const keys = p.inRange.flatMap((w) => IDENTITY_ORDER.map((di) => PlanData.keyForWeekDay(w, di)));
+    const hasPast = keys.some((k) => k < p.today), hasToday = keys.includes(p.today);
+    const span = hasPast && hasToday ? '（包含已經過去的日子跟今天）' : hasPast ? '（包含已經過去的日子）' : hasToday ? '（包含今天）' : '';
     const lines = [
-      `把 ${name(fromUserId)} 的課表複製到 ${name(to)}？`,
-      `範圍：${scope}，明天（${tomorrowLabel}）起；今天和以前不動。`,
-      p.changedDays ? `會改 ${p.changedDays} 天。` : '',
-      p.ownEdited ? `${name(to)} 自己改過的 ${p.ownEdited} 天會被蓋掉。` : '',
-      recordedLine,
+      `把 ${from} 的課表複製到 ${who}？`,
+      `範圍：${scope}，整週都換${span}。`,
+      p.changedDays ? `會改 ${p.changedDays} 天；同一天名稱一樣的項目，打過的勾會留著。` : '',
+      p.ownEdited ? `${who} 自己改過的 ${p.ownEdited} 天會被蓋掉。` : '',
+      ...lostLines,
+      ...dropLines,
+      ...p.statuses.map((x) => `${dayName(x)}${who} 標了「${statusName[x.status]}」，那天會照樣顯示${statusName[x.status]}（要練的話到那天取消）。`),
       skipLine,
-      p.reduced.length ? `${weeksText(p.reduced)} ${name(to)} 標了「本週已降量」。` : '',
-      p.goalChanged ? `目標跑量也會換成 ${name(fromUserId)} 的。` : '',
-      p.metricChanged ? `長跑計量單位（以時間／距離計）也會換成 ${name(fromUserId)} 的。` : '',
+      p.reduced.length ? `${weeksText(p.reduced)} ${who} 標了「本週已降量」。` : '',
+      p.goalChanged ? `目標跑量也會換成 ${from} 的。` : '',
+      p.metricChanged ? `長跑計量單位（以時間／距離計）也會換成 ${from} 的。` : '',
     ].filter(Boolean);
     if (!confirm(lines.join('\n'))) return;
-    Store.applyCopyPlan(p);
+    Sync.quietPlanWeeks(to, p.weeks.map((w) => w.weekNumber)); // 結果下面一起講，「沒存進去」的視窗不另外跳
+    const res = Store.applyCopyPlan(p);
     render();
+    if (!res.weeks.length) { Sync.quietPlanWeeks(); alert('這次沒有複製：課表資料不完整，沒有存。'); return; }
+    // 第 63 條：存進雲端之後才講結果，照每一週實際的結果講（以前沒有任何提示，被退回時看起來像按了沒反應）
+    const failed = await Sync.settlePlanWeeks(to, res.weeks);
+    Sync.quietPlanWeeks();
+    render();
+    const settings = [p.goalChanged ? '目標跑量' : '', p.metricChanged ? '長跑計量單位' : ''].filter(Boolean).join('、');
+    const what = res.days ? `改了 ${res.days} 天` : `${settings}換成 ${from} 的`;
+    if (!failed.length) { alert(`已經把 ${from} 的課表複製給 ${who}：${scope}，${what}。`); return; }
+    const of = (kind) => failed.filter((f) => f.kind === kind).map((f) => f.weekNumber);
+    const okWeeks = res.weeks.filter((w) => !failed.some((f) => f.weekNumber === w));
+    alert([
+      okWeeks.length ? `${weeksText(okWeeks)}已經複製好了。` : '',
+      of('network').length ? `${weeksText(of('network'))}在這台改好了，但還沒存進雲端（沒有連上網路）。連上網路會自動補存；補存好之前，${who} 的手機看不到。` : '',
+      of('denied').length ? `${weeksText(of('denied'))}寫入被拒。${Sync.planDeniedMsg(to)}這台改的留著，存得進去的時候會自動補存。` : '',
+      of('conflict').length ? `${weeksText(of('conflict'))}剛被別人改過，這次沒有複製（畫面已經換成雲端上最新的）。確認一下再按一次複製。` : '',
+      of('signed-out').length ? `${weeksText(of('signed-out'))}沒有存進雲端（已經登出）。登入之後再按一次複製。` : '',
+    ].filter(Boolean).join('\n'));
   },
 };
 const A = App; // 給 inline onclick="A.xxx()" 用的短名
