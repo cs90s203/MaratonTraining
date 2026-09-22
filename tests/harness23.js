@@ -86,6 +86,20 @@ const fn = (name) => vm.runInContext(name, sandbox);
   assert([0, 1, 2, 3, 4, 5, 6].every((di) => titles('mick', di) === mickBefore[di]) && titles('Phoebe', 2) !== expected[2], 'Mick and Phoebe untouched');
   const html = fn('renderDayBody')(WN, 0, 'Annlin');
   assert(html.includes('https://www.youtube.com/watch?v=g_tea8ZNk5A') && html.includes('伸展'), 'the day renders with the stretch video link');
+  // 決策紀錄第 60 條：影片按鈕寫 YouTube 標題的簡化版（不是再寫一次項目名稱），說明直接顯示在按鈕下面
+  //（她：「在課表裡展開也看不到呀，只有在項目裡看的到沒有意義的」）
+  const wed = fn('renderDayRecordCard')(WN, 2, Store.effectiveWeek(WN, 'Annlin').days[2], null, true);
+  const legV = Store.videoFor('pamela-booty-no-jumps-10');
+  assert(wed.includes('<span>10 MIN BOOTY WORKOUT</span>') && wed.includes('<span>10 MIN BOOBS &amp; BACK</span>') && !wed.includes('<span>胸背</span>'), 'record card: video buttons show the simplified YouTube titles, not the item name again');
+  assert(wed.includes(`class="item-video-note">${legV.notes}<`) && wed.includes('最後 4 分鐘做臀橋'), 'record card: the video description is shown under its button');
+  assert(!wed.includes('決策紀錄') && !wed.includes('在對話裡給的') && !wed.includes('YouTube：'), 'no provenance text on the runner-facing card');
+  const coachWed = fn('renderDayBody')(WN, 2, 'Annlin');
+  assert(coachWed.includes('item-video-note') && coachWed.includes('最後 4 分鐘做臀橋'), 'coach mode card shows the description too');
+  const ro = fn('renderReadOnlyDay')(WN, 2, Store.effectiveWeek(WN, 'Annlin').days[2], null, 'Annlin');
+  assert(ro.includes('最後 4 分鐘做臀橋'), 'read-only view (looking at someone else) shows it too');
+  // 舊影片（搜尋型）也一樣顯示：「統一，一起顯示」
+  const oldV = fn('itemPlanParts')({ id: 'o', type: 'recovery', title: 'x', videoRef: 'pamela-daily-stretch' }, {}).body;
+  assert(oldV.includes('搜尋「Pamela Reif 5 MIN DAILY STRETCH」') && oldV.includes(Store.videoFor('pamela-daily-stretch').notes), 'old search-type videos show their (rewritten) description too');
 
   // ── 再排進 Phoebe：庫裡都有了，全部沿用、不再新增 ──
   App.viewWeekOf('Phoebe');

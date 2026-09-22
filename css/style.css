@@ -153,7 +153,10 @@ button.item-check::after, .rec-tick::after, button.rec-radio::after { content: '
 .item-meta { font-size: 12.5px; color: var(--text2); display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 4px; }
 .item-meta .zone { font-weight: 600; color: var(--accent2); }
 .item-notes { font-size: 13px; color: var(--text2); margin-top: 6px; line-height: 1.55; }
-.item-links { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+/* 每部影片一塊：按鈕，底下是它的說明（決策紀錄第 60 條），好幾部就上下排 */
+.item-links { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 8px; }
+.item-video { max-width: 100%; }
+.item-video-note { font-size: 13px; color: var(--text2); line-height: 1.55; margin-top: 5px; overflow-wrap: anywhere; }
 .item-link {
   font-size: 12.5px; font-weight: 600; padding: 5px 10px; border-radius: 8px;
   background: var(--card); border: 1px solid var(--inpBorder); color: var(--accent2); display: inline-flex; gap: 5px; align-items: center;

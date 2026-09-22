@@ -354,20 +354,23 @@ function itemPlanParts(item, opts) {
 
   // 一個項目可以有好幾部影片（第 28 條），每部一個連結。連結上直接寫影片名稱——
   // 好幾個「看影片」並排會分不出哪個是哪個。查不到的（庫還沒同步到這台）略過不畫。
+  // 決策紀錄第 60 條：影片的說明（notes）顯示在它的按鈕下面——以前只在設定頁的編輯表單看得到，練習當下看不到。
   const links = [];
   PlanData.itemVideoRefs(item).forEach((ref) => {
     const v = Store.videoFor(ref, opts.dateKey);
+    let link = '';
     // 自訂影片的網址是教練貼的（第 26 條）：只接受 https://，擋掉 javascript: 之類會執行的連結
     // 只要是影片一律實心圓播放鍵開頭（第 32、34 條：一眼分得出哪些是影片），搜尋型的用文字講「搜尋」
     if (v && v.linkType === 'video' && v.url && /^https:\/\//i.test(v.url)) {
-      links.push(`<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener">${ICON.playCircle}<span>${h(v.title || '看影片')}</span></a>`);
+      link = `<a class="item-link" href="${h(v.url)}" target="_blank" rel="noopener">${ICON.playCircle}<span>${h(v.title || '看影片')}</span></a>`;
     } else if (v && v.linkType === 'search') {
       const q = encodeURIComponent(v.searchQuery || v.title);
-      links.push(`<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${ICON.playCircle}<span>搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</span></a>`);
+      link = `<a class="item-link" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">${ICON.playCircle}<span>搜尋「${h(v.creator ? v.creator + ' ' : '')}${h(v.title)}」</span></a>`;
     } else if (v && v.linkType === 'none') {
       // 「不需要連結（只是說明）」：只顯示文字，不是影片所以不放播放鍵
-      links.push(`<span class="item-link plain">${h(v.title)}</span>`);
+      link = `<span class="item-link plain">${h(v.title)}</span>`;
     }
+    if (link) links.push(`<div class="item-video">${link}${v.notes ? `<div class="item-video-note">${h(v.notes)}</div>` : ''}</div>`);
   });
   let workoutBlock = '';
   if (item.workoutRef) {

@@ -114,6 +114,12 @@ def main():
            for ref in ([it["videoRef"]] if it.get("videoRef") else []) + list(it.get("videoRefs") or [])
            if ref not in vids]
     check("videoRef／videoRefs 全部找得到", not bad, str(bad[:5]))
+    # 決策紀錄第 60 條：影片的 notes 會顯示在課表卡的影片按鈕下面，是寫給跑者看的說明——
+    # 不能空著，也不能混進寫給自己的出處（v0.26.6 的 notes 寫了「決策紀錄第 57 條」「YouTube：原始標題」）
+    DEV_WORDS = ["決策紀錄", ".json", "Phase ", "YouTube：", "在對話裡給的"]
+    bad = [v["id"] for v in videos["videos"]
+           if not (v.get("notes") or "").strip() or any(w in v["notes"] for w in DEV_WORDS) or len(v["notes"]) > 300]
+    check("內建影片都有寫給跑者看的說明（不空、不含出處、最多 300 字）", not bad, str(bad[:5]))
     bad = [f'W{a}D{b} → {it["workoutRef"]}' for a, b, it in items
            if it["workoutRef"] and it["workoutRef"] not in wkts]
     check("workoutRef 全部找得到", not bad, str(bad[:5]))

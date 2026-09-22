@@ -1,5 +1,5 @@
 {
-  "_note": "linkType 決定 UI 行為：video=直接開連結；search=開 YouTube 搜尋該關鍵字；none=只顯示文字不給按鈕。url 一律為 null，除非是人工貼進來的真實網址——不要生成 YouTube 網址，規格書第 93 行。",
+  "_note": "linkType 決定 UI 行為：video=直接開連結；search=開 YouTube 搜尋該關鍵字；none=只顯示文字不給按鈕。url 一律為 null，除非是人工貼進來的真實網址——不要生成 YouTube 網址，規格書第 93 行。 notes 會顯示在課表卡的影片按鈕下面，寫給跑者看（器材、動作怎麼安排、強度、要注意的地方），不寫出處或決策紀錄編號（tools/verify_plan.py 會查）。title 用 YouTube 標題的簡化版。",
   "videos": [
     {
       "id": "fitnessblender-postpartum",
@@ -9,37 +9,37 @@
       "linkType": "search",
       "searchQuery": "Fitness Blender Postpartum Core and Pelvic Floor Recovery",
       "url": null,
-      "notes": "Phase 1 用。原計畫第六節點名的產後專門課程，取代該階段的 Pamela Reif。"
+      "notes": "恢復奠基期用的產後專門課程。這個連結是 YouTube 搜尋，沒有指定哪一支：從搜尋結果挑一支 Fitness Blender 的產後（Postnatal／Postpartum）影片來做。"
     },
     {
       "id": "pamela-booty-low-impact",
-      "title": "10 MIN BOOTY WORKOUT - Knee Friendly, Low Impact, No Squats",
+      "title": "10 MIN BOOTY WORKOUT - Knee Friendly",
       "creator": "Pamela Reif",
       "category": "glutes",
       "linkType": "search",
       "searchQuery": "Pamela Reif 10 min booty workout knee friendly low impact no squats",
       "url": null,
-      "notes": "Phase 2 之後才用。低衝擊、對產後較友善的那一支。"
+      "notes": "對膝蓋友善的低衝擊版：沒有深蹲、沒有弓箭步，不需要器材。每個動作 30 秒，需要休息就停。原計畫建議基礎期之後再做。"
     },
     {
       "id": "pamela-ab-neck-friendly",
-      "title": "10 MIN AB WORKOUT - Back & Neck Friendly / No Equipment",
+      "title": "10 MIN AB WORKOUT - Back & Neck Friendly",
       "creator": "Pamela Reif",
       "category": "core",
       "linkType": "search",
       "searchQuery": "Pamela Reif 10 min ab workout back and neck friendly no equipment",
       "url": null,
-      "notes": "Phase 2 之後才用。"
+      "notes": "強度偏高的腹肌訓練，但對下背跟脖子比較友善：除了一個撐住的動作，下背都能貼地。每個動作 30 秒，不需要器材。原計畫建議基礎期之後再做。"
     },
     {
       "id": "pamela-abs-yoga",
-      "title": "10 MIN ABS + YOGA - a slow and relaxed workout",
+      "title": "10 MIN ABS + YOGA",
       "creator": "Pamela Reif",
       "category": "core-mobility",
       "linkType": "search",
       "searchQuery": "Pamela Reif 10 min abs and yoga slow relaxed workout",
       "url": null,
-      "notes": "核心＋放鬆混合日。強度低，Phase 1 的週日伸展也可用。"
+      "notes": "動作慢、不跳：前段練腹肌、中段練整體核心，最後幾分鐘伸展放鬆。中間沒有休息，不需要器材。強度不高，恢復奠基期的週日也可以拿來當伸展。"
     },
     {
       "id": "pamela-daily-stretch",
@@ -49,7 +49,7 @@
       "linkType": "search",
       "searchQuery": "Pamela Reif 5 min daily stretch",
       "url": null,
-      "notes": "恢復／伸展日。"
+      "notes": "很短的收操伸展（約 5 分鐘、10 個動作）：身體側邊、腿、腹部，加上脊椎跟髖部的活動度。練完、睡前或起床都可以做，不需要器材。"
     },
     {
       "id": "pamela-leg-stretch",
@@ -59,7 +59,7 @@
       "linkType": "search",
       "searchQuery": "Pamela Reif 10 min leg stretch",
       "url": null,
-      "notes": "長跑後的腿部放鬆。"
+      "notes": "伸展大腿後側、大腿前側、髖屈肌跟臀部。長跑或腿痠的隔天、練完收操、睡前都可以做。不需要器材，墊一張瑜伽墊或毛巾。"
     },
     {
       "id": "pamela-legs-fatburn",
@@ -69,77 +69,77 @@
       "linkType": "search",
       "searchQuery": "Pamela Reif 10 min legs fat burn",
       "url": null,
-      "notes": "強度較高。原計畫第六節建議 Phase 2 後期再用。目前課表未排入。"
+      "notes": "腿、臀的肌力動作，加上開合跳、高抬腿、登山者這類跳躍的有氧動作，強度比較高。原計畫建議基礎期後段再做。每個動作 30 秒，需要休息就停，不需要器材。"
     },
     {
       "id": "deadbug-birddog",
-      "title": "死蟲式 ＋ 鳥狗式（自訂節奏，不需要影片）",
+      "title": "死蟲式＋鳥狗式",
       "creator": null,
       "category": "pelvic-floor-core",
       "linkType": "none",
       "searchQuery": null,
       "url": null,
-      "notes": "動作細節見 workouts.json 的 pelvic-core-basic。"
+      "notes": "不需要影片，照自己的呼吸節奏慢慢做。動作要領在「產後核心／骨盆底啟動」的「查看動作」裡。"
     },
     {
       "id": "mady-full-body-stretch-15",
-      "title": "伸展（無語音）",
+      "title": "15 Min. Full Body Stretch",
       "creator": "Mady Morrison",
       "category": "mobility",
       "linkType": "video",
       "searchQuery": null,
       "url": "https://www.youtube.com/watch?v=g_tea8ZNk5A&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=4",
-      "notes": "全程沒有語音指導，只有音樂跟偶爾的提示音，跟著畫面動作自己抓感覺、抓時間；作者說這是她自己訓練計畫第 7 天的恢復日。（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+      "notes": "沒有語音指導，只有音樂跟提示音，跟著畫面做。"
     },
     {
       "id": "pamela-booty-no-jumps-10",
-      "title": "腿臀（無跳躍）",
+      "title": "10 MIN BOOTY WORKOUT",
       "creator": "Pamela Reif",
       "category": "glutes",
       "linkType": "video",
       "searchQuery": null,
       "url": "https://www.youtube.com/watch?v=WGnCC4udvlw&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=2",
-      "notes": "沒有跳躍動作、不需要器材；用脈動式小動作＋切換腳的站位練臀肌不同角度，中間安排的「休息」其實是撐住某個姿勢不放鬆，最後 4 分鐘做臀橋。（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+      "notes": "沒有跳躍、不需要器材。小幅度脈動＋換腳的位置練臀部各角度；中間的「休息」是撐住姿勢不放鬆，最後 4 分鐘做臀橋。"
     },
     {
       "id": "pamela-boobs-back-10",
-      "title": "胸背",
+      "title": "10 MIN BOOBS & BACK",
       "creator": "Pamela Reif",
       "category": "back",
       "linkType": "video",
       "searchQuery": null,
       "url": "https://www.youtube.com/watch?v=xCOjXzJA5IM&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=5",
-      "notes": "不需要器材，練胸肌跟上背／下背，重點是改善姿勢挺直；每個動作跟著做約 30 秒，全長跟練不用暫停。（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+      "notes": "不需要器材。練胸跟上下背、改善姿勢；每個動作 30 秒，跟著做不用暫停。"
     },
     {
       "id": "lilly-hip-dips-10",
-      "title": "臀核心（側臀）",
+      "title": "HIP DIPS WORKOUT",
       "creator": "Lilly Sabri",
       "category": "glutes",
       "linkType": "video",
       "searchQuery": null,
       "url": "https://www.youtube.com/watch?v=N1axQ7Kejos&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=3",
-      "notes": "居家徒手練習，針對髖部外側、側臀那塊肌群（作者說的「臀凹（hip dips）」）；影片沒有特別要求器材。（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+      "notes": "不需要器材，在家做。練髖部外側、側臀。"
     },
     {
       "id": "pamela-beginner-abs-10",
-      "title": "核心（初學者）",
+      "title": "10 MIN BEGINNER AB WORKOUT",
       "creator": "Pamela Reif",
       "category": "core",
       "linkType": "video",
       "searchQuery": null,
       "url": "https://www.youtube.com/watch?v=1f8yoFFdkcY&t=69s",
-      "notes": "連結從 1:09 開始。比她其他核心影片的強度低，動作之間有安排休息，不需要器材。（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+      "notes": "初學者版，比作者其他腹肌影片輕鬆，動作之間有休息，不需要器材。連結從 1:09 開始。"
     },
     {
       "id": "pamela-only-back-10",
-      "title": "背",
+      "title": "10 MIN ONLY BACK",
       "creator": "Pamela Reif",
       "category": "back",
       "linkType": "video",
       "searchQuery": null,
       "url": "https://www.youtube.com/watch?v=x0UKQEG-mi4&list=PL8M_dMu_5Ef-QZj_oXPf1hmYL7xQarXGr&index=9",
-      "notes": "徒手、躺姿在地板上做，練上背、下背、肩胛後側，帶一點核心，不需要器材；作者特別提醒：這是「痠」不是「痛」，練到真的痛要停下來調整姿勢，不要硬撐。（Mick 2026-09-22 在對話裡給的連結，決策紀錄第 57 條）"
+      "notes": "不需要器材，躺在地板上做。練上背、下背、後肩，帶一點核心。痠是正常的，真的痛就停下來調整姿勢。"
     }
   ]
 }
