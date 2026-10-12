@@ -142,7 +142,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   const todayBefore = title('Annlin', TW, TD);
   await App.copyPlanFrom('mick', 'future');
   assert(fetched === 'Annlin', 'asks the server for her day swaps and records before copying');
-  assert(msg.includes('把 Mick 的課表複製到 Annlin？') && msg.includes('整週都換（包含已經過去的日子跟今天）') && msg.includes(`會改 ${expected} 天；同一天名稱一樣的項目，打過的勾會留著。`), 'confirm says who → who, whole weeks, how many days');
+  assert(msg.includes('把 Mick 的課表複製到 Annlin？') && msg.includes(TD > 0 ? '整週都換（包含已經過去的日子跟今天）' : '整週都換（包含今天）') && msg.includes(`會改 ${expected} 天；同一天名稱一樣的項目，打過的勾會留著。`), 'confirm says who → who, whole weeks, how many days');
   assert(msg.includes('Annlin 自己改過的 1 天會被蓋掉。') && msg.includes(`第 ${F1} 週 Annlin 自己對調過順序，這週跳過。`) && msg.includes('目標跑量也會換成 Mick 的。'), 'confirm warns about her own edits, skipped weeks and the goal');
   assert(title('Annlin', F3, 2) === 'F3 Mick' && Store.weekVolume(F3, 'Annlin').goal.min === 30 && title('Annlin', W, 5) === title('mick', W, 5) && title('Annlin', W, 1) === '舊共用課表改過', 'copied into her plan');
   assert(title('Annlin', TW, TD) === '今天 Mick' && todayBefore !== '今天 Mick' && (TD === 6 || title('Annlin', TW, TD + 1) === '明天 Mick'), 'today and tomorrow both copied');
@@ -233,6 +233,9 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     runTransaction: (f) => f({ get: (ref) => ref.get(), set: (ref, data) => { globalThis.__remote[ref.path] = data; } }),
   }`, sandbox);
   Sync.state = 'done';
+  // 這一段用固定的第 9 週：前面測試用的週是跟今天有關的（TW+1～TW+3），今天剛好是第 6～8 週時前面會碰到第 9 週，狀態要先清掉
+  if (Store.planWeeks.Annlin) delete Store.planWeeks.Annlin[9];
+  delete Store._planCloudAt['Annlin:9']; delete Store._planChainCur['Annlin:9'];
   Sync.pushPlanWeek('Annlin', 9, { weekNumber: 9, updatedAt: 'A' }, null);
   await tick(); await tick();
   assert(sandbox.__remote['users/Annlin/planWeeks/9'] && sandbox.__remote['users/Annlin/planWeeks/9'].updatedAt === 'A', 'writes users/Annlin/planWeeks/9');

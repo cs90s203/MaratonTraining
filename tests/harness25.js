@@ -173,7 +173,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
     App.addItemFromLibrary(TW, PD, tpl.id);
     await settle();
     const addedP = Store.effectiveWeek(TW, 'Phoebe').days[PD].items.slice(-1)[0];
-    App.moveItem(TW, PD, addedP.id, -1);
+    for (let n = Store.effectiveWeek(TW, 'Phoebe').days[PD].items.length; n > 1; n--) App.moveItem(TW, PD, addedP.id, -1); // 一路 ↑ 到最前面
     App.saveItemNote(TW, TD, Store.effectiveWeek(TW, 'Phoebe').days[TD].items[0].id, { value: '今天的備註' });
     await settle();
     App.viewWeekOf('Annlin');
@@ -181,7 +181,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
     await App.copyPlanFrom('Phoebe', 'week');
     const aw = Store.effectiveWeek(TW, 'Annlin');
     assert(aw.days[PD].items[0].title === '伸展' && aw.days[TD].items[0].coachNote === '今天的備註', 'this week: the ↑ on an earlier day and today\'s note are copied too (her report)');
-    assert(sandbox.__confirms.slice(-1)[0].includes('包含已經過去的日子跟今天'), 'and the confirm says past days and today are included');
+    assert(sandbox.__confirms.slice(-1)[0].includes(TD > 0 ? '包含已經過去的日子跟今天' : '包含今天'), 'and the confirm says what the range really includes (past days only when today is not the first day of the week)');
     App.state.weekViewNumber = W;
   } else console.log('SKIP: today is not inside the plan');
 

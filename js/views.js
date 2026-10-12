@@ -1276,10 +1276,30 @@ function renderWeekCoachPanel(wn, w, hasOverride, uid) {
         <div class="preset-text"><span class="preset-lbl">預先排好的課表</span>${h(p.name)}</div>
         <button class="btn" style="background:var(--warn);width:auto;padding:8px 14px;font-size:13px" onclick="A.applyWeekPreset('${jsq(p.id)}')">排進 ${who} 這週</button>
       </div>`).join('');
+  // 決策紀錄第 65 條：複製這個人自己另一週的課表（「這週和下週都改成跟第 3 週一樣」）。只有教練（跟複製別人的課表同一個門檻）。
+  // 目標＝畫面上這一週起連續幾週，按鈕上寫明實際是第幾週（不寫「這週」：在看別週時會搞不清楚）。
+  const totalWeeks = PlanData.plan.totalWeeks;
+  const srcSel = App.state.copySrcWeek;
+  const weekOpts = Array.from({ length: totalWeeks }, (_, i) => i + 1).map((n) => {
+    const a = PlanData.dateForWeekDay(n, 0), b = PlanData.dateForWeekDay(n, 6);
+    return `<option value="${n}" ${srcSel === n ? 'selected' : ''}>第 ${n} 週（${a.getMonth() + 1}/${a.getDate()}～${b.getMonth() + 1}/${b.getDate()}）</option>`;
+  }).join('');
+  const copyOwnRow = Store.canEditLibrary() ? `
+      <div class="preset-row">
+        <div class="preset-text"><span class="preset-lbl">複製 ${who} 另一週的課表</span>
+          <select class="copy-src" aria-label="要複製哪一週的課表" onchange="A.setCopySrcWeek(this.value)">
+            <option value="" ${srcSel ? '' : 'selected'}>選哪一週…</option>${weekOpts}
+          </select>
+        </div>
+        <div class="copy-targets">
+          <button type="button" class="copy-btn" ${srcSel ? '' : 'disabled'} onclick="A.copyOwnWeek(1)">複製到第 ${wn} 週</button>
+          ${wn < totalWeeks ? `<button type="button" class="copy-btn" ${srcSel ? '' : 'disabled'} onclick="A.copyOwnWeek(2)">複製到第 ${wn}～${wn + 1} 週</button>` : ''}
+        </div>
+      </div>` : '';
   return `
     <div class="card" style="margin-top:12px;border-color:var(--warn)">
       <div style="font-weight:700;font-size:12.5px;color:var(--warn);margin-bottom:10px">🛠 本週課表設定</div>
-      ${presetRows}
+      ${presetRows}${copyOwnRow}
       ${stale ? `<div class="banner warn" style="margin-bottom:10px">${ICON.warn}<div><b>這週的調整是基於舊版出廠課表（v${w.basePlanVersion || 3}）</b>出廠課表已更新到 v${PlanData.plan.planVersion}（例如走跑改成 Zone 2 跑），這週不會自動跟上。要套用新版請按下面「還原本週為出廠預設值」再重新調整。</div></div>` : ''}
       <div class="edit-form">
         <div class="row">

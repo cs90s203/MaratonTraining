@@ -97,6 +97,12 @@ function isRestOnlyDay(d) {
 // 複製課表比「換了之後有沒有變差」用（自主休息、更換項目是她標的，不在這裡比）
 const DAY_STATUS_RANK = { pending: 0, partial: 1, done: 2 };
 
+// 這天可以休息：整天都是休息，或二擇一裡有休息可以選。複製課表換了之後不能休息了，確認畫面要講（決策紀錄第 65 條，審查抓到：
+// 她把較早的週複製到後面，後面的休息日（或「完全休息 或 散步」那種可以選休息的日子）被換成要練的，跑量那一行完全看不出來）
+function canRest(d) {
+  return !!d && Array.isArray(d.items) && (isRestOnlyDay(d) || (!!d.selectOne && d.items.some((it) => it.type === 'rest')));
+}
+
 // 一週的顯示順序：identity＝出廠順序（週一顯示週一的內容...）。決策紀錄第 14 條：
 // 環境因素讓某天跟另一天對調時，用這個排列表示「日曆上的第 i 天，顯示的其實是
 // 出廠課表第 order[i] 天的內容」——課表項目一個字都沒改，只是重新標籤，所以不可能
@@ -1046,7 +1052,7 @@ const Store = {
   },
 
   // ── 複製課表（決策紀錄第 56 條，只有教練；第 64 條改成整週）────────────────────────────
-  // 把 from 的課表複製到 to。range：'week'（weekNumber 那一週）| 'future'（這週起到最後一週）。
+  // 把 from 的課表複製到 to。range：'week'（weekNumber 那一週）| 'future'（這週起到最後一週）| 數字 N（weekNumber 起連續 N 週，第 65 條）。
   // 第 64 條：整週都複製，包含這週已經過去的日子跟今天（她：「整週都複製」）。以前一律「明天起」——怕今天做過的課被換掉、
   // 打的勾對不上。現在跟預排課表（第 57 條）同一套：同一天名稱＋類型一樣的項目沿用 to 原本的 id，打過的勾留著；
   // 對不上的換新 id（不會把勾套到別的項目上），確認畫面照日期點名哪一天先選的／打過勾的會被換掉（lost）。
@@ -1068,6 +1074,11 @@ const Store = {
   },
   copyWeeksInRange(range, weekNumber) {
     const total = PlanData.plan.totalWeeks;
+    if (typeof range === 'number') { // 第 65 條：從 weekNumber 起連續 range 週（「這週和下週」）
+      const run = [];
+      for (let wn = weekNumber; wn < weekNumber + range && wn <= total; wn++) if (wn >= 1) run.push(wn);
+      return run;
+    }
     if (range === 'week') return weekNumber >= 1 && weekNumber <= total ? [weekNumber] : [];
     const loc = PlanData.locateToday();
     const first = loc.status === 'in-plan' ? loc.weekNumber : (loc.status === 'before-start' ? 1 : total + 1);
@@ -1075,29 +1086,40 @@ const Store = {
     for (let wn = first; wn <= total; wn++) out.push(wn);
     return out;
   },
-  copyPlanPreview(fromUserId, toUserId, range, weekNumber) {
+  // srcWeek（第 65 條）：不寫＝每一週照 fromUserId 同一週換；寫了＝每個目標週都照 fromUserId 的第 srcWeek 週換
+  //（「這週和下週都改成跟第 3 週一樣」）。這時 fromUserId 可以就是 toUserId 自己。
+  copyPlanPreview(fromUserId, toUserId, range, weekNumber, srcWeek) {
     const today = this.todayKey();
-    const out = { from: fromUserId, to: toUserId, range, today, inRange: [], weeks: [], skipped: [], lost: [], drops: [], statuses: [], reduced: [], changedDays: 0, ownEdited: 0, goalChanged: false, metricChanged: false };
+    const out = { from: fromUserId, to: toUserId, range, srcWeek: srcWeek || null, today, inRange: [], weeks: [], skipped: [], lost: [], drops: [], races: [], statuses: [], reduced: [], changedDays: 0, ownEdited: 0, goalChanged: false, metricChanged: false };
+    if (srcWeek && !(Number.isInteger(srcWeek) && srcWeek >= 1 && srcWeek <= PlanData.plan.totalWeeks)) return out;
     this.copyWeeksInRange(range, weekNumber).forEach((wn) => {
       out.inRange.push(wn);
       const adj = this.weekAdjustmentFor(wn, toUserId);
       if (adj && isValidDayOrder(adj.dayOrder) && adj.dayOrder.some((v, i) => v !== i)) { out.skipped.push(wn); return; }
-      const src = this.effectiveWeek(wn, fromUserId), dst = this.effectiveWeek(wn, toUserId);
+      const src = this.effectiveWeek(srcWeek || wn, fromUserId), dst = this.effectiveWeek(wn, toUserId);
       const dstOwn = this.planWeeks[toUserId] && this.planWeeks[toUserId][wn];
       const editors = (dstOwn && !dstOwn.isFactory && dstOwn.editedBy) || {};
       const changed = IDENTITY_ORDER.filter((di) => dayContentKey(src.days[di]) !== dayContentKey(dst.days[di]));
+      const newDays = {};
       changed.forEach((di) => {
         const key = PlanData.keyForWeekDay(wn, di);
         const e0 = this.entryFor(toUserId, key);
         const e = e0 && !e0.deleted ? e0 : null;
         const nd = this._copyDay(src.days[di], dst.days[di], di, e);
+        newDays[di] = nd;
         // 第 0 條（審查抓到）：換了之後這天看起來變差的都要點名——完成／部分完成往下掉（例如留著的勾在二擇一裡沒選到就不算）、
         // 過去跟今天的休息日變成要練的日子（只寫了附註也算：附註不是做完）
         if (!PlanData.isExpired(wn, di)) {
           const before = this._dayStatusFor(dst.days[di], e), after = this._dayStatusFor(nd, e);
           if (DAY_STATUS_RANK[after] < DAY_STATUS_RANK[before]) out.drops.push({ weekNumber: wn, dayIndex: di, kind: 'undone', from: before, to: after, future: key >= today });
           else if (key <= today && after === 'pending' && isRestOnlyDay(dst.days[di]) && !isRestOnlyDay(nd)) out.drops.push({ weekNumber: wn, dayIndex: di, kind: 'rest-to-training', today: key === today });
+          // 今天跟以後：這天原本可以休息，換了之後不能休息了＝負荷變多（第 0 條，審查抓到：以前只講今天跟過去的休息日，
+          // 下週的休息日被換成要練的、或「可以選休息」的日子沒了，完全不會講）
+          else if (key >= today && canRest(dst.days[di]) && !canRest(nd)) out.drops.push({ weekNumber: wn, dayIndex: di, kind: 'rest-lost', optional: !isRestOnlyDay(dst.days[di]), today: key === today });
         }
+        // 比賽日：換了之後多了一場比賽、或原本的比賽被拿掉（預計跑量不算比賽日，那一行看不出來；審查抓到）
+        const raceOld = ((dst.days[di] && dst.days[di].items) || []).find((it) => it.type === 'race'), raceNew = nd.items.find((it) => it.type === 'race');
+        if (!!raceOld !== !!raceNew) out.races.push({ weekNumber: wn, dayIndex: di, gone: !!raceOld, title: (raceOld || raceNew).title });
         if (!e) return;
         const newIds = new Set(nd.items.map((it) => it.id));
         const oldById = {};
@@ -1112,7 +1134,14 @@ const Store = {
       const fieldsChanged = WEEK_PLAN_FIELDS.filter((k) => stableJson(src[k] == null ? null : src[k]) !== stableJson(dst[k] == null ? null : dst[k]));
       if (!changed.length && !fieldsChanged.length) return;
       if (adj && adj.reduced) out.reduced.push(wn); // 她標了「本週已降量」：確認畫面講一聲
-      out.weeks.push({ weekNumber: wn, days: changed, fields: fieldsChanged });
+      // 預計跑量（課表加總）換之前、換之後：確認畫面講，讓她看得出這次複製會讓這週的跑量變多還是變少（第 0 條：變多的要看得到）。
+      // 目標跑量（教練自己訂的數字）也換的話，預計跑量照新的內容算，不看那個目標
+      const km = {
+        before: this.weekTargetAuto(wn, toUserId, { planOnly: true }),
+        after: this.weekTargetAuto(wn, toUserId, { planOnly: true, week: { ...dst, days: dst.days.map((d, di) => newDays[di] || d) } }),
+      };
+      const goal = fieldsChanged.includes('weeklyVolumeKm') ? { before: dst.weeklyVolumeKm || null, after: src.weeklyVolumeKm || null } : null;
+      out.weeks.push({ weekNumber: wn, days: changed, fields: fieldsChanged, km, goal });
       out.changedDays += changed.length;
       out.ownEdited += changed.filter((di) => editors[di] === toUserId).length;
       if (fieldsChanged.includes('weeklyVolumeKm')) out.goalChanged = true;
@@ -1124,11 +1153,12 @@ const Store = {
   // 照預覽存（每週一份，版本比對跟平常改課表同一條路）。回傳實際存了哪幾週、共幾天（結果提示照這個講，第 63 條）。
   applyCopyPlan(preview) {
     const res = { weeks: [], days: 0 };
-    if (!preview || !this.isCoach(this.activeUserId) || preview.from === preview.to) return res;
+    if (!preview || !this.isCoach(this.activeUserId) || (preview.from === preview.to && !preview.srcWeek)) return res;
+    if (preview.srcWeek && !(Number.isInteger(preview.srcWeek) && preview.srcWeek >= 1 && preview.srcWeek <= PlanData.plan.totalWeeks)) return res;
     const at = nowIso();
     preview.weeks.forEach(({ weekNumber: wn, days, fields }) => {
       if (!days.length && !fields.length) return;
-      const src = this.effectiveWeek(wn, preview.from);
+      const src = this.effectiveWeek(preview.srcWeek || wn, preview.from);
       const dst = this.effectiveWeek(wn, preview.to);
       const week = JSON.parse(JSON.stringify(dst));
       week.__baseUpdatedAt = this._planBase(wn, preview.to);
@@ -1718,7 +1748,7 @@ const Store = {
   weekTargetAuto(weekNumber, userId, opts) {
     const planOnly = !!(opts && opts.planOnly);
     const uid = userId || this.activeUserId;
-    const w = this.effectiveWeek(weekNumber, uid);
+    const w = (opts && opts.week) || this.effectiveWeek(weekNumber, uid); // opts.week：還沒存的內容（複製課表的預覽用）
     const pace = Number(PlanData.plan.timeBasedRunPaceMinPerKm) || 9;
     const order = planOnly ? IDENTITY_ORDER : this.effectiveDayOrder(weekNumber, uid);
     let min = 0, max = 0, timeBased = false;
