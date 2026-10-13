@@ -134,9 +134,9 @@ const fn = (name) => vm.runInContext(name, sandbox);
 
   // ── 第二輪審查 ──
   const realFetchCopyGuards = Sync.fetchCopyGuards; // 下面第 5 段會先換成假的
-  // 同一份課表放到兩週後（測試不管哪天跑，那週都在未來）
-  const TW = PlanData.locateToday().weekNumber;
-  const FW = Math.min(TW + 2, PlanData.plan.totalWeeks);
+  // 同一份課表放到另一週：互不相同、不是上面用的第 WN 週；今天之後的優先，計畫最後幾週不夠了就用前面的週
+  const cal = require('./lib/weeks')(PlanData);
+  const [FW, W6] = cal.pick(2, [WN]);
   const test = JSON.parse(JSON.stringify(preset));
   test.id = 'test-future'; test.weekNumber = FW; test.name = '測試週';
   PlanData.weekPresets.push(test);
@@ -165,23 +165,27 @@ const fn = (name) => vm.runInContext(name, sandbox);
   assert(tp.templates.breath && tp.templates.breath.item.type === 'recovery' && tp.templates.breath.id !== wrongStretch.id, 'library match needs the same name AND type');
   // 3. 明天以後她已經先記了東西的日子（例如先選了休息）也照排——以前整天不動，結果還是舊的「或」
   //   （使用者：「你怎麼沒有照我排的課表排？……不要擅自改成或」）；確認畫面照日期講會換掉什麼；本週已降量也講
-  const sunOld = Store.effectiveWeek(FW, 'Phoebe').days[6];
-  const restOpt = sunOld.items.find((it) => it.type === 'rest');
-  const sunKey = PlanData.keyForWeekDay(FW, 6);
-  if (restOpt) Store.mergeRemoteEntry('Phoebe', sunKey, { done: { [restOpt.id]: true }, selectedItemId: sunOld.selectOne ? restOpt.id : null, status: null, updatedAt: '2026-09-22T09:00:00.000Z', fieldAt: {} });
-  else Store.mergeRemoteEntry('Phoebe', sunKey, { done: {}, selectedItemId: null, status: 'rested', updatedAt: '2026-09-22T09:00:00.000Z', fieldAt: {} });
-  Store.weekAdjustments.Phoebe = { ...(Store.weekAdjustments.Phoebe || {}), [FW]: { reduced: true } };
-  let m2 = '';
-  sandbox.confirm = (m) => { m2 = m; return true; };
-  App.applyWeekPreset('test-future');
-  const sd = PlanData.dateForWeekDay(FW, 6);
-  const sunLabel = `週日（${sd.getMonth() + 1}/${sd.getDate()}）`;
-  assert(restOpt
-    ? m2.includes(`${sunLabel}Phoebe ${sunOld.selectOne ? '先選的' : ''}`) && m2.includes(`「${restOpt.title}」不在新的課表裡，會換成這份排的內容`)
-    : m2.includes(`${sunLabel}Phoebe 標了「自主休息」`), 'confirm names by date what she had arranged on that day');
-  assert(ftitles(6) === expected[6] && !Store.effectiveWeek(FW, 'Phoebe').days[6].selectOne, 'that day is scheduled exactly as written too (no leftover 「或」)');
-  assert(m2.includes(`Phoebe 標了第 ${FW} 週「本週已降量」`), 'confirm mentions 本週已降量');
-  assert(ftitles(0) === expected[0] && ftitles(5) === expected[5], 'the other days are applied');
+  if (cal.isFuture(FW)) { // 先記了東西的日子要在今天之後才是這段的情況（過去的日子 App 講法不同）；計畫最後一週沒有
+    const sunOld = Store.effectiveWeek(FW, 'Phoebe').days[6];
+    const restOpt = sunOld.items.find((it) => it.type === 'rest');
+    const sunKey = PlanData.keyForWeekDay(FW, 6);
+    if (restOpt) Store.mergeRemoteEntry('Phoebe', sunKey, { done: { [restOpt.id]: true }, selectedItemId: sunOld.selectOne ? restOpt.id : null, status: null, updatedAt: '2026-09-22T09:00:00.000Z', fieldAt: {} });
+    else Store.mergeRemoteEntry('Phoebe', sunKey, { done: {}, selectedItemId: null, status: 'rested', updatedAt: '2026-09-22T09:00:00.000Z', fieldAt: {} });
+    Store.weekAdjustments.Phoebe = { ...(Store.weekAdjustments.Phoebe || {}), [FW]: { reduced: true } };
+    let m2 = '';
+    sandbox.confirm = (m) => { m2 = m; return true; };
+    App.applyWeekPreset('test-future');
+    const sd = PlanData.dateForWeekDay(FW, 6);
+    const sunLabel = `週日（${sd.getMonth() + 1}/${sd.getDate()}）`;
+    // 二擇一的週日（第 1～16 週）她「選了」休息：確認畫面講「Phoebe 先選的」；純休息的週日（第 17 週起）她只是「打了勾」：講「打過勾的」，不帶名字
+    const lostLine = sunOld.selectOne ? `${sunLabel}Phoebe 先選的` : `${sunLabel}打過勾的`;
+    assert(restOpt
+      ? m2.includes(lostLine) && m2.includes(`「${restOpt.title}」不在新的課表裡，會換成這份排的內容`)
+      : m2.includes(`${sunLabel}Phoebe 標了「自主休息」`), 'confirm names by date what she had arranged on that day');
+    assert(ftitles(6) === expected[6] && !Store.effectiveWeek(FW, 'Phoebe').days[6].selectOne, 'that day is scheduled exactly as written too (no leftover 「或」)');
+    assert(m2.includes(`Phoebe 標了第 ${FW} 週「本週已降量」`), 'confirm mentions 本週已降量');
+    assert(ftitles(0) === expected[0] && ftitles(5) === expected[5], 'the other days are applied');
+  } else console.log(`SKIP: 第 ${FW} 週不在今天之後（先記了東西的日子照排那一段只看今天以後的日子）`);
   // 3b. 她給了影片的項目照她講的：庫裡同名同類型但影片不一樣的不拿來用、也不動她的庫；只寫名字的（useLibrary）才用庫裡的
   const alt = JSON.parse(JSON.stringify(test));
   alt.items.stretch.videoRefs = ['pamela-leg-stretch'];
@@ -194,7 +198,6 @@ const fn = (name) => vm.runInContext(name, sandbox);
   const sunInterval = Store.effectiveWeek(WN, 'Annlin').days[6].items.find((it) => it.type === 'interval');
   assert(sunInterval && sunInterval.duration && sunInterval.duration.min === 35 && PlanData.itemSegments(sunInterval).length === 3, 'interval has a time and her 400 m × 4 example');
   // 5. 複製課表：長跑計量單位不一樣時確認畫面要講
-  const W6 = Math.min(TW + 4, PlanData.plan.totalWeeks);
   const mk = App._cloneEffectiveWeek(W6, 'mick'); mk.longRunMetric = mk.longRunMetric === 'distance' ? 'time' : 'distance';
   Store.savePlanWeek('mick', W6, mk, { batch: true });
   const pm = Store.copyPlanPreview('mick', 'Phoebe', 'week', W6);

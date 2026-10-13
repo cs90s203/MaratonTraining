@@ -27,7 +27,8 @@ const J = (x) => JSON.stringify(x);
   Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushLibrary = () => {};
   const pushes = []; Store._cloudPushPlanWeek = (uid, wn, doc) => pushes.push(wn);
   Store.coachMode = true;
-  const W = PlanData.locateToday().weekNumber + 3;
+  const cal = require('./lib/weeks')(PlanData);
+  const W = cal.pick(2)[0]; // 這段用第一個、下面第 46 條那段用第二個（同一個沙盒，改到同一週會互相影響）；今天之後的優先，計畫最後幾週不夠了就往前補
   const dayIdx = Store.effectiveWeek(W).days.findIndex((d) => !d.selectOne && d.items.some((it) => it.type === 'run' && it.duration));
   const D = dayIdx;
   const card = (wn, di, id) => { const d = Store.effectiveWeek(wn).days[di]; const i = d.items.findIndex((x) => x.id === id); return fn('renderItemCard')(wn, di, d.items[i], i, d.items.length, null, !!d.selectOne, false); };
@@ -42,12 +43,12 @@ const J = (x) => JSON.stringify(x);
   const htmlEd = card(W, D, run.id);
   assert((htmlEd.match(/A\.setItemAmount\(/g) || []).length === 2 && htmlEd.includes(`value="${run.duration.min}"`) && htmlEd.includes('>分<'), 'double-tapped: two editable inputs');
   App.state.amountEdit = null;
-  const lr = PlanData.plan.weeks.flatMap((w) => w.days.flatMap((d, di) => d.items.map((it) => ({ w: w.weekNumber, di, it })))).find((x) => x.it.type === 'long-run' && x.it.distanceKm && !x.it.duration && x.w >= W);
+  const lr = PlanData.plan.weeks.flatMap((w) => w.days.flatMap((d, di) => d.items.map((it) => ({ w: w.weekNumber, di, it })))).find((x) => x.it.type === 'long-run' && x.it.distanceKm && !x.it.duration);
   App.state.amountEdit = { weekNumber: lr.w, dayIndex: lr.di, itemId: lr.it.id };
   const lrHtml = card(lr.w, lr.di, lr.it.id);
   App.state.amountEdit = null;
   assert(lrHtml.includes('data-amt="distanceKm"') && !lrHtml.includes('data-amt="duration"') && lrHtml.includes('>K<'), 'distance-only long run: the distance is the editable number');
-  const rest = PlanData.plan.weeks.flatMap((w) => w.days.flatMap((d, di) => d.items.map((it) => ({ w: w.weekNumber, di, it })))).find((x) => x.it.type === 'rest' && x.w >= W);
+  const rest = PlanData.plan.weeks.flatMap((w) => w.days.flatMap((d, di) => d.items.map((it) => ({ w: w.weekNumber, di, it })))).find((x) => x.it.type === 'rest');
   assert(!card(rest.w, rest.di, rest.it.id).includes('amt-edit'), 'rest item has no number inputs');
 
   // 存成常用：項目庫沒有 → 有按鈕
@@ -136,7 +137,7 @@ const J = (x) => JSON.stringify(x);
   if (so) {
     App.swapItemFromLibrary(so.w, so.di, so.d.items[0].id, t0.id);
     assert(Store.effectiveWeek(so.w).days[so.di].items.every((it) => !it.derived), 'select-one day: swap clears derived on both options');
-  }
+  } else console.log('SKIP: no select-one day with derived values from this week on (the plan is almost over)');
 
   // ── 今天以前的日子：跟其他日子一樣可以改（決策紀錄第 59 條，她：「為什麼週一不能跟其他天一樣教練模式修改內容？」）──
   const todayKey = PlanData.dayKey(PlanData.today());
@@ -195,7 +196,7 @@ const J = (x) => JSON.stringify(x);
   const { PlanData, Store, App } = sandbox;
   const fn = (name) => vm.runInContext(name, sandbox);
   Store.coachMode = true;
-  const W = PlanData.locateToday().weekNumber + 4;
+  const W = require('./lib/weeks')(PlanData).pick(2)[1];
   const D = Store.effectiveWeek(W).days.findIndex((d) => !d.selectOne && d.items.some((it) => it.type === 'run' && it.duration));
   const it = Store.effectiveWeek(W).days[D].items.find((x) => x.type === 'run' && x.duration);
   // 1. 點兩下才改

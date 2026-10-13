@@ -47,7 +47,9 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   }`, sandbox);
   Store._cloudPushPlanWeek = Sync.pushPlanWeek.bind(Sync);
   Store.coachMode = true;
-  const W = Math.min(PlanData.locateToday().weekNumber + 1, PlanData.plan.totalWeeks);
+  const cal = require('./lib/weeks')(PlanData);
+  // 每一段各用自己的一週（W、W2…W5），狀態才不會串；今天之後的優先，計畫最後幾週不夠了就往前補。上週留給最後「過去的一週」那段
+  const [W, W2, W3, W4, W5] = cal.pick(5, [cal.past(1)]);
   App.state.page = 'week'; App.state.weekViewNumber = W;
   const titles = (u, di) => Store.effectiveWeek(W, u).days[di].items.map((i) => i.title).join('+');
   const cloudDoc = (u) => sandbox.__remote[`users/${u}/planWeeks/${W}`];
@@ -68,7 +70,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   App.addItemFromLibrary(W, 0, tpl.id);
   await settle();
   const added = Store.effectiveWeek(W, 'Phoebe').days[0].items.slice(-1)[0];
-  App.moveItem(W, 0, added.id, -1);
+  for (let k = Store.effectiveWeek(W, 'Phoebe').days[0].items.length; k > 1; k--) App.moveItem(W, 0, added.id, -1); // 一路 ↑ 到最前面（賽週的週一是二擇一，本來就有兩個項目）
   App.saveItemNote(W, 1, Store.effectiveWeek(W, 'Phoebe').days[1].items[0].id, { value: '給 Annlin 看的備註' });
   await settle();
   const phoebeMon = titles('Phoebe', 0);
@@ -79,7 +81,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   assert(titles('Annlin', 0) === phoebeMon && Store.effectiveWeek(W, 'Annlin').days[1].items[0].coachNote === '給 Annlin 看的備註', 'copied: the item order within the day and the coach note both arrive');
   assert(cloudDoc('Annlin').days[1].items[0].coachNote === '給 Annlin 看的備註' && cloudDoc('Annlin').days[0].items[0].title === '伸展', 'and they are in Annlin\'s cloud copy (her phone sees them)');
   assert(sandbox.__alerts.length === 1 && /^已經把 Phoebe 的課表複製給 Annlin：第 \d+ 週，改了 \d+ 天。$/.test(sandbox.__alerts[0]), `after the cloud confirms, it says so: ${sandbox.__alerts[0]}`);
-  assert(sandbox.__confirms.slice(-1)[0].includes('整週都換') && !sandbox.__confirms.slice(-1)[0].includes('已經過去的日子'), 'confirm says the whole week is copied (a future week: no mention of past days)');
+  assert(sandbox.__confirms.slice(-1)[0].includes('整週都換') && sandbox.__confirms.slice(-1)[0].includes('已經過去的日子') === !cal.isFuture(W), 'confirm says the whole week is copied (a future week: no mention of past days; a past week: says so)');
 
   // ── 第 64 條：網路斷掉時存檔——畫面上的修改留著、講清楚、不會在下一次被誤判成「別人改過」──
   App.viewWeekOf('Phoebe');
@@ -186,7 +188,6 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   } else console.log('SKIP: today is not inside the plan');
 
   // ── 排在後面、照舊內容改的存檔，不能在衝突之後蓋掉別人的（審查抓到的回歸）──
-  const W2 = Math.min(W + 2, PlanData.plan.totalWeeks);
   App.state.weekViewNumber = W2;
   App.viewWeekOf('Annlin');
   App.saveItemNote(W2, 0, Store.effectiveWeek(W2, 'Annlin').days[0].items[0].id, { value: 'C0' });
@@ -245,7 +246,6 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   Sync.resubscribe = () => {};
 
   // ══ 審查第四輪：同步狀態卡住／講錯、修改沒存進去卻沒講 ══
-  const W3 = Math.min(W + 3, PlanData.plan.totalWeeks), W4 = Math.min(W + 4, PlanData.plan.totalWeeks);
   App.state.weekViewNumber = W3;
   const note = (wn, di, text) => App.saveItemNote(wn, di, Store.effectiveWeek(wn, 'Annlin').days[di].items[0].id, { value: text });
   const elsewhere = (wn) => { const d = { ...JSON.parse(JSON.stringify(sandbox.__remote[`users/Annlin/planWeeks/${wn}`] || { ...PlanData.week(wn), weekNumber: wn, userId: 'Annlin' })), updatedAt: `2099-04-0${wn % 9 + 1}T00:00:00.000Z` }; sandbox.__remote[`users/Annlin/planWeeks/${wn}`] = d; };
@@ -301,6 +301,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   App.state.weekViewNumber = W;
 
   // ── 複製會讓她的日子看起來變差的，確認畫面一天一天講（第 0 條，審查抓到）──
+  // 計畫最前面幾天（plan.expiredBefore 之前）是過期日，不計分，也就沒有「變差」可講：那幾天跳過（harness26 同樣的寫法）
   if (loc.status === 'in-plan') {
     const TW = loc.weekNumber, TD = loc.dayIndex;
     App.state.weekViewNumber = TW;
@@ -315,11 +316,11 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
     pw.days[TD] = { ...pw.days[TD], selectOne: true, items: [{ id: 'p-rest', type: 'rest', title: '完全休息' }, { ...runIt, id: 'p-run' }] };
     Store.savePlanWeek('Phoebe', TW, pw); await settle();
     const pv = Store.copyPlanPreview('Phoebe', 'Annlin', 'week', TW);
-    assert(pv.drops.some((x) => x.dayIndex === TD && x.kind === 'undone'), 'a day she finished that would become not-finished is flagged');
+    assert(PlanData.isExpired(TW, TD) || pv.drops.some((x) => x.dayIndex === TD && x.kind === 'undone'), 'a day she finished that would become not-finished is flagged');
     sandbox.confirm = (m) => { sandbox.__confirms.push(m); return false; }; // 看確認畫面就好，不真的複製
     await App.copyPlanFrom('Phoebe', 'week');
     const c = sandbox.__confirms.slice(-1)[0] || '';
-    assert(c.includes('Annlin 原本是「完成」，換成 Phoebe 的之後會變成「待完成」'), `and the confirm names it (today: 待完成, like the day card): ${c.split('\n').find((l) => l.includes('原本是')) || ''}`);
+    assert(PlanData.isExpired(TW, TD) || c.includes('Annlin 原本是「完成」，換成 Phoebe 的之後會變成「待完成」'), `and the confirm names it (today: 待完成, like the day card): ${c.split('\n').find((l) => l.includes('原本是')) || ''}`);
     // 過去的休息日（沒紀錄）變成要練的日子
     if (TD > 0) {
       const aw2 = App._cloneEffectiveWeek(TW, 'Annlin'); aw2.days[TD - 1] = { ...aw2.days[TD - 1], selectOne: false, items: [{ id: 'a-rest', type: 'rest', title: '完全休息' }] };
@@ -330,10 +331,10 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
       Store.savePlanWeek('Phoebe', TW, pw2); await settle();
       await App.copyPlanFrom('Phoebe', 'week');
       const c2 = sandbox.__confirms.slice(-1)[0] || '';
-      assert(c2.includes('原本是休息日，換成 Phoebe 的之後會變成要練的日子（沒有紀錄會顯示未完成）'), 'a past rest day turning into a training day is named too');
+      assert(PlanData.isExpired(TW, TD - 1) || c2.includes('原本是休息日，換成 Phoebe 的之後會變成要練的日子（沒有紀錄會顯示未完成）'), 'a past rest day turning into a training day is named too');
       // 審查抓到：那天只寫了附註（沒打勾）也一樣——附註不是做完
       Store.mergeRemoteEntry('Annlin', pk, { done: {}, selectedItemId: null, status: null, actualNote: '今天休息，只推嬰兒車散步', updatedAt: '2026-09-22T10:00:01.000Z', fieldAt: {} });
-      assert(Store.copyPlanPreview('Phoebe', 'Annlin', 'week', TW).drops.some((x) => x.dayIndex === TD - 1 && x.kind === 'rest-to-training'), 'a past rest day with only a note is still named');
+      assert(PlanData.isExpired(TW, TD - 1) || Store.copyPlanPreview('Phoebe', 'Annlin', 'week', TW).drops.some((x) => x.dayIndex === TD - 1 && x.kind === 'rest-to-training'), 'a past rest day with only a note is still named');
       // 審查抓到：部分完成的一天換成二擇一，留著的勾沒被選到就不算——「部分完成」往下掉也要講
       const aw3 = App._cloneEffectiveWeek(TW, 'Annlin');
       aw3.days[TD - 1] = { ...aw3.days[TD - 1], selectOne: false, items: [{ id: 'a-core', type: 'recovery', title: '核心', duration: { min: 10, max: 10 } }, { id: 'a-run3', type: 'run', title: '輕鬆跑', duration: { min: 30, max: 30 } }] };
@@ -344,7 +345,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
       Store.savePlanWeek('Phoebe', TW, pw3); await settle();
       await App.copyPlanFrom('Phoebe', 'week');
       const c3 = sandbox.__confirms.slice(-1)[0] || '';
-      assert(c3.includes('Annlin 原本是「部分完成」，換成 Phoebe 的之後會變成「未完成」'), `partial → not counted is named: ${c3.split('\n').find((l) => l.includes('部分完成')) || ''}`);
+      assert(PlanData.isExpired(TW, TD - 1) || c3.includes('Annlin 原本是「部分完成」，換成 Phoebe 的之後會變成「未完成」'), `partial → not counted is named: ${c3.split('\n').find((l) => l.includes('部分完成')) || ''}`);
     }
     // 審查抓到：今天是休息日、換成要練的，也要講（整週複製包含今天）
     {
@@ -355,7 +356,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
       Store.savePlanWeek('Phoebe', TW, pw4); await settle();
       await App.copyPlanFrom('Phoebe', 'week');
       const c4 = sandbox.__confirms.slice(-1)[0] || '';
-      assert(c4.includes('原本是休息日，換成 Phoebe 的之後會變成要練的日子（今天還沒練）'), 'today\'s rest day turning into a training day is named');
+      assert(PlanData.isExpired(TW, TD) || c4.includes('原本是休息日，換成 Phoebe 的之後會變成要練的日子（今天還沒練）'), 'today\'s rest day turning into a training day is named');
     }
     // 範圍的說法照實際（審查抓到）：整週都在過去的，不寫「包含今天」
     if (TW > 1) {
@@ -369,11 +370,10 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
     }
     sandbox.confirm = (m) => { sandbox.__confirms.push(m); return true; };
     App.state.weekViewNumber = W;
-  }
+  } else console.log('SKIP: today is not inside the plan (days that would look worse after copying)');
 
   // ══ 審查第五輪（重整之後）══
   {
-    const W5 = Math.min(W + 5, PlanData.plan.totalWeeks);
     App.state.weekViewNumber = W5;
     App.viewWeekOf('Annlin');
     const note5 = (di, text) => App.saveItemNote(W5, di, Store.effectiveWeek(W5, 'Annlin').days[di].items[0].id, { value: text });

@@ -80,62 +80,67 @@ const J = (x) => JSON.stringify(x);
 
   // ── 教練項目卡：只有圓圈能點 ──（用今天，不能用未來的日子——未來的圓圈是停用的，見第 31 條）
   const loc = PlanData.locateToday();
-  assert(loc.status === 'in-plan', 'harness needs today inside the plan, got ' + loc.status);
-  const TW = loc.weekNumber, TD = loc.dayIndex;
-  const card = vm.runInContext('renderItemCard', sandbox)(TW, TD, { id: 'c-x', type: 'run', title: 'Z2' }, 0, 2, null, false, false);
-  const itemOpen = card.match(/<div class="item [^"]*"[^>]*>/)[0];
-  assert(!itemOpen.includes('onclick'), 'coach item card container has no onclick');
-  assert(new RegExp(`<button type="button" class="item-check" onclick="A\\.toggleItem\\(${TW},${TD},'c-x'\\)"`).test(card), 'check circle is the toggle button');
-  const cardSel = vm.runInContext('renderItemCard', sandbox)(TW, TD, { id: 'c-y', type: 'run', title: 'Z2' }, 0, 2, null, true, false);
-  assert(new RegExp(`class="item-check" onclick="A\\.selectChoice\\(${TW},${TD},'c-y'\\)"`).test(cardSel), 'selectOne coach card: circle selects');
-  const cardExp = vm.runInContext('renderItemCard', sandbox)(1, 0, { id: 'c-z', type: 'run', title: 'Z2' }, 0, 2, null, false, true);
-  assert(!cardExp.includes('onclick="A.toggleItem') && cardExp.includes('<span class="item-check">'), 'expired card: circle is inert span');
+  if (loc.status !== 'in-plan') console.log('SKIP: today is not inside the plan (the coach cards and the 打勾 rules below are about today)');
+  else {
+    const TW = loc.weekNumber, TD = loc.dayIndex;
+    const card = vm.runInContext('renderItemCard', sandbox)(TW, TD, { id: 'c-x', type: 'run', title: 'Z2' }, 0, 2, null, false, false);
+    const itemOpen = card.match(/<div class="item [^"]*"[^>]*>/)[0];
+    assert(!itemOpen.includes('onclick'), 'coach item card container has no onclick');
+    assert(new RegExp(`<button type="button" class="item-check" onclick="A\\.toggleItem\\(${TW},${TD},'c-x'\\)"`).test(card), 'check circle is the toggle button');
+    const cardSel = vm.runInContext('renderItemCard', sandbox)(TW, TD, { id: 'c-y', type: 'run', title: 'Z2' }, 0, 2, null, true, false);
+    assert(new RegExp(`class="item-check" onclick="A\\.selectChoice\\(${TW},${TD},'c-y'\\)"`).test(cardSel), 'selectOne coach card: circle selects');
+    const cardExp = vm.runInContext('renderItemCard', sandbox)(1, 0, { id: 'c-z', type: 'run', title: 'Z2' }, 0, 2, null, false, true);
+    assert(!cardExp.includes('onclick="A.toggleItem') && cardExp.includes('<span class="item-check">'), 'expired card: circle is inert span');
 
-  // ── 第 31 條：未來的日子不能預先打勾，但誤觸的一定能取消 ──
-  const FW = TW + 1; // 下週同一天：一定是未來
-  const fKey = PlanData.keyForWeekDay(FW, TD);
-  assert(Store.isFutureKey(fKey) && !Store.isFutureKey(PlanData.keyForWeekDay(TW, TD)), 'isFutureKey: next week yes, today no');
-  // 找下週一個非二擇一、只有一個非休息項目的日子，跟一個二擇一有休息選項的日子
-  const fw = Store.effectiveWeek(FW);
-  const singleIdx = fw.days.findIndex((d) => !d.selectOne && d.items.length === 1 && d.items[0].type !== 'rest');
-  const choiceIdx = fw.days.findIndex((d) => d.selectOne && d.items.some((x) => x.type === 'rest') && d.items.some((x) => x.type !== 'rest'));
-  assert(singleIdx >= 0 && choiceIdx >= 0, 'found future single day and future rest-choice day');
-  const sKey = PlanData.keyForWeekDay(FW, singleIdx), sItem = fw.days[singleIdx].items[0];
-  const doneOf = (k, id) => { const e = Store.entryFor(Store.activeUserId, k); return !!(e && e.done && e.done[id]); };
-  assert(Store.toggleItemDone(sKey, sItem.id) === null && !doneOf(sKey, sItem.id), 'future: ticking a training item is refused');
-  Store.setActualStats(sKey, { distanceKm: 5 }, true);
-  assert(!doneOf(sKey, sItem.id), 'future: filling numbers does not auto-tick');
-  // 模擬誤觸留下的完成（舊版漏洞）：直接寫進去
-  Store._writeOwnEntry(sKey, { done: Store._fullDone(sKey, { [sItem.id]: true }), status: null }, true);
-  assert(doneOf(sKey, sItem.id), 'setup: future day stuck as done');
-  const stuckCard = vm.runInContext('renderDayRecordCard', sandbox)(FW, singleIdx, fw.days[singleIdx], Store.entryFor(Store.activeUserId, sKey), true);
-  assert(/class="rec-done on[^"]*"/.test(stuckCard) && stuckCard.includes('應該是誤觸了'), 'stuck future day shows the 完成 button (on) with an undo hint');
-  assert(stuckCard.includes('實際公里') || stuckCard.includes('實際時間'), 'future day shows number fields (decision 38)');
-  Store.toggleItemDone(sKey, sItem.id);
-  assert(!doneOf(sKey, sItem.id), 'future: un-ticking is always allowed');
-  const cleanCard = vm.runInContext('renderDayRecordCard', sandbox)(FW, singleIdx, fw.days[singleIdx], Store.entryFor(Store.activeUserId, sKey), true);
-  assert(!cleanCard.includes('class="rec-done'), 'future day not done → no 完成 button');
-  // 教練模式項目卡：未來沒勾的圓圈停用、勾了的可以點掉
-  const fCard = vm.runInContext('renderItemCard', sandbox)(FW, singleIdx, sItem, 0, 1, null, false, false);
-  assert(/<button type="button" class="item-check" disabled/.test(fCard) && !fCard.includes('A.toggleItem'), 'future coach card: unticked circle disabled');
-  const fCardDone = vm.runInContext('renderItemCard', sandbox)(FW, singleIdx, sItem, 0, 1, { done: { [sItem.id]: true } }, false, false);
-  assert(fCardDone.includes(`A.toggleItem(${FW},${singleIdx},'${sItem.id}')`), 'future coach card: ticked circle can be clicked off');
-  // 二擇一：未來只能預先選休息那一邊
-  const cKey = PlanData.keyForWeekDay(FW, choiceIdx), cDay = fw.days[choiceIdx];
-  const trainOpt = cDay.items.find((x) => x.type !== 'rest'), restOpt = cDay.items.find((x) => x.type === 'rest');
-  assert(Store.setSelectedItem(cKey, trainOpt.id) === null, 'future choice: picking the training option is refused');
-  assert(Store.setSelectedItem(cKey, restOpt.id) !== null && Store.entryFor(Store.activeUserId, cKey).selectedItemId === restOpt.id, 'future choice: pre-scheduling rest is allowed');
-  const choiceCard = vm.runInContext('renderDayRecordCard', sandbox)(FW, choiceIdx, cDay, Store.entryFor(Store.activeUserId, cKey), true);
-  assert(choiceCard.includes(`A.selectChoice(${FW},${choiceIdx},'${restOpt.id}')`) && !choiceCard.includes(`A.selectChoice(${FW},${choiceIdx},'${trainOpt.id}')`), 'future choice card: rest radio active, training radio disabled');
-  Store.setSelectedItem(cKey, restOpt.id);
-  assert(!Store.entryFor(Store.activeUserId, cKey).selectedItemId, 'future choice: un-selecting is allowed');
-  // 今天照常可以打勾
-  const tw = Store.effectiveWeek(TW).days[TD];
-  if (!tw.selectOne) {
-    const tKey = PlanData.keyForWeekDay(TW, TD);
-    Store.toggleItemDone(tKey, tw.items[0].id);
-    assert(doneOf(tKey, tw.items[0].id), 'today: ticking still works');
-    Store.toggleItemDone(tKey, tw.items[0].id);
+    const doneOf = (k, id) => { const e = Store.entryFor(Store.activeUserId, k); return !!(e && e.done && e.done[id]); };
+    const FW = TW + 1; // 下週同一天：一定是未來（計畫最後一週沒有下一週，那段印 SKIP）
+    if (FW > PlanData.plan.totalWeeks) console.log('SKIP: no week after this one (future-day ticking rules)');
+    else {
+      // ── 第 31 條：未來的日子不能預先打勾，但誤觸的一定能取消 ──
+      const fKey = PlanData.keyForWeekDay(FW, TD);
+      assert(Store.isFutureKey(fKey) && !Store.isFutureKey(PlanData.keyForWeekDay(TW, TD)), 'isFutureKey: next week yes, today no');
+      // 找下週一個非二擇一、只有一個非休息項目的日子，跟一個二擇一有休息選項的日子
+      const fw = Store.effectiveWeek(FW);
+      const singleIdx = fw.days.findIndex((d) => !d.selectOne && d.items.length === 1 && d.items[0].type !== 'rest');
+      const choiceIdx = fw.days.findIndex((d) => d.selectOne && d.items.some((x) => x.type === 'rest') && d.items.some((x) => x.type !== 'rest'));
+      assert(singleIdx >= 0 && choiceIdx >= 0, 'found future single day and future rest-choice day');
+      const sKey = PlanData.keyForWeekDay(FW, singleIdx), sItem = fw.days[singleIdx].items[0];
+      assert(Store.toggleItemDone(sKey, sItem.id) === null && !doneOf(sKey, sItem.id), 'future: ticking a training item is refused');
+      Store.setActualStats(sKey, { distanceKm: 5 }, true);
+      assert(!doneOf(sKey, sItem.id), 'future: filling numbers does not auto-tick');
+      // 模擬誤觸留下的完成（舊版漏洞）：直接寫進去
+      Store._writeOwnEntry(sKey, { done: Store._fullDone(sKey, { [sItem.id]: true }), status: null }, true);
+      assert(doneOf(sKey, sItem.id), 'setup: future day stuck as done');
+      const stuckCard = vm.runInContext('renderDayRecordCard', sandbox)(FW, singleIdx, fw.days[singleIdx], Store.entryFor(Store.activeUserId, sKey), true);
+      assert(/class="rec-done on[^"]*"/.test(stuckCard) && stuckCard.includes('應該是誤觸了'), 'stuck future day shows the 完成 button (on) with an undo hint');
+      assert(stuckCard.includes('實際公里') || stuckCard.includes('實際時間'), 'future day shows number fields (decision 38)');
+      Store.toggleItemDone(sKey, sItem.id);
+      assert(!doneOf(sKey, sItem.id), 'future: un-ticking is always allowed');
+      const cleanCard = vm.runInContext('renderDayRecordCard', sandbox)(FW, singleIdx, fw.days[singleIdx], Store.entryFor(Store.activeUserId, sKey), true);
+      assert(!cleanCard.includes('class="rec-done'), 'future day not done → no 完成 button');
+      // 教練模式項目卡：未來沒勾的圓圈停用、勾了的可以點掉
+      const fCard = vm.runInContext('renderItemCard', sandbox)(FW, singleIdx, sItem, 0, 1, null, false, false);
+      assert(/<button type="button" class="item-check" disabled/.test(fCard) && !fCard.includes('A.toggleItem'), 'future coach card: unticked circle disabled');
+      const fCardDone = vm.runInContext('renderItemCard', sandbox)(FW, singleIdx, sItem, 0, 1, { done: { [sItem.id]: true } }, false, false);
+      assert(fCardDone.includes(`A.toggleItem(${FW},${singleIdx},'${sItem.id}')`), 'future coach card: ticked circle can be clicked off');
+      // 二擇一：未來只能預先選休息那一邊
+      const cKey = PlanData.keyForWeekDay(FW, choiceIdx), cDay = fw.days[choiceIdx];
+      const trainOpt = cDay.items.find((x) => x.type !== 'rest'), restOpt = cDay.items.find((x) => x.type === 'rest');
+      assert(Store.setSelectedItem(cKey, trainOpt.id) === null, 'future choice: picking the training option is refused');
+      assert(Store.setSelectedItem(cKey, restOpt.id) !== null && Store.entryFor(Store.activeUserId, cKey).selectedItemId === restOpt.id, 'future choice: pre-scheduling rest is allowed');
+      const choiceCard = vm.runInContext('renderDayRecordCard', sandbox)(FW, choiceIdx, cDay, Store.entryFor(Store.activeUserId, cKey), true);
+      assert(choiceCard.includes(`A.selectChoice(${FW},${choiceIdx},'${restOpt.id}')`) && !choiceCard.includes(`A.selectChoice(${FW},${choiceIdx},'${trainOpt.id}')`), 'future choice card: rest radio active, training radio disabled');
+      Store.setSelectedItem(cKey, restOpt.id);
+      assert(!Store.entryFor(Store.activeUserId, cKey).selectedItemId, 'future choice: un-selecting is allowed');
+    }
+    // 今天照常可以打勾
+    const tw = Store.effectiveWeek(TW).days[TD];
+    if (!tw.selectOne) {
+      const tKey = PlanData.keyForWeekDay(TW, TD);
+      Store.toggleItemDone(tKey, tw.items[0].id);
+      assert(doneOf(tKey, tw.items[0].id), 'today: ticking still works');
+      Store.toggleItemDone(tKey, tw.items[0].id);
+    }
   }
 
   // ── 項目編輯表單：影片一列一個下拉 ──
@@ -153,10 +158,13 @@ const J = (x) => JSON.stringify(x);
   Store.coachMode = false;
 
   // ── 二擇一選項卡：只有圓圈能選 ──
-  // 找一個二擇一、還沒過期的日子
+  // 找一個二擇一、還沒過期的日子。這段看的是卡片的結構（未來的日子選不了訓練那邊，上面測過了），所以當成那天已經到了——
+  // 不然計畫剛開始的幾天，第一個二擇一日（第 1 週週日）還在未來，訓練那邊的圓圈是停用的，數起來少一個
+  const realIsFutureKey = Store.isFutureKey; Store.isFutureKey = () => false;
   let wn = null, di = null;
   for (const w of PlanData.plan.weeks) { const i = w.days.findIndex((d) => d.selectOne); if (i >= 0 && !PlanData.isExpired(w.weekNumber, i)) { wn = w.weekNumber; di = i; break; } }
   const rec = vm.runInContext('renderDayRecordCard', sandbox)(wn, di, Store.effectiveDay(wn, di), null, true);
+  Store.isFutureKey = realIsFutureKey;
   assert(!/<div class="rec-opt[^"]*"[^>]*onclick/.test(rec), 'rec-opt container has no onclick');
   assert((rec.match(/<button type="button" class="rec-radio" onclick="A\.selectChoice/g) || []).length === Store.effectiveDay(wn, di).items.length, 'each option has a radio button');
 

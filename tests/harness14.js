@@ -28,21 +28,24 @@ const J = (x) => JSON.stringify(x);
   Store.coachMode = true;
 
   // 決策紀錄第 50 條：教練拖曳＝兩天對調；這週也可以，今天以前的日子不行
-  const W = PlanData.locateToday().weekNumber + 1;
-  const before = Store.effectiveWeek(W).days.map((d) => d.items.map((it) => it.id).join('+'));
-  App.state.expandedDay = { weekNumber: W, dayIndex: 5 };
-  App.swapPlanWeekDays(W, 5, 1); // 週六跟週二對調
-  const after = Store.effectiveWeek(W);
-  assert(after.days[1].items.map((it) => it.id).join('+') === before[5] && after.days[5].items.map((it) => it.id).join('+') === before[1], 'Saturday and Tuesday exchanged');
-  assert([0, 2, 3, 4, 6].every((i) => after.days[i].items.map((it) => it.id).join('+') === before[i]), 'other days untouched (swap, not insert)');
-  assert(after.days.every((d, i) => d.dayIndex === i) && !!after.layoutAt, 'dayIndex renumbered, layoutAt stamped');
-  assert(pushedWeeks.length === 1 && pushedWeeks[0].wn === W && pushedWeeks[0].uid === 'mick', "Mick's own week saved (pushed to cloud)");
-  assert(J(App.state.expandedDay) === J({ weekNumber: W, dayIndex: 1 }), 'expanded row follows its content');
+  const cal = require('./lib/weeks')(sandbox.PlanData);
+  const W = cal.future(1), PW = cal.past(1); // 下週（整週在未來）、上週（整週在過去）。計畫最後一週沒有下週、第一週沒有上週，那幾段印 SKIP
+  if (W) {
+    const before = Store.effectiveWeek(W).days.map((d) => d.items.map((it) => it.id).join('+'));
+    App.state.expandedDay = { weekNumber: W, dayIndex: 5 };
+    App.swapPlanWeekDays(W, 5, 1); // 週六跟週二對調
+    const after = Store.effectiveWeek(W);
+    assert(after.days[1].items.map((it) => it.id).join('+') === before[5] && after.days[5].items.map((it) => it.id).join('+') === before[1], 'Saturday and Tuesday exchanged');
+    assert([0, 2, 3, 4, 6].every((i) => after.days[i].items.map((it) => it.id).join('+') === before[i]), 'other days untouched (swap, not insert)');
+    assert(after.days.every((d, i) => d.dayIndex === i) && !!after.layoutAt, 'dayIndex renumbered, layoutAt stamped');
+    assert(pushedWeeks.length === 1 && pushedWeeks[0].wn === W && pushedWeeks[0].uid === 'mick', "Mick's own week saved (pushed to cloud)");
+    assert(J(App.state.expandedDay) === J({ weekNumber: W, dayIndex: 1 }), 'expanded row follows its content');
+  } else console.log('SKIP: no week after this one (swapping days in a future week)');
 
   // 這週（已經開始）：今天以後的日子可以換；牽涉到今天要確認；今天以前不行
-  const TW = PlanData.locateToday().weekNumber, TD = PlanData.locateToday().dayIndex;
+  const { TW, TD } = cal;
   const todayKey = PlanData.dayKey(PlanData.today());
-  const futureA = [0, 1, 2, 3, 4, 5, 6].filter((i) => PlanData.keyForWeekDay(TW, i) > todayKey);
+  const futureA = cal.inPlan ? [0, 1, 2, 3, 4, 5, 6].filter((i) => PlanData.keyForWeekDay(TW, i) > todayKey) : [];
   if (futureA.length >= 2) {
     const b0 = Store.effectiveWeek(TW).days.map((d) => d.items.map((it) => it.id).join('+'));
     const n0 = pushedWeeks.length;
@@ -59,28 +62,38 @@ const J = (x) => JSON.stringify(x);
     App.swapPlanWeekDays(TW, TD, futureA[0]);
     assert(J(Store.effectiveWeek(TW).days.map((d) => d.items.map((it) => it.id))) !== b1, 'confirmed: today can be exchanged');
   }
-  const b2 = J(Store.effectiveWeek(1).days.map((d) => d.items.map((it) => it.id)));
-  const nA = sandbox.__alerts.length;
-  App.swapPlanWeekDays(1, 5, 3);
-  assert(J(Store.effectiveWeek(1).days.map((d) => d.items.map((it) => it.id))) === b2 && sandbox.__alerts.length === nA + 1 && sandbox.__alerts[nA].includes('今天以前'), 'past days cannot be exchanged');
+  if (PW) { // 上週：整週都在過去（不寫死第 1 週：計畫第一週時第 1 週就是這週）
+    const b2 = J(Store.effectiveWeek(PW).days.map((d) => d.items.map((it) => it.id)));
+    const nA = sandbox.__alerts.length;
+    App.swapPlanWeekDays(PW, 5, 3);
+    assert(J(Store.effectiveWeek(PW).days.map((d) => d.items.map((it) => it.id))) === b2 && sandbox.__alerts.length === nA + 1 && sandbox.__alerts[nA].includes('今天以前'), 'past days cannot be exchanged');
+  } else console.log('SKIP: no week before this one (past days cannot be exchanged)');
 
   // 畫面：過去的日子鎖住、沒有把手；今天以後有把手；說明是「對調」
   App.state.page = 'week';
-  App.state.weekViewNumber = 1;
-  const html1 = vm.runInContext('renderWeekPage', sandbox)(App.state);
-  assert(html1.includes('data-coach="1"') && (html1.match(/weekday-acc[^"]*locked/g) || []).length === 7 && !html1.includes('class="drag-handle"'), 'coach mode past week: all rows locked, no handles');
-  App.state.weekViewNumber = TW;
-  const htmlT = vm.runInContext('renderWeekPage', sandbox)(App.state);
-  const lockedT = [0, 1, 2, 3, 4, 5, 6].filter((i) => PlanData.keyForWeekDay(TW, i) < todayKey).length;
-  assert((htmlT.match(/weekday-acc[^"]*locked/g) || []).length === lockedT && (htmlT.match(/class="drag-handle"/g) || []).length === 7 - lockedT, 'coach mode current week: handles on today and later only');
-  App.state.weekViewNumber = W;
-  const html3 = vm.runInContext('renderWeekPage', sandbox)(App.state);
-  assert((html3.match(/class="drag-handle"/g) || []).length === 7 && html3.includes('兩天的課表直接對調') && html3.includes('Mick 的課表'), 'coach mode future week: 7 handles and the swap hint');
-  Store.coachMode = false;
-  App.state.weekViewNumber = W - 1;
-  const htmlUser = vm.runInContext('renderWeekPage', sandbox)(App.state);
-  assert(htmlUser.includes('data-coach="0"') && (htmlUser.match(/class="drag-handle"/g) || []).length === 7 && !htmlUser.includes('這週已經開始'), 'normal mode: this week still has personal drag handles');
-  Store.coachMode = true;
+  if (PW) {
+    App.state.weekViewNumber = PW;
+    const html1 = vm.runInContext('renderWeekPage', sandbox)(App.state);
+    assert(html1.includes('data-coach="1"') && (html1.match(/weekday-acc[^"]*locked/g) || []).length === 7 && !html1.includes('class="drag-handle"'), 'coach mode past week: all rows locked, no handles');
+  } else console.log('SKIP: no week before this one (past week rows are locked)');
+  if (cal.inPlan) {
+    App.state.weekViewNumber = TW;
+    const htmlT = vm.runInContext('renderWeekPage', sandbox)(App.state);
+    const lockedT = [0, 1, 2, 3, 4, 5, 6].filter((i) => PlanData.keyForWeekDay(TW, i) < todayKey).length;
+    assert((htmlT.match(/weekday-acc[^"]*locked/g) || []).length === lockedT && (htmlT.match(/class="drag-handle"/g) || []).length === 7 - lockedT, 'coach mode current week: handles on today and later only');
+  } else console.log('SKIP: today is not inside the plan (current week rows)');
+  if (W) {
+    App.state.weekViewNumber = W;
+    const html3 = vm.runInContext('renderWeekPage', sandbox)(App.state);
+    assert((html3.match(/class="drag-handle"/g) || []).length === 7 && html3.includes('兩天的課表直接對調') && html3.includes('Mick 的課表'), 'coach mode future week: 7 handles and the swap hint');
+  } else console.log('SKIP: no week after this one (future week rows)');
+  if (cal.inPlan) {
+    Store.coachMode = false;
+    App.state.weekViewNumber = TW;
+    const htmlUser = vm.runInContext('renderWeekPage', sandbox)(App.state);
+    assert(htmlUser.includes('data-coach="0"') && (htmlUser.match(/class="drag-handle"/g) || []).length === 7 && !htmlUser.includes('這週已經開始'), 'normal mode: this week still has personal drag handles');
+    Store.coachMode = true;
+  } else console.log('SKIP: today is not inside the plan (normal mode, this week)');
 
   // ── 複製：打開預填好的新內容，按存檔才建立 ──
   const tpl = Store.saveLibraryDoc(null, 'item', { name: '間歇 400', item: { type: 'interval', title: '間歇跑', duration: { min: 40, max: 40 }, segments: [{ kind: 'repeat', times: 4, steps: [{ kind: 'main', amount: { unit: 'm', min: 400, max: 400 }, zone: null, note: '' }] }] } });
@@ -131,25 +144,27 @@ const J = (x) => JSON.stringify(x);
   assert(vcopy && vcopy.linkType === 'none', 'saved video copy keeps linkType none');
 
   // ── 畫面停在舊排列時，別人搬過天：不照位置存 ──
-  const W4 = W + 1;
-  Store.markPlanSeen(); // 畫面畫好
-  const remote = JSON.parse(JSON.stringify(Store.effectiveWeek(W4)));
-  const [mv] = remote.days.splice(5, 1); remote.days.splice(2, 0, mv);
-  remote.days = remote.days.map((d, i) => ({ ...d, dayIndex: i }));
-  Store.mergeRemotePlanWeek('mick', W4, { ...remote, weekNumber: W4, updatedAt: '2026-09-14T12:00:00.000Z', layoutAt: '2026-09-14T12:00:00.000Z' }); // 另一台裝置搬了天，這台表單開著，沒重畫
-  const nPush2 = pushedWeeks.length, nAlert2 = sandbox.__alerts.length;
-  App.swapPlanWeekDays(W4, 3, 4);
-  assert(pushedWeeks.length === nPush2 && sandbox.__alerts.length === nAlert2 + 1 && sandbox.__alerts[nAlert2].includes('剛被別人搬動過'), 'stale screen: swap after someone else moved days is refused');
-  const noteBefore = J(Store.effectiveWeek(W4));
-  const wk = App._cloneEffectiveWeek(W4); wk.days[2].items[0].title = '改到錯的那天';
-  assert(Store.savePlanWeek('mick', W4, wk) === null && J(Store.effectiveWeek(W4)) === noteBefore, 'stale screen: any positional save is refused');
-  Store.markPlanSeen(); // 重畫之後
-  App.swapPlanWeekDays(W4, 3, 4);
-  assert(pushedWeeks.length === nPush2 + 1, 'after re-render the swap goes through');
-  const wk2 = App._cloneEffectiveWeek(W4); wk2.days[0].items[0].title = Store.effectiveWeek(W4).days[0].items[0].title;
-  assert(Store.savePlanWeek('mick', W4, wk2, { silent: true }) !== null, 'own consecutive save without re-render is not refused');
-  Store.resetPlanWeek('mick', W4);
-  assert(Store.savePlanWeek('mick', W4, App._cloneEffectiveWeek(W4)) !== null, 'own reset then save is not refused');
+  const W4 = cal.future(2); // 再下一週（整週在未來，換天才不會被擋）；W 就是下週，W4 要另一週。最後兩週沒有
+  if (W4) {
+    Store.markPlanSeen(); // 畫面畫好
+    const remote = JSON.parse(JSON.stringify(Store.effectiveWeek(W4)));
+    const [mv] = remote.days.splice(5, 1); remote.days.splice(2, 0, mv);
+    remote.days = remote.days.map((d, i) => ({ ...d, dayIndex: i }));
+    Store.mergeRemotePlanWeek('mick', W4, { ...remote, weekNumber: W4, updatedAt: '2026-09-14T12:00:00.000Z', layoutAt: '2026-09-14T12:00:00.000Z' }); // 另一台裝置搬了天，這台表單開著，沒重畫
+    const nPush2 = pushedWeeks.length, nAlert2 = sandbox.__alerts.length;
+    App.swapPlanWeekDays(W4, 3, 4);
+    assert(pushedWeeks.length === nPush2 && sandbox.__alerts.length === nAlert2 + 1 && sandbox.__alerts[nAlert2].includes('剛被別人搬動過'), 'stale screen: swap after someone else moved days is refused');
+    const noteBefore = J(Store.effectiveWeek(W4));
+    const wk = App._cloneEffectiveWeek(W4); wk.days[2].items[0].title = '改到錯的那天';
+    assert(Store.savePlanWeek('mick', W4, wk) === null && J(Store.effectiveWeek(W4)) === noteBefore, 'stale screen: any positional save is refused');
+    Store.markPlanSeen(); // 重畫之後
+    App.swapPlanWeekDays(W4, 3, 4);
+    assert(pushedWeeks.length === nPush2 + 1, 'after re-render the swap goes through');
+    const wk2 = App._cloneEffectiveWeek(W4); wk2.days[0].items[0].title = Store.effectiveWeek(W4).days[0].items[0].title;
+    assert(Store.savePlanWeek('mick', W4, wk2, { silent: true }) !== null, 'own consecutive save without re-render is not refused');
+    Store.resetPlanWeek('mick', W4);
+    assert(Store.savePlanWeek('mick', W4, App._cloneEffectiveWeek(W4)) !== null, 'own reset then save is not refused');
+  } else console.log('SKIP: fewer than two weeks left after this one (stale-screen day swaps need a second future week)');
 
   // ── 項目庫：新增常用項目的表單 ──
   App.state.libraryEdit = { kind: 'item', id: 'new', draft: null };

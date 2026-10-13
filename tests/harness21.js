@@ -25,7 +25,8 @@ const fn = (name) => vm.runInContext(name, sandbox);
   Store.activeUserId = 'mick'; Store.init(); Store._cloudPush = () => {}; Store._cloudPushLibrary = () => {};
   const pushes = []; Store._cloudPushPlanWeek = (uid, wn) => pushes.push(wn);
   Store.coachMode = true;
-  const W = PlanData.locateToday().weekNumber + 1;
+  const cal = require('./lib/weeks')(PlanData);
+  const W = cal.future(1) || cal.past(1); // 隨便一週（要有跑步的日子）：優先下週；最後一週、計畫結束後就用上週
   const D = Store.effectiveWeek(W).days.findIndex((d) => !d.selectOne && d.items.some((it) => it.type === 'run'));
   const it = Store.effectiveWeek(W).days[D].items.find((x) => x.type === 'run');
   const card = () => { const d = Store.effectiveWeek(W).days[D]; const i = d.items.findIndex((x) => x.id === it.id); return fn('renderItemCard')(W, D, d.items[i], i, d.items.length, null, false, false); };
@@ -67,7 +68,9 @@ const fn = (name) => vm.runInContext(name, sandbox);
 
   // ── 第 55 條：休息日可以加運動，加的是要做的（v0.26.3：她說「+ 就是一起、和的意思，不是二選一，也不是或」）──
   const isRestOnlyDay = fn('isRestOnlyDay');
-  const restRef = PlanData.plan.weeks.flatMap((w) => w.days.map((d, di) => ({ w: w.weekNumber, di, d }))).find((x) => x.w >= W && !x.d.selectOne && x.d.items.length === 1 && x.d.items[0].type === 'rest');
+  const todayKey = PlanData.dayKey(PlanData.today());
+  const restRef = PlanData.plan.weeks.flatMap((w) => w.days.map((d, di) => ({ w: w.weekNumber, di, d }))).find((x) => PlanData.keyForWeekDay(x.w, x.di) > todayKey && !x.d.selectOne && x.d.items.length === 1 && x.d.items[0].type === 'rest');
+  if (!restRef) { console.log('SKIP: no rest-only day left after today (the plan is almost over)'); return; }
   const RW = restRef.w, RD = restRef.di;
   const key = PlanData.keyForWeekDay(RW, RD);
   assert(isRestOnlyDay(Store.effectiveWeek(RW).days[RD]) && fn('dayStatusText')('pending', null, key, true) === '休息日', 'a day that is only rest still says 休息日');

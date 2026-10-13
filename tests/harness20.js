@@ -28,6 +28,7 @@ const fn = (name) => vm.runInContext(name, sandbox);
   Sync.user = { email: 'x@example.com' }; Sync.detectedUserId = 'mick';
   Sync.subscribeOtherEntries = (u) => subs.push('e:' + u); Sync.subscribeOtherWeekAdjustments = (u) => subs.push('w:' + u); Sync.subscribeOtherProfile = () => {};
   const loc = PlanData.locateToday();
+  if (loc.status !== 'in-plan') { console.log('SKIP: today is not inside the plan (this harness reads today\'s record)'); return; }
   const W = loc.weekNumber, TD = loc.dayIndex;
   const today = PlanData.keyForWeekDay(W, TD);
   // Annlin 今天做了第一項、填了數字跟附註；她自己把週一週三對調過
@@ -35,7 +36,8 @@ const fn = (name) => vm.runInContext(name, sandbox);
   Store.weekAdjustments.Annlin = { [W]: { dayOrder: [2, 1, 0, 3, 4, 5, 6] } };
   const annOrder = Store.effectiveDayOrder(W, 'Annlin');
   const shown = d0[annOrder[TD]];
-  Store.mergeRemoteEntry('Annlin', today, { done: { [shown.items[0].id]: true }, actualDistanceKm: 5.2, actualDurationMinutes: 33, effort: 4, actualNote: '後半段有點喘 <b>x</b>', status: null, selectedItemId: null, updatedAt: '2026-09-15T10:00:00.000Z', fieldAt: {} });
+  // 二擇一的日子（週日在第 1～16 週）勾要配「選了這一個」才算數；不是二擇一的日子沒有選這回事
+  Store.mergeRemoteEntry('Annlin', today, { done: { [shown.items[0].id]: true }, actualDistanceKm: 5.2, actualDurationMinutes: 33, effort: 4, actualNote: '後半段有點喘 <b>x</b>', status: null, selectedItemId: shown.selectOne ? shown.items[0].id : null, updatedAt: '2026-09-15T10:00:00.000Z', fieldAt: {} });
   // 自己今天標了身體狀況（不能出現在看別人的畫面）
   Store.setFlag && Store.setFlag(today, 'pain', true);
 

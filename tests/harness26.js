@@ -300,6 +300,10 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   assert(PlanData.isExpired(TW, TD) || ct.includes(`第 ${TW} 週週${PlanData.weekdayLabel(TD)}（`) && ct.includes('原本可以選休息'), 'today too: the rest option that goes away is named');
 
   // ── 比賽日：預計跑量不算比賽日，那一行看不出來，要另外講 ──
+  // 前面「她真正的情況」把第 3 週複製到 V、V+1（V＝這週）：今天在第 25、26 週時會蓋掉第 26 週（比賽那週），
+  // 下面比的就是一個已經沒有比賽的第 26 週。先把比賽那天還原成出廠的
+  edit('mick', total, (x) => { x.days[6] = JSON.parse(JSON.stringify(PlanData.week(total).days[6])); });
+  await settle();
   const raceItem = PlanData.week(total).days[6].items.find((i) => i.type === 'race');
   const rc = await asks(total, wT);
   assert(!!raceItem && rc.includes(`會變成比賽「${raceItem.title}」（第 ${total} 週週日有比賽）`), `copying the race week onto another week says a race appears: ${(rc.split('\n').find((l) => l.includes('比賽')) || '')}`);

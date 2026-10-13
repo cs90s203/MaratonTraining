@@ -27,7 +27,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
 
   // ── 第 49 條：週目標跑量 ──
   Store.coachMode = true;
-  const W = PlanData.locateToday().weekNumber + 2;
+  const W = require('./lib/weeks')(PlanData).pick(1)[0]; // 隨便一週：今天之後的優先，計畫最後一週沒有下週就用前面的
   const auto = Store.weekTargetAuto(W, 'mick', { planOnly: true });
   App.setWeeklyVolume(W, String(auto.max + 10), String(auto.max + 15));
   const vol = Store.weekVolume(W, 'mick');
@@ -89,7 +89,9 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
   await new Promise((r) => setTimeout(r, 300));
   const { Store, App, PlanData } = sandbox;
   Store.activeUserId = 'mick'; Store.coachMode = false;
-  App.state.page = 'week'; App.state.weekViewNumber = PlanData.locateToday().weekNumber;
+  const cal = require('./lib/weeks')(PlanData);
+  if (!cal.inPlan) { console.log('SKIP: today is not inside the plan (the week page for this week)'); return; }
+  App.state.page = 'week'; App.state.weekViewNumber = cal.TW;
   const page = vm.runInContext('renderWeekPage', sandbox)(App.state);
   assert(/class="vol-who[^"]*"[^>]*>Mick(<svg[^]*?<\/svg>)?<\/(span|button)>本週訓練目標/.test(page), 'week target heading starts with the current person (Mick)');
   Store.activeUserId = 'Annlin';
