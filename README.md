@@ -58,9 +58,17 @@ Port **8772** 已登記在 `~/Documents/Projects/CLAUDE.md` 的 Port 註冊表�
 改完程式先跑測試（node，不用裝任何套件；有任何一項失敗會回傳非 0）：
 
 ```bash
-./tests/run.sh                 # 程式行為（store／views／app）
+./tests/run.sh                 # 程式行為（store／views／app）：真實日期跑一遍，再把「今天」固定在幾個日子各跑一遍（約 1 分鐘）
+./tests/run.sh --quick         # 只跑真實日期（來回調整時用，幾秒）
 python3 tools/verify_plan.py   # 課表 JSON
 ```
+
+**測試的結果不能跟「哪天跑」有關。** harness 用 `PlanData.locateToday()` 排「這週」「今天」，以前結果會隨日子變：2026-10-12（週一）撞出三個失敗，一天一天掃下去，週日、12 月中、計畫最後幾週、計畫開始前和結束後又各撞出別的。現在：
+
+- `./tests/run.sh` 預設會再把今天固定在計畫上幾個容易出事的日子各跑一遍（計畫開始前一天、第 1 週週三、週一、週五、週日、12 月中、倒數幾週、最後一天、結束後一天）。日子從 `data/plan.json` 推出來、不寫死，每一天對應哪一種失敗寫在 `tests/lib/dates.js`。
+- **發版前、或改了跟日期有關的程式／測試之後**，一天一天掃一遍（約 15 分鐘）：`./tests/run.sh --scan 2026-09-06 2027-03-08`。一次只跑一個 node、不要平行——有幾個測試靠 20ms 的 `setTimeout` 等非同步做完，CPU 一忙會假失敗。重現單一支：`./tests/run.sh --on 2026-12-14 22`（把今天固定在那天、只跑 harness22）。
+- 固定今天的做法：`MARATHON_TODAY=YYYY-MM-DD node -r ./tests/lib/clock.js tests/harnessNN.js`。`Date` 換成「那天中午、每次呼叫 +1ms」（一定要往前走：`updatedAt` 重複會讓課表同步的版本比對失常），vm 沙盒裡也換；`tests/harness00.js` 確認它真的有生效。
+- 寫新測試：週次用 `tests/lib/weeks.js` 挑——`pick(n, avoid)` 給 n 個互不相同、不超過最後一週、不撞寫死用到的週；`future(k)`／`past(k)` 沒有那一週時回 `null`，要印 `SKIP:`，不要自己夾成別週；需要「整週在今天之後」的（換天、套用常用項目都只動今天以後的日子）先問 `isFuture`。計畫之外的日子（`locateToday().status !== 'in-plan'`）也印 SKIP，不要丟例外。前面的區塊改過的東西，後面的區塊開頭要放回去或避開。
 
 ## 部署
 
